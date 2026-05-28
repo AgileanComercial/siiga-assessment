@@ -1,4 +1,14 @@
 // ═══════════════════════════════════════════
+//  SUPABASE SETUP
+// ═══════════════════════════════════════════
+const SUPABASE_URL = 'https://ghtdfhupjoddfwiqzdpa.supabase.co';
+const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImdodGRmaHVwam9kZGZ3aXF6ZHBhIiwicm9sZSI6ImFub24iLCJpYXQiOjE3Nzk3MjY4MTYsImV4cCI6MjA5NTMwMjgxNn0.d0FDQk-P_xTWslTN2zIfxi8wNpxpf1Xwz5AhX3cnUnc';
+
+const supabase = (window.supabase && SUPABASE_URL !== 'YOUR_SUPABASE_URL_HERE') 
+  ? window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY) 
+  : null;
+
+// ═══════════════════════════════════════════
 //  STATE
 // ═══════════════════════════════════════════
 var S = {
@@ -2392,7 +2402,7 @@ function closeSaveModal() {
   document.getElementById('save-modal').style.display = 'none';
 }
 
-function confirmSave() {
+async function confirmSave() {
   var nome = document.getElementById('save-nome').value.trim() || 'Diagnóstico sem nome';
   var list = getAllDiagnosticos();
   var maxes = {f1:21,f2:12,f3:18,f4:12};
@@ -2426,6 +2436,39 @@ function confirmSave() {
   saveDiagnosticos(list);
   closeSaveModal();
   clearDraft();
+
+  // Enviar para o Supabase
+  if(supabase) {
+    try {
+      const { data, error } = await supabase.from('assessments').insert([{
+        id: record.id,
+        nome: record.nome,
+        empresa: record.empresa,
+        consultor: record.consultor,
+        contato: record.contato,
+        cargo: record.cargo,
+        email: record.email,
+        telefone: record.telefone,
+        data: record.data,
+        modelo_mo: record.modeloMO,
+        num_obras: record.numObras,
+        orcamento_medio: record.orcamentoMedio,
+        total_score: record.totalScore,
+        total_max: record.totalMax,
+        nivel: record.nivel,
+        scores: record.scores,
+        state: record.state
+      }]);
+      if(error) {
+        console.error("Erro ao salvar no Supabase:", error);
+      } else {
+        console.log("Salvo no Supabase com sucesso!");
+      }
+    } catch(err) {
+      console.error("Erro ao conectar com Supabase:", err);
+    }
+  }
+
   showToast('Diagnóstico salvo com sucesso!');
 }
 
