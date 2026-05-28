@@ -301,6 +301,30 @@ function fmtNumBare(n) {
   return Math.round(n)+'';
 }
 
+function maskPhone(input) {
+  let v = input.value.replace(/\D/g, '');
+  if (v.length > 11) v = v.slice(0, 11);
+  if (v.length > 2) {
+    v = '(' + v.substring(0,2) + ') ' + v.substring(2);
+  }
+  if (v.length > 10) {
+    v = v.substring(0,10) + '-' + v.substring(10);
+  } else if (v.length > 9) {
+    v = v.substring(0,9) + '-' + v.substring(9);
+  }
+  input.value = v;
+}
+
+function maskCapitalize(input) {
+  let words = input.value.split(' ');
+  for (let i = 0; i < words.length; i++) {
+    if (words[i].length > 0) {
+      words[i] = words[i].charAt(0).toUpperCase() + words[i].slice(1).toLowerCase();
+    }
+  }
+  input.value = words.join(' ');
+}
+
 // ═══════════════════════════════════════════
 //  COVER
 // ═══════════════════════════════════════════
