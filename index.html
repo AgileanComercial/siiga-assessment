@@ -51,15 +51,15 @@
       <div style="font-size:10px;text-transform:uppercase;letter-spacing:0.12em;color:var(--orange);font-weight:700;margin-bottom:10px">Dados do Prospect</div>
       <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px">
         <div><label style="font-size:10px;color:var(--gray2);text-transform:uppercase;letter-spacing:0.08em;display:block;margin-bottom:4px">Empresa</label>
-          <input class="text-input" id="c-empresa" placeholder="Nome da empresa"></div>
+          <input class="text-input" id="c-empresa" placeholder="Nome da empresa" oninput="this.value = this.value.toUpperCase()"></div>
         <div><label style="font-size:10px;color:var(--gray2);text-transform:uppercase;letter-spacing:0.08em;display:block;margin-bottom:4px">Contato / Prospect</label>
-          <input class="text-input" id="c-contato" placeholder="Nome do prospect"></div>
+          <input class="text-input" id="c-contato" placeholder="Nome do prospect" oninput="maskCapitalize(this)"></div>
         <div><label style="font-size:10px;color:var(--gray2);text-transform:uppercase;letter-spacing:0.08em;display:block;margin-bottom:4px">Cargo</label>
-          <input class="text-input" id="c-cargo" placeholder="Ex: Diretor de Engenharia"></div>
+          <input class="text-input" id="c-cargo" placeholder="Ex: Diretor de Engenharia" oninput="maskCapitalize(this)"></div>
         <div><label style="font-size:10px;color:var(--gray2);text-transform:uppercase;letter-spacing:0.08em;display:block;margin-bottom:4px">E-mail</label>
-          <input class="text-input" id="c-email" type="email" placeholder="email@empresa.com.br"></div>
+          <input class="text-input" id="c-email" type="email" placeholder="email@empresa.com.br" oninput="this.value = this.value.toLowerCase()"></div>
         <div style="grid-column:1/-1"><label style="font-size:10px;color:var(--gray2);text-transform:uppercase;letter-spacing:0.08em;display:block;margin-bottom:4px">Telefone</label>
-          <input class="text-input" id="c-telefone" placeholder="(85) 99999-9999" style="max-width:240px"></div>
+          <input class="text-input" id="c-telefone" placeholder="(85) 99999-9999" style="max-width:240px" oninput="maskPhone(this)"></div>
       </div>
     </div>
 
@@ -71,7 +71,7 @@
       <div style="font-size:10px;text-transform:uppercase;letter-spacing:0.12em;color:var(--gray2);font-weight:700;margin-bottom:10px">Dados do Consultor</div>
       <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px">
         <div><label style="font-size:10px;color:var(--gray2);text-transform:uppercase;letter-spacing:0.08em;display:block;margin-bottom:4px">Consultor Agilean</label>
-          <input class="text-input" id="c-consultor" placeholder="Seu nome"></div>
+          <input class="text-input" id="c-consultor" placeholder="Seu nome" oninput="maskCapitalize(this)"></div>
         <div><label style="font-size:10px;color:var(--gray2);text-transform:uppercase;letter-spacing:0.08em;display:block;margin-bottom:4px">Data</label>
           <input class="text-input" id="c-data" type="date"></div>
       </div>
