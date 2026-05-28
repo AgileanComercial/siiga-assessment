@@ -4,7 +4,7 @@
 const SUPABASE_URL = 'https://ghtdfhupjoddfwiqzdpa.supabase.co';
 const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImdodGRmaHVwam9kZGZ3aXF6ZHBhIiwicm9sZSI6ImFub24iLCJpYXQiOjE3Nzk3MjY4MTYsImV4cCI6MjA5NTMwMjgxNn0.d0FDQk-P_xTWslTN2zIfxi8wNpxpf1Xwz5AhX3cnUnc';
 
-const supabase = (window.supabase && SUPABASE_URL !== 'YOUR_SUPABASE_URL_HERE') 
+const supabaseClient = (window.supabase && SUPABASE_URL !== 'YOUR_SUPABASE_URL_HERE') 
   ? window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY) 
   : null;
 
@@ -2438,9 +2438,9 @@ async function confirmSave() {
   clearDraft();
 
   // Enviar para o Supabase
-  if(supabase) {
+  if(supabaseClient) {
     try {
-      const { data, error } = await supabase.from('assessments').insert([{
+      const { data, error } = await supabaseClient.from('assessments').insert([{
         id: record.id,
         nome: record.nome,
         empresa: record.empresa,
