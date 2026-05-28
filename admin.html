@@ -1,0 +1,275 @@
+<!DOCTYPE html>
+<html lang="pt-br">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Admin - Diagnóstico SIIGA</title>
+  
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
+
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+  
+  <style>
+    :root {
+      --bg: #0f1115;
+      --surface: #1a1d24;
+      --surface2: #252a33;
+      --orange: #ff5e1e;
+      --orange-hover: #ff7640;
+      --text: #ffffff;
+      --gray: #a1a6b0;
+      --border: rgba(255,255,255,0.08);
+      --font-display: 'Outfit', sans-serif;
+      --font-body: 'Inter', sans-serif;
+    }
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body {
+      background-color: var(--bg);
+      color: var(--text);
+      font-family: var(--font-body);
+      min-height: 100vh;
+      display: flex;
+      flex-direction: column;
+    }
+    header {
+      background: rgba(26, 29, 36, 0.8);
+      backdrop-filter: blur(12px);
+      border-bottom: 1px solid var(--border);
+      padding: 20px 40px;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      position: sticky;
+      top: 0;
+      z-index: 10;
+    }
+    h1 {
+      font-family: var(--font-display);
+      font-weight: 600;
+      font-size: 24px;
+    }
+    h1 span {
+      color: var(--orange);
+    }
+    main {
+      padding: 40px;
+      flex: 1;
+      max-width: 1400px;
+      margin: 0 auto;
+      width: 100%;
+    }
+    
+    /* Login Overlay */
+    #login-overlay {
+      position: fixed;
+      top: 0; left: 0; width: 100%; height: 100%;
+      background: var(--bg);
+      z-index: 100;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      flex-direction: column;
+    }
+    .login-box {
+      background: var(--surface);
+      padding: 40px;
+      border-radius: 16px;
+      border: 1px solid var(--border);
+      text-align: center;
+      width: 100%;
+      max-width: 400px;
+      box-shadow: 0 20px 40px rgba(0,0,0,0.4);
+    }
+    .input-pass {
+      width: 100%;
+      padding: 14px;
+      background: rgba(255,255,255,0.05);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      color: white;
+      font-size: 16px;
+      margin: 20px 0;
+      outline: none;
+      transition: 0.2s;
+    }
+    .input-pass:focus { border-color: var(--orange); }
+    .btn {
+      background: var(--orange);
+      color: white;
+      border: none;
+      padding: 12px 24px;
+      border-radius: 8px;
+      font-weight: 600;
+      cursor: pointer;
+      font-family: var(--font-display);
+      transition: 0.2s;
+    }
+    .btn:hover { background: var(--orange-hover); }
+
+    /* Table */
+    .table-container {
+      background: var(--surface);
+      border-radius: 12px;
+      border: 1px solid var(--border);
+      overflow: hidden;
+      margin-top: 20px;
+    }
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      text-align: left;
+    }
+    th, td {
+      padding: 16px 20px;
+      border-bottom: 1px solid var(--border);
+    }
+    th {
+      font-family: var(--font-display);
+      font-size: 12px;
+      text-transform: uppercase;
+      letter-spacing: 0.1em;
+      color: var(--gray);
+      background: rgba(255,255,255,0.02);
+      font-weight: 600;
+    }
+    td { font-size: 14px; }
+    tr:last-child td { border-bottom: none; }
+    tr:hover td { background: rgba(255,255,255,0.02); }
+
+    .btn-sm {
+      padding: 8px 16px;
+      font-size: 13px;
+      background: rgba(255,255,255,0.1);
+    }
+    .btn-sm:hover {
+      background: rgba(255,255,255,0.15);
+    }
+
+    /* Modal */
+    #details-modal {
+      display: none;
+      position: fixed;
+      top: 0; left: 0; width: 100%; height: 100%;
+      background: rgba(0,0,0,0.8);
+      backdrop-filter: blur(5px);
+      z-index: 50;
+      align-items: center;
+      justify-content: center;
+    }
+    .modal-content {
+      background: var(--surface);
+      width: 90%;
+      max-width: 800px;
+      height: 90vh;
+      border-radius: 16px;
+      border: 1px solid var(--border);
+      display: flex;
+      flex-direction: column;
+      overflow: hidden;
+    }
+    .modal-header {
+      padding: 20px;
+      border-bottom: 1px solid var(--border);
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+    .modal-body {
+      padding: 20px;
+      flex: 1;
+      overflow-y: auto;
+    }
+    .close-btn {
+      background: none; border: none; color: white;
+      font-size: 24px; cursor: pointer; opacity: 0.7;
+    }
+    .close-btn:hover { opacity: 1; }
+
+    pre {
+      background: rgba(0,0,0,0.3);
+      padding: 20px;
+      border-radius: 8px;
+      overflow-x: auto;
+      font-size: 13px;
+      color: #00ffaa;
+      line-height: 1.5;
+    }
+
+    .loader {
+      border: 3px solid rgba(255,255,255,0.1);
+      border-top-color: var(--orange);
+      border-radius: 50%;
+      width: 24px;
+      height: 24px;
+      animation: spin 1s linear infinite;
+      margin: 40px auto;
+    }
+    @keyframes spin { to { transform: rotate(360deg); } }
+  </style>
+</head>
+<body>
+
+  <!-- Login -->
+  <div id="login-overlay">
+    <div class="login-box">
+      <h2 style="font-family: var(--font-display); margin-bottom: 10px;">Acesso Restrito</h2>
+      <p style="color: var(--gray); font-size: 14px;">Insira a senha de administrador</p>
+      <input type="password" id="pass-input" class="input-pass" placeholder="Senha">
+      <button class="btn" style="width:100%" onclick="checkLogin()">Entrar</button>
+      <p id="login-error" style="color: #ff4444; font-size: 13px; margin-top: 15px; display: none;">Senha incorreta</p>
+    </div>
+  </div>
+
+  <header>
+    <h1>SIIGA <span>Admin</span></h1>
+    <button class="btn btn-sm" onclick="fetchData()">Atualizar Tabela</button>
+  </header>
+
+  <main>
+    <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:20px;">
+      <h2>Diagnósticos Recentes</h2>
+      <span style="color:var(--gray); font-size:14px" id="total-count">Carregando...</span>
+    </div>
+
+    <div class="table-container">
+      <table>
+        <thead>
+          <tr>
+            <th>Data</th>
+            <th>Empresa</th>
+            <th>Consultor</th>
+            <th>Contato</th>
+            <th>Telefone</th>
+            <th>Ações</th>
+          </tr>
+        </thead>
+        <tbody id="table-body">
+          <tr><td colspan="6" style="text-align:center"><div class="loader"></div></td></tr>
+        </tbody>
+      </table>
+    </div>
+  </main>
+
+  <!-- Modal Detalhes -->
+  <div id="details-modal">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h3 id="modal-title">Detalhes do Diagnóstico</h3>
+        <button class="close-btn" onclick="closeModal()">&times;</button>
+      </div>
+      <div class="modal-body">
+        <div id="modal-summary" style="margin-bottom:20px; display:grid; grid-template-columns: 1fr 1fr; gap:10px; font-size:14px;">
+          <!-- JS fills this -->
+        </div>
+        <h4 style="margin-bottom:10px; font-family:var(--font-display); color:var(--orange)">Dados Brutos (Respostas & Scores)</h4>
+        <pre id="modal-json"></pre>
+      </div>
+    </div>
+  </div>
+
+  <script src="admin.js"></script>
+</body>
+</html>
