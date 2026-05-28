@@ -337,31 +337,68 @@ function maskDate(input) {
 //  COVER
 // ═══════════════════════════════════════════
 function startAssessment() {
+  const empresaInput = document.getElementById('c-empresa');
+  const contatoInput = document.getElementById('c-contato');
+  const cargoInput = document.getElementById('c-cargo');
   const emailInput = document.getElementById('c-email');
   const telefoneInput = document.getElementById('c-telefone');
+  const consultorInput = document.getElementById('c-consultor');
   const dataInput = document.getElementById('c-data');
 
+  if (!empresaInput.value.trim()) {
+    alert("Por favor, informe a Empresa.");
+    empresaInput.focus();
+    return;
+  }
+  if (!contatoInput.value.trim()) {
+    alert("Por favor, informe o Contato / Prospect.");
+    contatoInput.focus();
+    return;
+  }
+  if (!cargoInput.value.trim()) {
+    alert("Por favor, informe o Cargo.");
+    cargoInput.focus();
+    return;
+  }
+  if (!emailInput.value.trim()) {
+    alert("Por favor, informe o E-mail.");
+    emailInput.focus();
+    return;
+  }
   if (emailInput.value && !emailInput.checkValidity()) {
     alert("Por favor, insira um e-mail válido.");
     emailInput.focus();
     return;
   }
-  
+  if (!telefoneInput.value.trim()) {
+    alert("Por favor, informe o Telefone.");
+    telefoneInput.focus();
+    return;
+  }
   if (telefoneInput.value && telefoneInput.value.length < 14) {
     alert("Por favor, insira um telefone válido com DDD (mínimo 10 dígitos).");
     telefoneInput.focus();
     return;
   }
-  
+  if (!consultorInput.value.trim()) {
+    alert("Por favor, informe o nome do Consultor Agilean.");
+    consultorInput.focus();
+    return;
+  }
+  if (!dataInput.value.trim()) {
+    alert("Por favor, informe a Data.");
+    dataInput.focus();
+    return;
+  }
   if (dataInput.value && dataInput.value.length < 10) {
     alert("Por favor, insira uma data válida no formato dd/mm/aaaa.");
     dataInput.focus();
     return;
   }
 
-  S.empresa = document.getElementById('c-empresa').value || 'Empresa';
-  S.consultor = document.getElementById('c-consultor').value || 'Consultor';
-  S.contato = document.getElementById('c-contato').value || '';
+  S.empresa = empresaInput.value.trim();
+  S.consultor = consultorInput.value.trim();
+  S.contato = contatoInput.value.trim();
   
   // Format Date from DD/MM/YYYY to YYYY-MM-DD for standardizing internal storage if it matches
   let dateVal = dataInput.value || '';
@@ -371,9 +408,9 @@ function startAssessment() {
   }
   S.data = dateVal || new Date().toISOString().split('T')[0];
   
-  S.cargo = document.getElementById('c-cargo') ? document.getElementById('c-cargo').value || '' : '';
-  S.email = emailInput.value || '';
-  S.telefone = telefoneInput.value || '';
+  S.cargo = cargoInput.value.trim();
+  S.email = emailInput.value.trim();
+  S.telefone = telefoneInput.value.trim();
   currentBlock = 'b0';
   currentQIdx = 0;
   renderB0();
