@@ -325,17 +325,55 @@ function maskCapitalize(input) {
   input.value = words.join(' ');
 }
 
+function maskDate(input) {
+  let v = input.value.replace(/\D/g, '');
+  if (v.length > 8) v = v.slice(0, 8);
+  if (v.length > 2) v = v.substring(0,2) + '/' + v.substring(2);
+  if (v.length > 5) v = v.substring(0,5) + '/' + v.substring(5);
+  input.value = v;
+}
+
 // ═══════════════════════════════════════════
 //  COVER
 // ═══════════════════════════════════════════
 function startAssessment() {
+  const emailInput = document.getElementById('c-email');
+  const telefoneInput = document.getElementById('c-telefone');
+  const dataInput = document.getElementById('c-data');
+
+  if (emailInput.value && !emailInput.checkValidity()) {
+    alert("Por favor, insira um e-mail válido.");
+    emailInput.focus();
+    return;
+  }
+  
+  if (telefoneInput.value && telefoneInput.value.length < 14) {
+    alert("Por favor, insira um telefone válido com DDD (mínimo 10 dígitos).");
+    telefoneInput.focus();
+    return;
+  }
+  
+  if (dataInput.value && dataInput.value.length < 10) {
+    alert("Por favor, insira uma data válida no formato dd/mm/aaaa.");
+    dataInput.focus();
+    return;
+  }
+
   S.empresa = document.getElementById('c-empresa').value || 'Empresa';
   S.consultor = document.getElementById('c-consultor').value || 'Consultor';
   S.contato = document.getElementById('c-contato').value || '';
-  S.data = document.getElementById('c-data').value || new Date().toISOString().split('T')[0];
+  
+  // Format Date from DD/MM/YYYY to YYYY-MM-DD for standardizing internal storage if it matches
+  let dateVal = dataInput.value || '';
+  if (dateVal && dateVal.length === 10) {
+    const parts = dateVal.split('/');
+    if (parts.length === 3) dateVal = `${parts[2]}-${parts[1]}-${parts[0]}`;
+  }
+  S.data = dateVal || new Date().toISOString().split('T')[0];
+  
   S.cargo = document.getElementById('c-cargo') ? document.getElementById('c-cargo').value || '' : '';
-  S.email = document.getElementById('c-email').value || '';
-  S.telefone = document.getElementById('c-telefone').value || '';
+  S.email = emailInput.value || '';
+  S.telefone = telefoneInput.value || '';
   currentBlock = 'b0';
   currentQIdx = 0;
   renderB0();

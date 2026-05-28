@@ -73,7 +73,7 @@
         <div><label style="font-size:10px;color:var(--gray2);text-transform:uppercase;letter-spacing:0.08em;display:block;margin-bottom:4px">Consultor Agilean</label>
           <input class="text-input" id="c-consultor" placeholder="Seu nome" oninput="maskCapitalize(this)"></div>
         <div><label style="font-size:10px;color:var(--gray2);text-transform:uppercase;letter-spacing:0.08em;display:block;margin-bottom:4px">Data</label>
-          <input class="text-input" id="c-data" type="date"></div>
+          <input class="text-input" id="c-data" type="text" placeholder="dd/mm/aaaa" oninput="maskDate(this)"></div>
       </div>
     </div>
     <button class="btn btn-p" style="width:100%;font-size:15px;padding:14px" onclick="startAssessment()">Iniciar Diagnóstico →</button>
