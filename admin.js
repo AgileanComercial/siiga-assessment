@@ -15,7 +15,7 @@ document.getElementById('pass-input').addEventListener('keypress', function (e) 
 function checkLogin() {
   const pass = document.getElementById('pass-input').value;
   // Senha simples definida via solicitação de segurança básica
-  if (pass === 'siigaadmin26') {
+  if (pass === '@Agilean2026') {
     document.getElementById('login-overlay').style.display = 'none';
     fetchData();
   } else {
