@@ -9,6 +9,9 @@
 <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script>
+function maskPhone(input){var d=input.value.replace(/\D/g,'');if(d.length>11)d=d.substring(0,11);var r='';if(d.length===0){r='';}else if(d.length<=2){r='('+d;}else if(d.length<=7){r='('+d.substring(0,2)+') '+d.substring(2);}else if(d.length<=10){r='('+d.substring(0,2)+') '+d.substring(2,6)+'-'+d.substring(6);}else{r='('+d.substring(0,2)+') '+d.substring(2,7)+'-'+d.substring(7);}input.value=r;}
+</script>
 <link rel="stylesheet" href="styles.css">
 </head>
 <body>
@@ -58,7 +61,7 @@
         <div><label style="font-size:10px;color:var(--gray2);text-transform:uppercase;letter-spacing:0.08em;display:block;margin-bottom:4px">E-mail</label>
           <input class="text-input" id="c-email" type="email" placeholder="email@empresa.com.br" oninput="this.value = this.value.toLowerCase()"></div>
         <div style="grid-column:1/-1"><label style="font-size:10px;color:var(--gray2);text-transform:uppercase;letter-spacing:0.08em;display:block;margin-bottom:4px">Telefone</label>
-          <input class="text-input" id="c-telefone" placeholder="(85) 99999-9999" style="max-width:240px" oninput="maskPhone(this)"></div>
+          <input class="text-input" id="c-telefone" placeholder="(85) 99999-9999" maxlength="15" style="max-width:240px" oninput="maskPhone(this)"></div>
       </div>
     </div>
 
@@ -1384,6 +1387,6 @@
   </div>
 </div>
 
-<script src="script.js?v=3"></script>
+<script src="script.js?v=5"></script>
 </body>
 </html>

@@ -302,17 +302,21 @@ function fmtNumBare(n) {
 }
 
 function maskPhone(input) {
-  let v = input.value.replace(/\D/g, '');
-  if (v.length > 11) v = v.slice(0, 11);
-  if (v.length > 2) {
-    v = '(' + v.substring(0,2) + ') ' + v.substring(2);
+  var digits = input.value.replace(/\D/g, '');
+  if (digits.length > 11) digits = digits.substring(0, 11);
+  var result = '';
+  if (digits.length === 0) {
+    result = '';
+  } else if (digits.length <= 2) {
+    result = '(' + digits;
+  } else if (digits.length <= 7) {
+    result = '(' + digits.substring(0, 2) + ') ' + digits.substring(2);
+  } else if (digits.length <= 10) {
+    result = '(' + digits.substring(0, 2) + ') ' + digits.substring(2, 6) + '-' + digits.substring(6);
+  } else {
+    result = '(' + digits.substring(0, 2) + ') ' + digits.substring(2, 7) + '-' + digits.substring(7);
   }
-  if (v.length > 10) {
-    v = v.substring(0,10) + '-' + v.substring(10);
-  } else if (v.length > 9) {
-    v = v.substring(0,9) + '-' + v.substring(9);
-  }
-  input.value = v;
+  input.value = result;
 }
 
 function maskCapitalize(input) {
