@@ -71,12 +71,8 @@ function maskPhone(input){var d=input.value.replace(/\D/g,'');if(d.length>11)d=d
     <!-- DADOS DO CONSULTOR -->
     <div style="width:100%;margin-bottom:20px;text-align:left">
       <div style="font-size:10px;text-transform:uppercase;letter-spacing:0.12em;color:var(--gray2);font-weight:700;margin-bottom:10px">Dados do Consultor</div>
-      <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px">
-        <div><label style="font-size:10px;color:var(--gray2);text-transform:uppercase;letter-spacing:0.08em;display:block;margin-bottom:4px">Consultor Agilean</label>
-          <input class="text-input" id="c-consultor" placeholder="Seu nome" oninput="maskCapitalize(this)"></div>
-        <div><label style="font-size:10px;color:var(--gray2);text-transform:uppercase;letter-spacing:0.08em;display:block;margin-bottom:4px">Data</label>
-          <input class="text-input" id="c-data" type="text" placeholder="dd/mm/aaaa" oninput="maskDate(this)"></div>
-      </div>
+      <div><label style="font-size:10px;color:var(--gray2);text-transform:uppercase;letter-spacing:0.08em;display:block;margin-bottom:4px">Consultor Agilean</label>
+        <input class="text-input" id="c-consultor" placeholder="Seu nome" oninput="maskCapitalize(this)"></div>
     </div>
     <button class="btn btn-p" style="width:100%;font-size:15px;padding:14px" onclick="startAssessment()">Iniciar Diagnóstico →</button>
     <p style="margin-top:10px;font-size:11px;color:var(--gray2)">Duração estimada: 45 min · Conduzido pelo consultor</p>

@@ -290,7 +290,7 @@ function renderTable() {
     var contato = getField(row, 'contato', 'contato') || '—';
     var telefone = getField(row, 'telefone', 'telefone') || '—';
 
-    var isChecked = selectedIds.indexOf(row.id) >= 0;
+    var isChecked = selectedIds.indexOf(String(row.id)) >= 0;
 
     var tr = document.createElement('tr');
     tr.style.cursor = 'pointer';
@@ -977,10 +977,11 @@ async function insertTestRecords() {
 //  SELECTION & EXPORT TO CSV
 // ═══════════════════════════════════════════
 function toggleRowSelect(checkbox, id) {
+  var strId = String(id);
   if (checkbox.checked) {
-    if (selectedIds.indexOf(id) < 0) selectedIds.push(id);
+    if (selectedIds.indexOf(strId) < 0) selectedIds.push(strId);
   } else {
-    selectedIds = selectedIds.filter(function(x) { return x !== id; });
+    selectedIds = selectedIds.filter(function(x) { return x !== strId; });
   }
   updateSelectAllCheckbox();
   updateExportButtonState();
@@ -988,10 +989,11 @@ function toggleRowSelect(checkbox, id) {
 
 function toggleSelectAll(masterCheckbox) {
   filteredData.forEach(function(row) {
+    var strId = String(row.id);
     if (masterCheckbox.checked) {
-      if (selectedIds.indexOf(row.id) < 0) selectedIds.push(row.id);
+      if (selectedIds.indexOf(strId) < 0) selectedIds.push(strId);
     } else {
-      selectedIds = selectedIds.filter(function(x) { return x !== row.id; });
+      selectedIds = selectedIds.filter(function(x) { return x !== strId; });
     }
   });
   renderTable();
@@ -1010,7 +1012,7 @@ function updateSelectAllCheckbox() {
   master.disabled = false;
   
   var allFilteredSelected = filteredData.every(function(row) {
-    return selectedIds.indexOf(row.id) >= 0;
+    return selectedIds.indexOf(String(row.id)) >= 0;
   });
   master.checked = allFilteredSelected;
 }
@@ -1050,7 +1052,7 @@ function exportSelectedCSV() {
   }
   
   var exportRows = allData.filter(function(row) {
-    return selectedIds.indexOf(row.id) >= 0;
+    return selectedIds.indexOf(String(row.id)) >= 0;
   });
   
   var headers = [
