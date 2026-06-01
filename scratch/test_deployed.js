@@ -1,6 +1,6 @@
 const fs = require('fs');
 
-// Mock a browser environment
+// Mock browser globals
 global.window = {
   scrollTo: (x, y) => { console.log('window.scrollTo called with:', x, y); },
   supabase: null
@@ -11,7 +11,6 @@ global.document = {
     return [];
   },
   getElementById: (id) => {
-    // console.log('document.getElementById called with:', id);
     if (id === 'c-empresa') return { value: 'CTAG CONSTRUÇÕES SERVIÇOS E IMÓ', focus: () => {} };
     if (id === 'c-contato') return { value: 'Lucas', focus: () => {} };
     if (id === 'c-cargo') return { value: 'Diretor', focus: () => {} };
@@ -41,18 +40,20 @@ global.localStorage = {
 global.navigator = {};
 global.location = {};
 
-// Load script.js
+// Load and evaluate deployed script.js
 try {
-  const code = fs.readFileSync('script.js', 'utf8');
-  eval(code);
-  console.log('Successfully evaluated script.js!');
+  const content = fs.readFileSync('C:\\Users\\Lucas Fernandes\\.gemini\\antigravity-ide\\brain\\3ac68998-bb90-485b-9289-2abb74b7dfb7\\.system_generated\\steps\\175\\content.md', 'utf8');
+  // Strip header up to '---'
+  const index = content.indexOf('---');
+  if (index === -1) throw new Error('Could not find separator ---');
+  const code = content.substring(index + 3);
   
-  // Try calling startAssessment
+  eval(code);
+  console.log('Successfully evaluated deployed script.js!');
+  
   if (typeof startAssessment === 'function') {
-    console.log('Calling startAssessment()...');
     startAssessment();
     console.log('Called startAssessment() successfully!');
-    console.log('State S is now:', JSON.stringify(S, null, 2));
   } else {
     console.error('startAssessment is not a function!');
   }
