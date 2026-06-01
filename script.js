@@ -302,17 +302,21 @@ function fmtNumBare(n) {
 }
 
 function maskPhone(input) {
-  let v = input.value.replace(/\D/g, '');
-  if (v.length > 11) v = v.slice(0, 11);
-  if (v.length > 2) {
-    v = '(' + v.substring(0,2) + ') ' + v.substring(2);
+  var digits = input.value.replace(/\D/g, '');
+  if (digits.length > 11) digits = digits.substring(0, 11);
+  var result = '';
+  if (digits.length === 0) {
+    result = '';
+  } else if (digits.length <= 2) {
+    result = '(' + digits;
+  } else if (digits.length <= 7) {
+    result = '(' + digits.substring(0, 2) + ') ' + digits.substring(2);
+  } else if (digits.length <= 10) {
+    result = '(' + digits.substring(0, 2) + ') ' + digits.substring(2, 6) + '-' + digits.substring(6);
+  } else {
+    result = '(' + digits.substring(0, 2) + ') ' + digits.substring(2, 7) + '-' + digits.substring(7);
   }
-  if (v.length > 10) {
-    v = v.substring(0,10) + '-' + v.substring(10);
-  } else if (v.length > 9) {
-    v = v.substring(0,9) + '-' + v.substring(9);
-  }
-  input.value = v;
+  input.value = result;
 }
 
 function maskCapitalize(input) {
@@ -343,7 +347,6 @@ function startAssessment() {
   const emailInput = document.getElementById('c-email');
   const telefoneInput = document.getElementById('c-telefone');
   const consultorInput = document.getElementById('c-consultor');
-  const dataInput = document.getElementById('c-data');
 
   if (!empresaInput.value.trim()) {
     alert("Por favor, informe a Empresa.");
@@ -385,28 +388,12 @@ function startAssessment() {
     consultorInput.focus();
     return;
   }
-  if (!dataInput.value.trim()) {
-    alert("Por favor, informe a Data.");
-    dataInput.focus();
-    return;
-  }
-  if (dataInput.value && dataInput.value.length < 10) {
-    alert("Por favor, insira uma data válida no formato dd/mm/aaaa.");
-    dataInput.focus();
-    return;
-  }
 
   S.empresa = empresaInput.value.trim();
   S.consultor = consultorInput.value.trim();
   S.contato = contatoInput.value.trim();
   
-  // Format Date from DD/MM/YYYY to YYYY-MM-DD for standardizing internal storage if it matches
-  let dateVal = dataInput.value || '';
-  if (dateVal && dateVal.length === 10) {
-    const parts = dateVal.split('/');
-    if (parts.length === 3) dateVal = `${parts[2]}-${parts[1]}-${parts[0]}`;
-  }
-  S.data = dateVal || new Date().toISOString().split('T')[0];
+  S.data = new Date().toISOString().split('T')[0];
   
   S.cargo = cargoInput.value.trim();
   S.email = emailInput.value.trim();
@@ -2449,7 +2436,7 @@ function resumeDraft() {
     document.getElementById('c-cargo').value    = S.cargo    || '';
     document.getElementById('c-email').value    = S.email    || '';
     document.getElementById('c-telefone').value = S.telefone || '';
-    document.getElementById('c-data').value     = S.data     || '';
+    if(document.getElementById('c-data')) document.getElementById('c-data').value = S.data || '';
   }
 
   // Navigate to where the user was
@@ -2718,4 +2705,4 @@ function importDiagnostico(input) {
 
 // Init
 checkAndOfferResume();
-document.getElementById('c-data').value = new Date().toISOString().split('T')[0];
+if(document.getElementById('c-data')) document.getElementById('c-data').value = new Date().toISOString().split('T')[0];

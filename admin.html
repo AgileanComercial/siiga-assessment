@@ -11,6 +11,7 @@
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
 
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
   
   <style>
     :root {
@@ -24,6 +25,10 @@
       --border: rgba(255,255,255,0.08);
       --font-display: 'Outfit', sans-serif;
       --font-body: 'Inter', sans-serif;
+      --green: #34d399;
+      --blue: #60a5fa;
+      --yellow: #fbbf24;
+      --red: #f87171;
     }
     * { margin: 0; padding: 0; box-sizing: border-box; }
     body {
@@ -57,7 +62,7 @@
     main {
       padding: 40px;
       flex: 1;
-      max-width: 1400px;
+      max-width: 1600px;
       margin: 0 auto;
       width: 100%;
     }
@@ -109,13 +114,90 @@
     }
     .btn:hover { background: var(--orange-hover); }
 
+    /* Filters */
+    .filters-bar {
+      display: flex;
+      gap: 12px;
+      flex-wrap: wrap;
+      align-items: center;
+      margin-bottom: 20px;
+      padding: 16px 20px;
+      background: var(--surface);
+      border-radius: 12px;
+      border: 1px solid var(--border);
+    }
+    .filter-input {
+      padding: 10px 14px;
+      background: rgba(255,255,255,0.05);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      color: white;
+      font-size: 13px;
+      font-family: var(--font-body);
+      outline: none;
+      transition: 0.2s;
+      min-width: 180px;
+    }
+    .filter-input:focus { border-color: var(--orange); }
+    .filter-input::placeholder { color: rgba(255,255,255,0.3); }
+    select.filter-input {
+      cursor: pointer;
+      min-width: 150px;
+      -webkit-appearance: none;
+      -moz-appearance: none;
+      appearance: none;
+      background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 12 12'%3E%3Cpath fill='%23a1a6b0' d='M6 8L1 3h10z'/%3E%3C/svg%3E");
+      background-repeat: no-repeat;
+      background-position: right 12px center;
+      padding-right: 32px;
+    }
+    .filter-label {
+      font-size: 11px;
+      text-transform: uppercase;
+      letter-spacing: 0.08em;
+      color: var(--gray);
+      font-weight: 600;
+    }
+    .filter-group {
+      display: flex;
+      flex-direction: column;
+      gap: 4px;
+    }
+
+    /* Stats */
+    .stats-row {
+      display: flex;
+      gap: 12px;
+      margin-bottom: 20px;
+      flex-wrap: wrap;
+    }
+    .stat-card {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 10px;
+      padding: 16px 20px;
+      flex: 1;
+      min-width: 120px;
+    }
+    .stat-card .stat-value {
+      font-family: var(--font-display);
+      font-size: 28px;
+      font-weight: 700;
+    }
+    .stat-card .stat-label {
+      font-size: 11px;
+      text-transform: uppercase;
+      letter-spacing: 0.08em;
+      color: var(--gray);
+      margin-top: 4px;
+    }
+
     /* Table */
     .table-container {
       background: var(--surface);
       border-radius: 12px;
       border: 1px solid var(--border);
-      overflow: hidden;
-      margin-top: 20px;
+      overflow-x: auto;
     }
     table {
       width: 100%;
@@ -123,21 +205,55 @@
       text-align: left;
     }
     th, td {
-      padding: 16px 20px;
+      padding: 14px 16px;
       border-bottom: 1px solid var(--border);
+      white-space: nowrap;
     }
     th {
       font-family: var(--font-display);
-      font-size: 12px;
+      font-size: 11px;
       text-transform: uppercase;
       letter-spacing: 0.1em;
       color: var(--gray);
       background: rgba(255,255,255,0.02);
       font-weight: 600;
+      position: sticky;
+      top: 0;
     }
-    td { font-size: 14px; }
+    td { font-size: 13px; }
     tr:last-child td { border-bottom: none; }
     tr:hover td { background: rgba(255,255,255,0.02); }
+
+    /* Dropdown menu */
+    .action-dropdown {
+      display: none;
+      position: absolute;
+      right: 16px;
+      top: 35px;
+      background: var(--surface2);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      box-shadow: 0 10px 20px rgba(0,0,0,0.5);
+      z-index: 90;
+      min-width: 140px;
+      padding: 6px 0;
+      overflow: hidden;
+    }
+    .action-dropdown a {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      padding: 10px 14px;
+      color: white;
+      font-size: 13px;
+      text-decoration: none;
+      transition: background 0.2s;
+      cursor: pointer;
+    }
+    .action-dropdown a:hover {
+      background: var(--orange);
+      color: white !important;
+    }
 
     .btn-sm {
       padding: 8px 16px;
@@ -148,45 +264,137 @@
       background: rgba(255,255,255,0.15);
     }
 
-    /* Modal */
+    /* Lead Score Badges */
+    .badge {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      padding: 4px 10px;
+      border-radius: 6px;
+      font-size: 12px;
+      font-weight: 700;
+      font-family: var(--font-display);
+      letter-spacing: 0.05em;
+    }
+    .badge-a {
+      background: rgba(52, 211, 153, 0.15);
+      color: var(--green);
+      border: 1px solid rgba(52, 211, 153, 0.3);
+    }
+    .badge-b {
+      background: rgba(96, 165, 250, 0.15);
+      color: var(--blue);
+      border: 1px solid rgba(96, 165, 250, 0.3);
+    }
+    .badge-c {
+      background: rgba(251, 191, 36, 0.15);
+      color: var(--yellow);
+      border: 1px solid rgba(251, 191, 36, 0.3);
+    }
+    .badge-none {
+      background: rgba(255,255,255,0.05);
+      color: var(--gray);
+      border: 1px solid var(--border);
+    }
+    .badge-nivel {
+      display: inline-block;
+      padding: 4px 10px;
+      border-radius: 6px;
+      font-size: 11px;
+      font-weight: 600;
+      font-family: var(--font-display);
+    }
+    .nivel-reativo { background: rgba(248,113,113,0.15); color: var(--red); border: 1px solid rgba(248,113,113,0.3); }
+    .nivel-construcao { background: rgba(251,191,36,0.15); color: var(--yellow); border: 1px solid rgba(251,191,36,0.3); }
+    .nivel-estruturado { background: rgba(96,165,250,0.15); color: var(--blue); border: 1px solid rgba(96,165,250,0.3); }
+    .nivel-referencia { background: rgba(52,211,153,0.15); color: var(--green); border: 1px solid rgba(52,211,153,0.3); }
+
+    /* Slide-over panel styles */
     #details-modal {
       display: none;
       position: fixed;
-      top: 0; left: 0; width: 100%; height: 100%;
-      background: rgba(0,0,0,0.8);
-      backdrop-filter: blur(5px);
-      z-index: 50;
-      align-items: center;
-      justify-content: center;
+      top: 0; right: 0; width: 100%; height: 100%;
+      background: rgba(15, 17, 21, 0.4);
+      backdrop-filter: blur(8px);
+      z-index: 100;
+      justify-content: flex-end;
+      align-items: stretch;
     }
     .modal-content {
       background: var(--surface);
-      width: 90%;
-      max-width: 800px;
-      height: 90vh;
-      border-radius: 16px;
-      border: 1px solid var(--border);
+      width: 100%;
+      max-width: 1100px;
+      height: 100%;
+      border-left: 1px solid var(--border);
+      border-radius: 0;
       display: flex;
       flex-direction: column;
       overflow: hidden;
+      box-shadow: -10px 0 30px rgba(0,0,0,0.5);
+      animation: slideIn 0.3s cubic-bezier(0.16, 1, 0.3, 1);
+    }
+    @keyframes slideIn {
+      from { transform: translateX(100%); }
+      to { transform: translateX(0); }
     }
     .modal-header {
-      padding: 20px;
+      padding: 24px 30px;
       border-bottom: 1px solid var(--border);
       display: flex;
       justify-content: space-between;
       align-items: center;
+      background: rgba(26, 29, 36, 0.5);
     }
     .modal-body {
-      padding: 20px;
+      padding: 30px;
       flex: 1;
       overflow-y: auto;
     }
     .close-btn {
       background: none; border: none; color: white;
-      font-size: 24px; cursor: pointer; opacity: 0.7;
+      font-size: 28px; cursor: pointer; opacity: 0.6;
+      line-height: 1; transition: 0.2s;
     }
-    .close-btn:hover { opacity: 1; }
+    .close-btn:hover { opacity: 1; transform: scale(1.1); }
+
+    /* Layout columns inside detail view */
+    .detail-layout {
+      display: grid;
+      grid-template-columns: 1.25fr 1fr;
+      gap: 30px;
+    }
+    @media (max-width: 992px) {
+      .detail-layout {
+        grid-template-columns: 1fr;
+        gap: 20px;
+      }
+    }
+
+    .detail-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 12px;
+      margin-bottom: 24px;
+    }
+    .detail-item {
+      padding: 12px 14px;
+      background: rgba(255,255,255,0.03);
+      border-radius: 8px;
+      border: 1px solid var(--border);
+    }
+    .detail-item label {
+      display: block;
+      font-size: 10px;
+      text-transform: uppercase;
+      letter-spacing: 0.08em;
+      color: var(--gray);
+      margin-bottom: 4px;
+      font-weight: 600;
+    }
+    .detail-item span {
+      font-size: 14px;
+      font-weight: 500;
+    }
 
     pre {
       background: rgba(0,0,0,0.3);
@@ -208,6 +416,14 @@
       margin: 40px auto;
     }
     @keyframes spin { to { transform: rotate(360deg); } }
+
+    @media (max-width: 768px) {
+      main { padding: 16px; }
+      header { padding: 16px 20px; }
+      .filters-bar { flex-direction: column; }
+      .filter-input { width: 100%; min-width: unset; }
+      .stats-row { flex-direction: column; }
+    }
   </style>
 </head>
 <body>
@@ -225,51 +441,200 @@
 
   <header>
     <h1>SIIGA <span>Admin</span></h1>
-    <button class="btn btn-sm" onclick="fetchData()">Atualizar Tabela</button>
+    <div style="display: flex; gap: 10px; align-items: center;">
+      <button class="btn btn-sm" id="btn-test" onclick="insertTestRecords()" style="background: var(--surface2); border: 1px solid var(--border);">＋ Inserir Testes</button>
+      <button class="btn btn-sm" onclick="fetchData()">⟳ Atualizar</button>
+    </div>
   </header>
 
   <main>
-    <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:20px;">
-      <h2>Diagnósticos Recentes</h2>
-      <span style="color:var(--gray); font-size:14px" id="total-count">Carregando...</span>
+    <!-- Stats Cards -->
+    <div class="stats-row" id="stats-row">
+      <div class="stat-card">
+        <div class="stat-value" id="stat-total">—</div>
+        <div class="stat-label">Total</div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-value" style="color:var(--green)" id="stat-a">—</div>
+        <div class="stat-label">Score A</div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-value" style="color:var(--blue)" id="stat-b">—</div>
+        <div class="stat-label">Score B</div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-value" style="color:var(--yellow)" id="stat-c">—</div>
+        <div class="stat-label">Score C</div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-value" style="color:var(--gray)" id="stat-none">—</div>
+        <div class="stat-label">Sem Score</div>
+      </div>
     </div>
 
+    <!-- Filters -->
+    <div class="filters-bar">
+      <div class="filter-group" style="flex:2;min-width:200px">
+        <label class="filter-label">Buscar</label>
+        <input type="text" class="filter-input" id="filter-search" placeholder="Empresa, consultor, contato..." oninput="applyFilters()">
+      </div>
+      <div class="filter-group">
+        <label class="filter-label">Lead Score</label>
+        <select class="filter-input" id="filter-score" onchange="applyFilters()">
+          <option value="">Todos</option>
+          <option value="A">Score A</option>
+          <option value="B">Score B</option>
+          <option value="C">Score C</option>
+          <option value="-">Sem score</option>
+        </select>
+      </div>
+      <div class="filter-group">
+        <label class="filter-label">Nível</label>
+        <select class="filter-input" id="filter-nivel" onchange="applyFilters()">
+          <option value="">Todos</option>
+          <option value="Reativo">Reativo</option>
+          <option value="Em Construção">Em Construção</option>
+          <option value="Estruturado">Estruturado</option>
+          <option value="Referência SIIGA">Referência</option>
+        </select>
+      </div>
+      <div class="filter-group">
+        <label class="filter-label">Consultor</label>
+        <select class="filter-input" id="filter-consultor" onchange="applyFilters()">
+          <option value="">Todos</option>
+        </select>
+      </div>
+    </div>
+
+    <!-- Results count -->
+    <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:12px;">
+      <span style="color:var(--gray); font-size:13px" id="total-count">Carregando...</span>
+      <div style="display:flex; gap:10px;">
+        <button class="btn btn-sm" id="btn-delete-selected" onclick="deleteSelected()" style="background: rgba(248, 113, 113, 0.15); color: var(--red); border: 1px solid rgba(248, 113, 113, 0.3); font-weight: 600; opacity: 0.5; pointer-events: none; transition: 0.2s;">🗑️ Excluir Selecionados</button>
+        <button class="btn btn-sm" id="btn-export" onclick="exportSelectedCSV()" style="background: rgba(52, 211, 153, 0.15); color: var(--green); border: 1px solid rgba(52, 211, 153, 0.3); font-weight: 600; opacity: 0.5; pointer-events: none; transition: 0.2s;">📥 Exportar Selecionados (CSV)</button>
+      </div>
+    </div>
+
+    <!-- Table -->
     <div class="table-container">
       <table>
         <thead>
           <tr>
+            <th style="width: 40px; text-align: center;"><input type="checkbox" id="check-all" onchange="toggleSelectAll(this)" style="cursor:pointer;"></th>
+            <th>Score</th>
             <th>Data</th>
             <th>Empresa</th>
             <th>Consultor</th>
             <th>Contato</th>
             <th>Telefone</th>
-            <th>Ações</th>
+            <th>Nível</th>
+            <th style="text-align: center;">Ações</th>
           </tr>
         </thead>
         <tbody id="table-body">
-          <tr><td colspan="6" style="text-align:center"><div class="loader"></div></td></tr>
+          <tr><td colspan="9" style="text-align:center"><div class="loader"></div></td></tr>
         </tbody>
       </table>
     </div>
   </main>
 
-  <!-- Modal Detalhes -->
+  <!-- Slide-over Detalhes -->
   <div id="details-modal">
     <div class="modal-content">
       <div class="modal-header">
-        <h3 id="modal-title">Detalhes do Diagnóstico</h3>
+        <div>
+          <h2 id="modal-title" style="font-family: var(--font-display); font-weight: 700; font-size: 22px; color: var(--orange);">Nome da Empresa</h2>
+          <p id="modal-subtitle" style="font-size: 13px; color: var(--gray); margin-top: 4px;">Detalhes completos do diagnóstico e lead scoring</p>
+        </div>
         <button class="close-btn" onclick="closeModal()">&times;</button>
       </div>
-      <div class="modal-body">
-        <div id="modal-summary" style="margin-bottom:20px; display:grid; grid-template-columns: 1fr 1fr; gap:10px; font-size:14px;">
-          <!-- JS fills this -->
         </div>
-        <h4 style="margin-bottom:10px; font-family:var(--font-display); color:var(--orange)">Dados Brutos (Respostas & Scores)</h4>
-        <pre id="modal-json"></pre>
       </div>
     </div>
   </div>
 
-  <script src="admin.js"></script>
+  <!-- Modal Editar -->
+  <div id="edit-modal" style="display:none; position:fixed; top:0; left:0; width:100%; height:100%; background:rgba(0,0,0,0.8); backdrop-filter:blur(5px); z-index:110; align-items:center; justify-content:center;">
+    <div class="login-box" style="max-width: 500px; text-align: left; background: var(--surface); border: 1px solid var(--border); border-radius: 12px; padding: 30px; box-shadow: 0 20px 40px rgba(0,0,0,0.5);">
+      <h3 style="font-family: var(--font-display); color: var(--orange); margin-bottom: 20px; font-size: 18px; font-weight: 700;">Editar Dados do Prospect</h3>
+      <input type="hidden" id="edit-id">
+      
+      <div style="margin-bottom:12px;">
+        <label style="font-size:10px; text-transform:uppercase; color:var(--gray); display:block; margin-bottom:4px; font-weight:600; letter-spacing:0.05em;">Empresa</label>
+        <input type="text" id="edit-empresa" class="filter-input" style="width:100%;">
+      </div>
+      <div style="display:grid; grid-template-columns:1fr 1fr; gap:10px; margin-bottom:12px;">
+        <div>
+          <label style="font-size:10px; text-transform:uppercase; color:var(--gray); display:block; margin-bottom:4px; font-weight:600; letter-spacing:0.05em;">Contato</label>
+          <input type="text" id="edit-contato" class="filter-input" style="width:100%;">
+        </div>
+        <div>
+          <label style="font-size:10px; text-transform:uppercase; color:var(--gray); display:block; margin-bottom:4px; font-weight:600; letter-spacing:0.05em;">Cargo</label>
+          <input type="text" id="edit-cargo" class="filter-input" style="width:100%;">
+        </div>
+      </div>
+      <div style="display:grid; grid-template-columns:1fr 1fr; gap:10px; margin-bottom:12px;">
+        <div>
+          <label style="font-size:10px; text-transform:uppercase; color:var(--gray); display:block; margin-bottom:4px; font-weight:600; letter-spacing:0.05em;">E-mail</label>
+          <input type="email" id="edit-email" class="filter-input" style="width:100%;">
+        </div>
+        <div>
+          <label style="font-size:10px; text-transform:uppercase; color:var(--gray); display:block; margin-bottom:4px; font-weight:600; letter-spacing:0.05em;">Telefone</label>
+          <input type="text" id="edit-telefone" class="filter-input" style="width:100%;" oninput="maskPhone(this)">
+        </div>
+      </div>
+      <div style="display:grid; grid-template-columns:1fr 1fr; gap:10px; margin-bottom:12px;">
+        <div>
+          <label style="font-size:10px; text-transform:uppercase; color:var(--gray); display:block; margin-bottom:4px; font-weight:600; letter-spacing:0.05em;">Consultor</label>
+          <input type="text" id="edit-consultor" class="filter-input" style="width:100%;">
+        </div>
+        <div>
+          <label style="font-size:10px; text-transform:uppercase; color:var(--gray); display:block; margin-bottom:4px; font-weight:600; letter-spacing:0.05em;">Nº Obras</label>
+          <input type="number" id="edit-num-obras" class="filter-input" style="width:100%;">
+        </div>
+      </div>
+      <div style="display:grid; grid-template-columns:1fr 1fr; gap:10px; margin-bottom:12px;">
+        <div>
+          <label style="font-size:10px; text-transform:uppercase; color:var(--gray); display:block; margin-bottom:4px; font-weight:600; letter-spacing:0.05em;">Orçamento Médio (R$)</label>
+          <input type="number" id="edit-orcamento" class="filter-input" style="width:100%;">
+        </div>
+        <div>
+          <label style="font-size:10px; text-transform:uppercase; color:var(--gray); display:block; margin-bottom:4px; font-weight:600; letter-spacing:0.05em;">Tipologia</label>
+          <select id="edit-tipologia" class="filter-input" style="width:100%; padding-right:10px;">
+            <option value="vert">Residencial Vertical</option>
+            <option value="horiz">Residencial Horizontal</option>
+            <option value="mcmv">MCMV / Habitação Popular</option>
+            <option value="com">Comercial / Industrial</option>
+            <option value="div">Portfólio Diversificado</option>
+          </select>
+        </div>
+      </div>
+      <div style="display:grid; grid-template-columns:1fr 1fr; gap:10px; margin-bottom:20px;">
+        <div>
+          <label style="font-size:10px; text-transform:uppercase; color:var(--gray); display:block; margin-bottom:4px; font-weight:600; letter-spacing:0.05em;">Modelo de Mão de Obra</label>
+          <select id="edit-modelo-mo" class="filter-input" style="width:100%;">
+            <option value="propria">Própria</option>
+            <option value="mista">Mista</option>
+            <option value="terceirizada">Terceirizada</option>
+          </select>
+        </div>
+        <div>
+          <label style="font-size:10px; text-transform:uppercase; color:var(--gray); display:block; margin-bottom:4px; font-weight:600; letter-spacing:0.05em;">Momento</label>
+          <select id="edit-momento" class="filter-input" style="width:100%;">
+            <option value="crescimento">Crescimento Acelerado</option>
+            <option value="consolidacao">Consolidação e Melhoria</option>
+            <option value="estavel">Operação Estável</option>
+          </select>
+        </div>
+      </div>
+      
+      <div style="display:flex; justify-content:flex-end; gap:10px;">
+        <button class="btn btn-sm" onclick="closeEditModal()" style="background:rgba(255,255,255,0.05); color:white; border:1px solid var(--border);">Cancelar</button>
+        <button class="btn btn-sm" onclick="saveEdit()" style="background:var(--orange); color:white;">Salvar Alterações</button>
+      </div>
+    </div>
+  </div>
+
+  <script src="admin.js?v=4"></script>
 </body>
 </html>
