@@ -57,7 +57,22 @@ function maskPhone(input){var d=input.value.replace(/\D/g,'');if(d.length>11)d=d
         <div><label style="font-size:10px;color:var(--gray2);text-transform:uppercase;letter-spacing:0.08em;display:block;margin-bottom:4px">Contato / Prospect</label>
           <input class="text-input" id="c-contato" placeholder="Nome do prospect" oninput="maskCapitalize(this)"></div>
         <div><label style="font-size:10px;color:var(--gray2);text-transform:uppercase;letter-spacing:0.08em;display:block;margin-bottom:4px">Cargo</label>
-          <input class="text-input" id="c-cargo" placeholder="Ex: Diretor de Engenharia" oninput="maskCapitalize(this)"></div>
+          <select class="text-input" id="c-cargo">
+            <option value="" disabled selected>Selecione o cargo</option>
+            <option value="C-Level">C-Level (CEO, COO, etc)</option>
+            <option value="Sócio">Sócio / Proprietário</option>
+            <option value="Diretor">Diretor</option>
+            <option value="Gerente">Gerente</option>
+            <option value="Coordenador">Coordenador</option>
+            <option value="Supervisor">Supervisor</option>
+            <option value="Engenheiro">Engenheiro</option>
+            <option value="Engenheiro de Obra">Engenheiro de Obra</option>
+            <option value="Engenheiro de Planejamento">Engenheiro de Planejamento</option>
+            <option value="Analista">Analista</option>
+            <option value="Consultor">Consultor</option>
+            <option value="Autônomo">Autônomo</option>
+            <option value="Outros">Outros</option>
+          </select></div>
         <div><label style="font-size:10px;color:var(--gray2);text-transform:uppercase;letter-spacing:0.08em;display:block;margin-bottom:4px">E-mail</label>
           <input class="text-input" id="c-email" type="email" placeholder="email@empresa.com.br" oninput="this.value = this.value.toLowerCase()"></div>
         <div style="grid-column:1/-1"><label style="font-size:10px;color:var(--gray2);text-transform:uppercase;letter-spacing:0.08em;display:block;margin-bottom:4px">Telefone</label>

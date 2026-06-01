@@ -398,8 +398,15 @@ function startAssessment() {
   S.cargo = cargoInput.value.trim();
   S.email = emailInput.value.trim();
   S.telefone = telefoneInput.value.trim();
+  
+  if (!S.id) {
+    S.id = Date.now();
+  }
+  S.status = 'Incompleto';
+
   currentBlock = 'b0';
   currentQIdx = 0;
+  saveDraft();
   renderB0();
   showScreen('screen-b0');
 }
@@ -2356,6 +2363,8 @@ function switchAdminTab(tab) {
 // ═══════════════════════════════════════════
 var DRAFT_KEY = 'siiga_draft';
 
+var syncTimeout = null;
+
 function saveDraft() {
   try {
     var draft = {
@@ -2372,6 +2381,51 @@ function saveDraft() {
     localStorage.setItem(DRAFT_KEY, JSON.stringify(draft));
     showDraftIndicator();
   } catch(e) {}
+  
+  if (supabaseClient && S.id) {
+    clearTimeout(syncTimeout);
+    syncTimeout = setTimeout(syncToSupabase, 2000);
+  }
+}
+
+async function syncToSupabase() {
+  if (!supabaseClient || !S.id) return;
+  
+  var totalMax = 21+12+18+12+3+3;
+  var totalScore = ['f1','f2','f3','f4'].reduce(function(acc,k) {
+    var arr = S.scores[k];
+    if(!Array.isArray(arr)) return acc;
+    return acc + arr.reduce(function(a,b){return a+(b||0);},0);
+  },0) + (S.scores.b03||0) + (S.scores.b06||0);
+
+  var record = {
+    id: S.id,
+    nome: S.empresa + (S.empresa ? ' — ' : '') + formatDate(S.data || new Date().toISOString().split('T')[0]),
+    empresa: S.empresa,
+    consultor: S.consultor,
+    contato: S.contato,
+    cargo: S.cargo || '',
+    email: S.email || '',
+    telefone: S.telefone || '',
+    data: S.data || new Date().toISOString().split('T')[0],
+    modelo_mo: S.modeloMO,
+    num_obras: S.numObras,
+    orcamento_medio: S.orcamentoMedio,
+    total_score: totalScore,
+    total_max: totalMax,
+    nivel: S.status === 'Completo' ? levelFromPct(totalScore/totalMax) : 'Incompleto',
+    scores: JSON.parse(JSON.stringify(S.scores)),
+    state: JSON.parse(JSON.stringify(S))
+  };
+
+  try {
+    const { error } = await supabaseClient.from('assessments').upsert([record]);
+    if (error) {
+      console.warn("Autosave: Não foi possível salvar no Supabase (verifique as políticas RLS).");
+    }
+  } catch(err) {
+    console.error(err);
+  }
 }
 
 function clearDraft() {
@@ -2499,8 +2553,9 @@ async function confirmSave() {
     return acc + arr.reduce(function(a,b){return a+(b||0);},0);
   },0) + (S.scores.b03||0) + (S.scores.b06||0);
 
+  S.status = 'Completo';
   var record = {
-    id: Date.now(),
+    id: S.id || Date.now(),
     nome: nome,
     empresa: S.empresa,
     consultor: S.consultor,
@@ -2509,11 +2564,11 @@ async function confirmSave() {
     email: S.email || '',
     telefone: S.telefone || '',
     data: S.data || new Date().toISOString().split('T')[0],
-    modeloMO: S.modeloMO,
-    numObras: S.numObras,
-    orcamentoMedio: S.orcamentoMedio,
-    totalScore: totalScore,
-    totalMax: totalMax,
+    modelo_mo: S.modeloMO,
+    num_obras: S.numObras,
+    orcamento_medio: S.orcamentoMedio,
+    total_score: totalScore,
+    total_max: totalMax,
     nivel: levelFromPct(totalScore/totalMax),
     scores: JSON.parse(JSON.stringify(S.scores)),
     state: JSON.parse(JSON.stringify(S))
@@ -2526,27 +2581,10 @@ async function confirmSave() {
   // Enviar para o Supabase
   if(supabaseClient) {
     try {
-      const { data, error } = await supabaseClient.from('assessments').insert([{
-        id: record.id,
-        nome: record.nome,
-        empresa: record.empresa,
-        consultor: record.consultor,
-        contato: record.contato,
-        cargo: record.cargo,
-        email: record.email,
-        telefone: record.telefone,
-        data: record.data,
-        modelo_mo: record.modeloMO,
-        num_obras: record.numObras,
-        orcamento_medio: record.orcamentoMedio,
-        total_score: record.totalScore,
-        total_max: record.totalMax,
-        nivel: record.nivel,
-        scores: record.scores,
-        state: record.state
-      }]);
+      const { data, error } = await supabaseClient.from('assessments').upsert([record]);
       if(error) {
         console.error("Erro ao salvar no Supabase:", error);
+        alert("Aviso: Falha ao sincronizar com o banco de dados. " + error.message);
       } else {
         console.log("Salvo no Supabase com sucesso!");
       }

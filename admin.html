@@ -570,7 +570,22 @@
         </div>
         <div>
           <label style="font-size:10px; text-transform:uppercase; color:var(--gray); display:block; margin-bottom:4px; font-weight:600; letter-spacing:0.05em;">Cargo</label>
-          <input type="text" id="edit-cargo" class="filter-input" style="width:100%;">
+          <select id="edit-cargo" class="filter-input" style="width:100%;">
+            <option value="" disabled>Selecione o cargo</option>
+            <option value="C-Level">C-Level (CEO, COO, etc)</option>
+            <option value="Sócio">Sócio / Proprietário</option>
+            <option value="Diretor">Diretor</option>
+            <option value="Gerente">Gerente</option>
+            <option value="Coordenador">Coordenador</option>
+            <option value="Supervisor">Supervisor</option>
+            <option value="Engenheiro">Engenheiro</option>
+            <option value="Engenheiro de Obra">Engenheiro de Obra</option>
+            <option value="Engenheiro de Planejamento">Engenheiro de Planejamento</option>
+            <option value="Analista">Analista</option>
+            <option value="Consultor">Consultor</option>
+            <option value="Autônomo">Autônomo</option>
+            <option value="Outros">Outros</option>
+          </select>
         </div>
       </div>
       <div style="display:grid; grid-template-columns:1fr 1fr; gap:10px; margin-bottom:12px;">
