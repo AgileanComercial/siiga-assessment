@@ -45,7 +45,7 @@ const TIPOLOGIA_C = ['vert', 'com', 'div'];
 function matchCargo(cargo, allowedList) {
   if (!cargo) return false;
   var cargoLower = cargo.toLowerCase().trim();
-  return allowedList.some(function(c) { return cargoLower.indexOf(c) >= 0; });
+  return allowedList.some(function (c) { return cargoLower.indexOf(c) >= 0; });
 }
 
 function getObrasRange(numObras) {
@@ -59,7 +59,7 @@ function getObrasRange(numObras) {
 }
 
 function getTipologiaLabel(tipologia) {
-  var map = { 'vert':'Residencial Vertical', 'horiz':'Residencial Horizontal', 'mcmv':'MCMV / Habitação Popular', 'com':'Comercial / Industrial', 'div':'Portfólio Diversificado' };
+  var map = { 'vert': 'Residencial Vertical', 'horiz': 'Residencial Horizontal', 'mcmv': 'MCMV / Habitação Popular', 'com': 'Comercial / Industrial', 'div': 'Portfólio Diversificado' };
   return map[tipologia] || tipologia || '—';
 }
 
@@ -114,8 +114,8 @@ function getNivelBadgeHTML(nivel) {
 // ═══════════════════════════════════════════
 function getState(row) {
   if (row.state && typeof row.state === 'object') return row.state;
-  if (typeof row.state === 'string') { try { return JSON.parse(row.state); } catch(e) {} }
-  if (row.json_data) { try { return JSON.parse(row.json_data); } catch(e) {} }
+  if (typeof row.state === 'string') { try { return JSON.parse(row.state); } catch (e) { } }
+  if (row.json_data) { try { return JSON.parse(row.json_data); } catch (e) { } }
   return {};
 }
 
@@ -129,14 +129,22 @@ function getField(row, directKey, stateKey) {
 //  PHASE DEFINITIONS (for display)
 // ═══════════════════════════════════════════
 var PHASES = {
-  f1: { label: 'Fase 1 · Planejamento Estratégico', color: '#60a5fa', max: 21, qCount: 7,
-    questions: ['Planejamento formal', 'Técnica de planejamento', 'Dimensionamento de duração', 'Integração orçamento × plano', 'Análise da Curva S', 'Cronograma bancário', 'Integração com suprimentos'] },
-  f2: { label: 'Fase 2 · Proteção da Execução', color: '#2dd4bf', max: 12, qCount: 4,
-    questions: ['Lookahead / rotina de médio prazo', 'Antecedência de riscos', 'Confirmação de equipes', 'Reprogramação formal'] },
-  f3: { label: 'Fase 3 · Gestão da Produção', color: '#34d399', max: 18, qCount: 6,
-    questions: ['Programação semanal', 'Check-in / Check-out diário', 'Registro de causas de desvio', 'Frequência coleta avanço', 'Vínculo qualidade × pagamento', 'Análise intermediária'] },
-  f4: { label: 'Fase 4 · Controle e Performance', color: '#9ca3af', max: 12, qCount: 4,
-    questions: ['Reunião de fechamento técnico', 'Reunião executiva com diretoria', 'Painel integrado de indicadores', 'Fechamento financeiro rastreável'] }
+  f1: {
+    label: 'Fase 1 · Planejamento Estratégico', color: '#60a5fa', max: 21, qCount: 7,
+    questions: ['Planejamento formal', 'Técnica de planejamento', 'Dimensionamento de duração', 'Integração orçamento × plano', 'Análise da Curva S', 'Cronograma bancário', 'Integração com suprimentos']
+  },
+  f2: {
+    label: 'Fase 2 · Proteção da Execução', color: '#2dd4bf', max: 12, qCount: 4,
+    questions: ['Lookahead / rotina de médio prazo', 'Antecedência de riscos', 'Confirmação de equipes', 'Reprogramação formal']
+  },
+  f3: {
+    label: 'Fase 3 · Gestão da Produção', color: '#34d399', max: 18, qCount: 6,
+    questions: ['Programação semanal', 'Check-in / Check-out diário', 'Registro de causas de desvio', 'Frequência coleta avanço', 'Vínculo qualidade × pagamento', 'Análise intermediária']
+  },
+  f4: {
+    label: 'Fase 4 · Controle e Performance', color: '#9ca3af', max: 12, qCount: 4,
+    questions: ['Reunião de fechamento técnico', 'Reunião executiva com diretoria', 'Painel integrado de indicadores', 'Fechamento financeiro rastreável']
+  }
 };
 
 function getPhaseScores(row) {
@@ -145,13 +153,13 @@ function getPhaseScores(row) {
     var st = getState(row);
     scores = st && st.scores;
   }
-  if (typeof scores === 'string') { try { scores = JSON.parse(scores); } catch(e) { scores = {}; } }
+  if (typeof scores === 'string') { try { scores = JSON.parse(scores); } catch (e) { scores = {}; } }
   return scores || {};
 }
 
 function sumArray(arr) {
   if (!Array.isArray(arr)) return 0;
-  return arr.reduce(function(a, b) { return a + (b || 0); }, 0);
+  return arr.reduce(function (a, b) { return a + (b || 0); }, 0);
 }
 
 function levelFromPct(p) {
@@ -174,7 +182,7 @@ function colorFromPct(p) {
 async function fetchData() {
   var tbody = document.getElementById('table-body');
   tbody.innerHTML = '<tr><td colspan="9" style="text-align:center"><div class="loader"></div></td></tr>';
-  
+
   if (!supabaseClient) {
     tbody.innerHTML = '<tr><td colspan="9" style="text-align:center;color:#ff4444">Erro: Supabase não inicializado.</td></tr>';
     return;
@@ -187,9 +195,9 @@ async function fetchData() {
       .order('created_at', { ascending: false });
 
     if (result.error) throw result.error;
-    
+
     allData = result.data || [];
-    allData.forEach(function(row) {
+    allData.forEach(function (row) {
       row._leadScore = calcLeadScore(row);
       row._nivel = getNivel(row);
     });
@@ -208,13 +216,13 @@ function populateConsultorFilter() {
   var select = document.getElementById('filter-consultor');
   var currentVal = select.value;
   var consultors = {};
-  allData.forEach(function(row) {
+  allData.forEach(function (row) {
     var c = getField(row, 'consultor', 'consultor');
     if (c && c.trim()) consultors[c.trim()] = true;
   });
   var sorted = Object.keys(consultors).sort();
   select.innerHTML = '<option value="">Todos</option>';
-  sorted.forEach(function(c) {
+  sorted.forEach(function (c) {
     var opt = document.createElement('option');
     opt.value = c; opt.textContent = c;
     if (c === currentVal) opt.selected = true;
@@ -224,7 +232,7 @@ function populateConsultorFilter() {
 
 function updateStats() {
   var countA = 0, countB = 0, countC = 0, countNone = 0;
-  allData.forEach(function(row) {
+  allData.forEach(function (row) {
     if (row._leadScore === 'A') countA++;
     else if (row._leadScore === 'B') countB++;
     else if (row._leadScore === 'C') countC++;
@@ -243,15 +251,15 @@ function applyFilters() {
   var nivelFilter = document.getElementById('filter-nivel').value;
   var consultorFilter = document.getElementById('filter-consultor').value;
 
-  filteredData = allData.filter(function(row) {
+  filteredData = allData.filter(function (row) {
     if (search) {
       var empresa = getField(row, 'empresa', 'empresa').toLowerCase();
       var consultor = getField(row, 'consultor', 'consultor').toLowerCase();
       var contato = getField(row, 'contato', 'contato').toLowerCase();
       var email = getField(row, 'email', 'email').toLowerCase();
       var telefone = getField(row, 'telefone', 'telefone').toLowerCase();
-      if (empresa.indexOf(search) < 0 && consultor.indexOf(search) < 0 && 
-          contato.indexOf(search) < 0 && email.indexOf(search) < 0 && telefone.indexOf(search) < 0) return false;
+      if (empresa.indexOf(search) < 0 && consultor.indexOf(search) < 0 &&
+        contato.indexOf(search) < 0 && email.indexOf(search) < 0 && telefone.indexOf(search) < 0) return false;
     }
     if (scoreFilter) {
       if (scoreFilter === '-') { if (row._leadScore) return false; }
@@ -281,10 +289,10 @@ function renderTable() {
     tbody.innerHTML = '<tr><td colspan="9" style="text-align:center;color:var(--gray)">Nenhum diagnóstico encontrado.</td></tr>';
     return;
   }
-  filteredData.forEach(function(row, index) {
+  filteredData.forEach(function (row, index) {
     var rawDate = row.created_at || new Date().toISOString();
     var d = new Date(rawDate);
-    var dateStr = d.getDate().toString().padStart(2,'0') + '/' + (d.getMonth()+1).toString().padStart(2,'0') + '/' + d.getFullYear() + ' ' + d.getHours().toString().padStart(2,'0') + ':' + d.getMinutes().toString().padStart(2,'0');
+    var dateStr = d.getDate().toString().padStart(2, '0') + '/' + (d.getMonth() + 1).toString().padStart(2, '0') + '/' + d.getFullYear() + ' ' + d.getHours().toString().padStart(2, '0') + ':' + d.getMinutes().toString().padStart(2, '0');
     var empresa = getField(row, 'empresa', 'empresa') || '—';
     var consultor = getField(row, 'consultor', 'consultor') || '—';
     var contato = getField(row, 'contato', 'contato') || '—';
@@ -294,10 +302,10 @@ function renderTable() {
 
     var tr = document.createElement('tr');
     tr.style.cursor = 'pointer';
-    tr.onclick = function() { openDetails(index); };
+    tr.onclick = function () { openDetails(index); };
     tr.innerHTML =
       '<td style="text-align:center;" onclick="event.stopPropagation();">' +
-        '<input type="checkbox" class="row-checkbox" data-id="' + row.id + '" onchange="toggleRowSelect(this, \'' + row.id + '\')" ' + (isChecked ? 'checked' : '') + ' style="cursor:pointer;">' +
+      '<input type="checkbox" class="row-checkbox" data-id="' + row.id + '" onchange="toggleRowSelect(this, \'' + row.id + '\')" ' + (isChecked ? 'checked' : '') + ' style="cursor:pointer;">' +
       '</td>' +
       '<td>' + getScoreBadgeHTML(row._leadScore) + '</td>' +
       '<td style="color:var(--gray);font-size:12px">' + dateStr + '</td>' +
@@ -307,12 +315,12 @@ function renderTable() {
       '<td>' + telefone + '</td>' +
       '<td>' + getNivelBadgeHTML(row._nivel) + '</td>' +
       '<td style="position:relative; text-align:center;" onclick="event.stopPropagation();">' +
-        '<button onclick="toggleActionMenu(event, ' + index + ')" style="background:none; border:none; color:var(--gray); cursor:pointer; font-size:18px; padding:4px 8px; font-weight:bold; outline:none;">⋮</button>' +
-        '<div id="action-menu-' + index + '" class="action-dropdown">' +
-          '<a onclick="handleAction(\'view\', ' + index + ')">📄 Detalhes</a>' +
-          '<a onclick="handleAction(\'edit\', ' + index + ')">✏️ Editar</a>' +
-          '<a onclick="handleAction(\'delete\', ' + index + ')" style="color:var(--red);">🗑️ Excluir</a>' +
-        '</div>' +
+      '<button onclick="toggleActionMenu(event, ' + index + ')" style="background:none; border:none; color:var(--gray); cursor:pointer; font-size:18px; padding:4px 8px; font-weight:bold; outline:none;">⋮</button>' +
+      '<div id="action-menu-' + index + '" class="action-dropdown">' +
+      '<a onclick="handleAction(\'view\', ' + index + ')">📄 Detalhes</a>' +
+      '<a onclick="handleAction(\'edit\', ' + index + ')">✏️ Editar</a>' +
+      '<a onclick="handleAction(\'delete\', ' + index + ')" style="color:var(--red);">🗑️ Excluir</a>' +
+      '</div>' +
       '</td>';
     tbody.appendChild(tr);
   });
@@ -326,47 +334,47 @@ let radarChartInstDetails = null;
 function calculateLeadROI(row) {
   var state = getState(row);
   var scores = getPhaseScores(row);
-  
+
   var obras = parseInt(row.num_obras || (state && state.numObras) || 5);
   var orcamento = parseFloat(row.orcamento_medio || (state && state.orcamentoMedio) || 8000000);
   var prazo = parseInt((state && state.prazoMedio) || 18);
   var mo = (state && state.modeloMO) || '';
-  
+
   var maxes = { f1: 21, f2: 12, f3: 18, f4: 12 };
-  
+
   function getAvgPct(key) {
     var arr = scores[key];
     if (!Array.isArray(arr)) return 0;
-    var sum = arr.reduce(function(a, b) { return a + (b || 0); }, 0);
+    var sum = arr.reduce(function (a, b) { return a + (b || 0); }, 0);
     return sum / (maxes[key] || 1);
   }
-  
+
   var f1p = getAvgPct('f1');
   var f2p = getAvgPct('f2');
   var f3p = getAvgPct('f3');
   var f4p = getAvgPct('f4');
-  
+
   var PCT_MO = 0.45;
   var ESTOURO_MO = 0.15;
   var CAPTURA_MO = 0.70;
   var CUSTO_ENG_DIA = 800;
   var diasLib = 13.75;
-  
+
   function capFactor(scoreComposto) {
     return Math.max(0.20, Math.min(1.0, 0.20 + (1 - scoreComposto) * 0.80));
   }
-  
+
   var fatTime = capFactor(f3p * 0.50 + f4p * 0.50);
   var fatRetr = capFactor(f2p * 0.30 + f3p * 0.70);
   var fatVeloc = capFactor(f1p * 0.50 + f2p * 0.50);
   var fatMO = capFactor(f3p * 0.70 + f2p * 0.30);
   var fatErros = capFactor(f3p * 0.40 + f4p * 0.60);
-  
+
   var engBase = diasLib * CUSTO_ENG_DIA * prazo;
   var retrBase = orcamento * 0.10 * 0.40;
   var velocBase = orcamento * 0.10 * 0.15;
   var erroBase = orcamento * PCT_MO * 0.02;
-  
+
   var moBase = 0;
   var moLabel = '', moBasis = '';
   if (mo === 'propria') {
@@ -378,7 +386,7 @@ function calculateLeadROI(row) {
     moLabel = 'Redução de estouro de MO (50% própria)';
     moBasis = 'Orçamento × 45% × 50% própria × 15% estouro × 70% de redução';
   }
-  
+
   var items = [
     {
       label: 'Otimização do time de gestão',
@@ -409,7 +417,7 @@ function calculateLeadROI(row) {
       portfolio: Math.round(erroBase * fatErros * obras)
     }
   ];
-  
+
   if (moBase > 0) {
     items.push({
       label: moLabel,
@@ -419,10 +427,10 @@ function calculateLeadROI(row) {
       portfolio: Math.round(moBase * fatMO * obras)
     });
   }
-  
-  var totalPorObra = items.reduce(function(a, b) { return a + b.porObra; }, 0);
-  var totalPortfolio = items.reduce(function(a, b) { return a + b.portfolio; }, 0);
-  
+
+  var totalPorObra = items.reduce(function (a, b) { return a + b.porObra; }, 0);
+  var totalPortfolio = items.reduce(function (a, b) { return a + b.portfolio; }, 0);
+
   return {
     items: items,
     totalPorObra: totalPorObra,
@@ -433,10 +441,10 @@ function calculateLeadROI(row) {
 function generateLeadOpportunities(row) {
   var state = getState(row);
   var scores = getPhaseScores(row);
-  
+
   var opps = [];
   var f1 = scores.f1 || [], f2 = scores.f2 || [], f3 = scores.f3 || [], f4 = scores.f4 || [];
-  
+
   if ((f1[0] || 0) <= 1) opps.push({ gap: 'Sem linha de base técnica com equipes dimensionadas', phase: 'F1', color: '#60a5fa', impact: 'Obras sem LB têm 20–30% mais estouro de prazo. Cada semana de atraso tem custo de oportunidade direto.' });
   if ((f1[1] || 0) <= 1) opps.push({ gap: 'Planejamento sem Linha de Balanço por lotes', phase: 'F1', color: '#60a5fa', impact: 'Impossível visualizar gargalos antecipadamente. Decisões de equipe são feitas no feeling.' });
   if ((f1[4] || 0) <= 1) opps.push({ gap: 'Suprimentos desconectado do planejamento', phase: 'F1', color: '#60a5fa', impact: 'Compras emergenciais têm custo 15–25% maior. Paradas por material faltante são evitáveis.' });
@@ -446,7 +454,7 @@ function generateLeadOpportunities(row) {
   if ((f3[0] || 0) <= 1) opps.push({ gap: 'Sem plano semanal e cadência diária (Last Planner)', phase: 'F3', color: '#34d399', impact: 'Obra opera sem feedback real. Uma semana de decisão perdida a cada ciclo.' });
   if ((f3[2] || 0) <= 1) opps.push({ gap: 'Avanço físico coletado por estimativa mensal', phase: 'F3', color: '#34d399', impact: 'Dado chega semanas atrasado. Improdutividade de MO invisível até o fechamento.' });
   if ((f4[0] || 0) <= 1) opps.push({ gap: 'Reunião executiva sem dados estruturados', phase: 'F4', color: '#9ca3af', impact: 'Decisões tomadas no feeling. Cada reunião termina com narrativa — não com plano.' });
-  
+
   return opps.slice(0, 5);
 }
 
@@ -473,15 +481,15 @@ function openDetails(index) {
 
   var rawDate = row.created_at || new Date().toISOString();
   var d = new Date(rawDate);
-  var dateStr = d.getDate().toString().padStart(2,'0') + '/' + (d.getMonth()+1).toString().padStart(2,'0') + '/' + d.getFullYear() + ' ' + d.getHours().toString().padStart(2,'0') + ':' + d.getMinutes().toString().padStart(2,'0');
+  var dateStr = d.getDate().toString().padStart(2, '0') + '/' + (d.getMonth() + 1).toString().padStart(2, '0') + '/' + d.getFullYear() + ' ' + d.getHours().toString().padStart(2, '0') + ':' + d.getMinutes().toString().padStart(2, '0');
 
   document.getElementById('modal-title').textContent = empresa;
   document.getElementById('modal-subtitle').textContent = 'Diagnóstico realizado em ' + dateStr + ' · Consultor: ' + consultor;
 
-  var clientPct = ['f1', 'f2', 'f3', 'f4'].map(function(k) {
+  var clientPct = ['f1', 'f2', 'f3', 'f4'].map(function (k) {
     var arr = scores[k];
     if (!Array.isArray(arr)) return 0;
-    var sum = arr.reduce(function(a, b) { return a + (b || 0); }, 0);
+    var sum = arr.reduce(function (a, b) { return a + (b || 0); }, 0);
     return sum / (PHASES[k].max || 1);
   });
 
@@ -489,7 +497,7 @@ function openDetails(index) {
   var oppHtml = '';
   if (opps.length > 0) {
     oppHtml += '<div style="display:grid;grid-template-columns:1fr;gap:10px;">';
-    opps.forEach(function(o) {
+    opps.forEach(function (o) {
       oppHtml += '<div style="padding:12px;background:rgba(255,94,30,0.03);border-left:3px solid var(--orange);border-radius:0 8px 8px 0;font-size:12px;">';
       oppHtml += '<div style="display:flex;justify-content:space-between;margin-bottom:4px;"><strong style="color:white;">' + o.gap + '</strong><span style="font-size:9px;padding:2px 6px;border-radius:4px;background:rgba(255,255,255,0.05);color:' + o.color + ';font-weight:bold;">' + o.phase + '</span></div>';
       oppHtml += '<div style="color:var(--gray);font-size:11px;line-height:1.4;">' + o.impact + '</div>';
@@ -502,19 +510,19 @@ function openDetails(index) {
 
   var roiData = calculateLeadROI(row);
   var portfolio = numObras * orcamento;
-  
+
   var roiHtml = '';
   roiHtml += '<div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:10px;margin-bottom:16px;">';
   roiHtml += '<div style="padding:10px;background:rgba(255,255,255,0.02);border:1px solid var(--border);border-radius:6px;text-align:center;"><div style="font-size:9px;color:var(--gray);text-transform:uppercase;margin-bottom:4px;">Portfólio Estimado</div><div style="font-family:Outfit;font-size:14px;font-weight:700;color:white;">' + fmtOrcamento(portfolio) + '</div></div>';
   roiHtml += '<div style="padding:10px;background:rgba(255,255,255,0.02);border:1px solid var(--border);border-radius:6px;text-align:center;"><div style="font-size:9px;color:var(--gray);text-transform:uppercase;margin-bottom:4px;">Retorno por Obra</div><div style="font-family:Outfit;font-size:14px;font-weight:700;color:var(--green);">' + fmtOrcamento(roiData.totalPorObra) + '</div></div>';
   roiHtml += '<div style="padding:10px;background:rgba(255,255,255,0.02);border:1px solid var(--border);border-radius:6px;text-align:center;"><div style="font-size:9px;color:var(--gray);text-transform:uppercase;margin-bottom:4px;">Retorno no Portfólio</div><div style="font-family:Outfit;font-size:14px;font-weight:700;color:var(--green);">' + fmtOrcamento(roiData.totalPortfolio) + '</div></div>';
   roiHtml += '</div>';
-  
+
   roiHtml += '<div style="overflow-x:auto;border:1px solid var(--border);border-radius:8px;background:rgba(0,0,0,0.15);">';
   roiHtml += '<table style="width:100%;border-collapse:collapse;text-align:left;font-size:11px;">';
   roiHtml += '<thead><tr style="background:rgba(255,255,255,0.03);"><th style="padding:8px 10px;color:var(--gray);text-transform:uppercase;font-size:9px;">Fonte de Ganho</th><th style="padding:8px 10px;color:var(--gray);text-transform:uppercase;font-size:9px;text-align:center;">Fator</th><th style="padding:8px 10px;color:var(--gray);text-transform:uppercase;font-size:9px;text-align:right;">Por Obra</th><th style="padding:8px 10px;color:var(--gray);text-transform:uppercase;font-size:9px;text-align:right;">Portfólio</th></tr></thead>';
   roiHtml += '<tbody>';
-  roiData.items.forEach(function(item, index) {
+  roiData.items.forEach(function (item, index) {
     var fp = Math.round(item.fator * 100);
     var rowBg = index % 2 === 0 ? 'rgba(255,255,255,0.01)' : 'transparent';
     roiHtml += '<tr style="border-bottom:1px solid var(--border);background:' + rowBg + ';">';
@@ -533,10 +541,10 @@ function openDetails(index) {
 
   var html = '';
   html += '<div class="detail-layout">';
-  
+
   // LEFT COLUMN
   html += '<div class="detail-left">';
-  
+
   html += '<div style="display:grid;grid-template-columns:repeat(4,1fr);gap:12px;margin-bottom:20px;">';
   html += '<div style="padding:10px;background:rgba(255,255,255,0.02);border:1px solid var(--border);border-radius:8px;text-align:center;"><div style="font-size:9px;color:var(--gray);text-transform:uppercase;margin-bottom:4px;">Lead Score</div>' + getScoreBadgeHTML(row._leadScore) + '</div>';
   html += '<div style="padding:10px;background:rgba(255,255,255,0.02);border:1px solid var(--border);border-radius:8px;text-align:center;"><div style="font-size:9px;color:var(--gray);text-transform:uppercase;margin-bottom:4px;">Nível SIIGA</div>' + getNivelBadgeHTML(row._nivel) + '</div>';
@@ -558,12 +566,12 @@ function openDetails(index) {
   html += '<h3 style="font-family:var(--font-display);font-size:13px;color:var(--orange);margin-bottom:16px;text-transform:uppercase;letter-spacing:0.05em;">Potencial de Ganhos Estimado (ROI)</h3>';
   html += roiHtml;
   html += '</div>';
-  
+
   html += '</div>';
 
   // RIGHT COLUMN
   html += '<div class="detail-right">';
-  
+
   html += '<div style="background:rgba(255,255,255,0.01);border:1px solid var(--border);border-radius:12px;padding:20px;margin-bottom:20px;">';
   html += '<h3 style="font-family:var(--font-display);font-size:13px;color:var(--orange);margin-bottom:16px;text-transform:uppercase;letter-spacing:0.05em;">Dados do Prospect</h3>';
   html += '<div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;">';
@@ -595,8 +603,8 @@ function openDetails(index) {
 
   html += '<div style="background:rgba(255,255,255,0.01);border:1px solid var(--border);border-radius:12px;padding:20px;margin-bottom:20px;">';
   html += '<h3 style="font-family:var(--font-display);font-size:13px;color:var(--orange);margin-bottom:16px;text-transform:uppercase;letter-spacing:0.05em;">Maturidade por Fase</h3>';
-  
-  ['f1', 'f2', 'f3', 'f4'].forEach(function(key) {
+
+  ['f1', 'f2', 'f3', 'f4'].forEach(function (key) {
     var phase = PHASES[key];
     var phaseScores = scores[key];
     var phaseTotal = sumArray(phaseScores);
@@ -619,7 +627,7 @@ function openDetails(index) {
     if (Array.isArray(phaseScores)) {
       html += '<details style="margin-top:6px;"><summary style="cursor:pointer;font-size:11px;color:var(--gray);outline:none;">Perguntas individuais</summary>';
       html += '<div style="display:grid;grid-template-columns:1fr;gap:6px;margin-top:8px;">';
-      phaseScores.forEach(function(qScore, qi) {
+      phaseScores.forEach(function (qScore, qi) {
         var qLabel = phase.questions[qi] || ('Pergunta ' + (qi + 1));
         var qPct = qScore / 3;
         var qColor = colorFromPct(qPct);
@@ -636,7 +644,7 @@ function openDetails(index) {
 
   if (scores.mo && typeof scores.mo === 'object' && Object.keys(scores.mo).length > 0) {
     var moKeys = Object.keys(scores.mo);
-    var moTotal = moKeys.reduce(function(a, k) { return a + (scores.mo[k] || 0); }, 0);
+    var moTotal = moKeys.reduce(function (a, k) { return a + (scores.mo[k] || 0); }, 0);
     var moMax = moKeys.length * 3;
     var moPct = moMax > 0 ? moTotal / moMax : 0;
     var moColor = colorFromPct(moPct);
@@ -657,10 +665,10 @@ function openDetails(index) {
     html += '</div>';
     html += '<div style="height:6px;background:rgba(255,255,255,0.06);border-radius:3px;margin-bottom:8px;overflow:hidden">';
     html += '<div style="height:100%;width:' + Math.round(moPct * 100) + '%;background:' + moColor + ';border-radius:3px"></div></div>';
-    
+
     html += '<details style="margin-top:6px;"><summary style="cursor:pointer;font-size:11px;color:var(--gray);outline:none;">Perguntas individuais</summary>';
     html += '<div style="display:grid;grid-template-columns:1fr;gap:6px;margin-top:8px;">';
-    moKeys.forEach(function(k) {
+    moKeys.forEach(function (k) {
       var qs = scores.mo[k] || 0;
       var qp = qs / 3;
       var qc = colorFromPct(qp);
@@ -703,7 +711,7 @@ function openDetails(index) {
       datasets: [
         {
           label: 'Sua empresa',
-          data: clientPct.map(function(p){ return Math.round(p * 100); }),
+          data: clientPct.map(function (p) { return Math.round(p * 100); }),
           borderColor: '#ff5e1e',
           backgroundColor: 'rgba(255,94,30,0.15)',
           borderWidth: 2.5,
@@ -717,7 +725,7 @@ function openDetails(index) {
           backgroundColor: 'rgba(255,255,255,0.03)',
           borderWidth: 1.5,
           pointRadius: 3,
-          borderDash: [5,3]
+          borderDash: [5, 3]
         },
         {
           label: 'Referência SIIGA',
@@ -726,7 +734,7 @@ function openDetails(index) {
           backgroundColor: 'rgba(52,211,153,0.05)',
           borderWidth: 1.5,
           pointRadius: 3,
-          borderDash: [3,3]
+          borderDash: [3, 3]
         }
       ]
     },
@@ -776,18 +784,18 @@ function buildScoringExplanation(row) {
   var tipologia = (state && state.tipologia) || '';
   var numObras = parseInt(row.num_obras || (state && state.numObras) || 0);
   var orcamento = parseFloat(row.orcamento_medio || (state && state.orcamentoMedio) || 0);
-  
+
   var cargoAB = matchCargo(cargo, CARGOS_AB);
   var cargoC = matchCargo(cargo, CARGOS_C);
   var tipoA = TIPOLOGIA_A.indexOf(tipologia) >= 0;
   var tipoB = TIPOLOGIA_B.indexOf(tipologia) >= 0;
   var tipoC = TIPOLOGIA_C.indexOf(tipologia) >= 0;
-  
+
   var check = '<span style="color:var(--green);font-weight:bold;margin-right:6px">✓</span>';
   var cross = '<span style="color:var(--red);font-weight:bold;margin-right:6px">✗</span>';
-  
+
   var html = '';
-  
+
   // Score A Card
   var scoreA_ok = (cargoAB && tipoA && numObras >= 1 && orcamento >= 1000000);
   html += '<div style="margin-bottom:14px;padding:12px;background:rgba(255,255,255,0.02);border-radius:8px;border:1px solid ' + (scoreA_ok ? 'rgba(52, 211, 153, 0.3)' : 'rgba(255,255,255,0.05)') + '">';
@@ -826,7 +834,7 @@ function buildScoringExplanation(row) {
   html += '<div>' + (numObras >= 5 ? check : cross) + 'Obras ≥ 5 (' + numObras + ')</div>';
   html += '<div>' + (orcamento >= 500000 ? check : cross) + 'Orçamento ≥ R$500k (' + fmtOrcamento(orcamento) + ')</div>';
   html += '</div></div>';
-  
+
   return html;
 }
 
@@ -838,7 +846,7 @@ function closeModal() {
   }
 }
 
-document.getElementById('details-modal').addEventListener('click', function(e) {
+document.getElementById('details-modal').addEventListener('click', function (e) {
   if (e.target === this) closeModal();
 });
 
@@ -881,7 +889,7 @@ async function insertTestRecords() {
         cargo: 'Diretor de Engenharia', email: 'roberto.silva@mrv.com.br', telefone: '(85) 99999-1234',
         data: '2026-05-29', numObras: 12, orcamentoMedio: 15000000, prazoMedio: 24,
         tipologia: 'vert', modeloMO: 'mista', momento: 'crescimento',
-        scores: { b03: 2, b06: 3, f1: [2,2,1,2,2,1,2], f2: [2,2,2,2], f3: [2,1,1,2,1,1], f4: [2,2,1,2], mo: { 'MO.1':2,'MO.2':1,'MO.3':2,'MO.4':1,'MO.5':2,'MO.6':1,'MO.7':2 } },
+        scores: { b03: 2, b06: 3, f1: [2, 2, 1, 2, 2, 1, 2], f2: [2, 2, 2, 2], f3: [2, 1, 1, 2, 1, 1], f4: [2, 2, 1, 2], mo: { 'MO.1': 2, 'MO.2': 1, 'MO.3': 2, 'MO.4': 1, 'MO.5': 2, 'MO.6': 1, 'MO.7': 2 } },
         showMO: true
       }
     },
@@ -914,7 +922,7 @@ async function insertTestRecords() {
         cargo: 'Gerente de Projetos', email: 'carlos@galpoesnordeste.com.br', telefone: '(81) 98888-5678',
         data: '2026-05-28', numObras: 6, orcamentoMedio: 8000000, prazoMedio: 14,
         tipologia: 'com', modeloMO: 'terceirizada', momento: 'consolidacao',
-        scores: { b03: 1, b06: 1, f1: [1,1,0,1,0,0,1], f2: [1,1,1,1], f3: [1,0,0,1,0,0], f4: [1,1,0,1], mo: { 'MO.5':1,'MO.6':0,'MO.7':1 } },
+        scores: { b03: 1, b06: 1, f1: [1, 1, 0, 1, 0, 0, 1], f2: [1, 1, 1, 1], f3: [1, 0, 0, 1, 0, 0], f4: [1, 1, 0, 1], mo: { 'MO.5': 1, 'MO.6': 0, 'MO.7': 1 } },
         showMO: true
       }
     },
@@ -947,7 +955,7 @@ async function insertTestRecords() {
         cargo: 'Engenheiro de Obra', email: 'joao@alfa.eng.br', telefone: '(11) 97777-4321',
         data: '2026-05-27', numObras: 3, orcamentoMedio: 4000000, prazoMedio: 12,
         tipologia: 'horiz', modeloMO: 'propria', momento: 'estavel',
-        scores: { b03: 0, b06: 0, f1: [0,0,0,0,1,0,0], f2: [0,0,1,0], f3: [0,0,0,1,0,0], f4: [0,0,0,0], mo: { 'MO.1':0,'MO.2':0,'MO.3':1,'MO.4':0 } },
+        scores: { b03: 0, b06: 0, f1: [0, 0, 0, 0, 1, 0, 0], f2: [0, 0, 1, 0], f3: [0, 0, 0, 1, 0, 0], f4: [0, 0, 0, 0], mo: { 'MO.1': 0, 'MO.2': 0, 'MO.3': 1, 'MO.4': 0 } },
         showMO: true
       }
     }
@@ -958,14 +966,14 @@ async function insertTestRecords() {
       var rec = testRecords[i];
       var result = await supabaseClient.from('assessments').insert([rec]);
       if (result.error) {
-        console.error('Erro ao inserir teste ' + (i+1) + ':', result.error);
+        console.error('Erro ao inserir teste ' + (i + 1) + ':', result.error);
       } else {
-        console.log('Teste ' + (i+1) + ' inserido com sucesso');
+        console.log('Teste ' + (i + 1) + ' inserido com sucesso');
       }
     }
     alert('3 registros de teste inseridos com sucesso!');
     fetchData();
-  } catch(err) {
+  } catch (err) {
     console.error('Erro:', err);
     alert('Erro ao inserir testes: ' + err.message);
   }
@@ -981,19 +989,19 @@ function toggleRowSelect(checkbox, id) {
   if (checkbox.checked) {
     if (selectedIds.indexOf(strId) < 0) selectedIds.push(strId);
   } else {
-    selectedIds = selectedIds.filter(function(x) { return x !== strId; });
+    selectedIds = selectedIds.filter(function (x) { return x !== strId; });
   }
   updateSelectAllCheckbox();
   updateExportButtonState();
 }
 
 function toggleSelectAll(masterCheckbox) {
-  filteredData.forEach(function(row) {
+  filteredData.forEach(function (row) {
     var strId = String(row.id);
     if (masterCheckbox.checked) {
       if (selectedIds.indexOf(strId) < 0) selectedIds.push(strId);
     } else {
-      selectedIds = selectedIds.filter(function(x) { return x !== strId; });
+      selectedIds = selectedIds.filter(function (x) { return x !== strId; });
     }
   });
   renderTable();
@@ -1003,15 +1011,15 @@ function toggleSelectAll(masterCheckbox) {
 function updateSelectAllCheckbox() {
   var master = document.getElementById('check-all');
   if (!master) return;
-  
+
   if (filteredData.length === 0) {
     master.checked = false;
     master.disabled = true;
     return;
   }
   master.disabled = false;
-  
-  var allFilteredSelected = filteredData.every(function(row) {
+
+  var allFilteredSelected = filteredData.every(function (row) {
     return selectedIds.indexOf(String(row.id)) >= 0;
   });
   master.checked = allFilteredSelected;
@@ -1050,27 +1058,27 @@ function exportSelectedCSV() {
     alert('Nenhum registro selecionado para exportação.');
     return;
   }
-  
-  var exportRows = allData.filter(function(row) {
+
+  var exportRows = allData.filter(function (row) {
     return selectedIds.indexOf(String(row.id)) >= 0;
   });
-  
+
   var headers = [
-    'ID', 'Data', 'Empresa', 'Contato', 'Cargo', 'E-mail', 'Telefone', 
-    'Consultor', 'Nivel', 'Lead Score', 'N_Obras', 'Orcamento_Medio', 
+    'ID', 'Data', 'Empresa', 'Contato', 'Cargo', 'E-mail', 'Telefone',
+    'Consultor', 'Nivel', 'Lead Score', 'N_Obras', 'Orcamento_Medio',
     'Tipologia', 'Modelo_MO', 'Momento', 'Total_Score', 'Maturidade_Pct'
   ];
-  
+
   var csvLines = [];
   csvLines.push(headers.join(';'));
-  
-  exportRows.forEach(function(row) {
+
+  exportRows.forEach(function (row) {
     var state = getState(row);
     var totalScore = row.total_score || 0;
     var totalMax = row.total_max || 66;
     var totalPct = totalMax > 0 ? (totalScore / totalMax) : 0;
     var maturityPct = Math.round(totalPct * 100) + '%';
-    
+
     var line = [
       row.id,
       row.created_at || '',
@@ -1090,14 +1098,14 @@ function exportSelectedCSV() {
       totalScore,
       maturityPct
     ];
-    
+
     csvLines.push(line.join(';'));
   });
-  
+
   var csvContent = '\uFEFF' + csvLines.join('\n');
   var blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
   var url = URL.createObjectURL(blob);
-  
+
   var link = document.createElement('a');
   link.setAttribute('href', url);
   link.setAttribute('download', 'diagnosticos_siiga_selecionados.csv');
@@ -1112,16 +1120,16 @@ async function deleteSelected() {
     alert('Nenhum registro selecionado para exclusão.');
     return;
   }
-  
+
   if (!confirm('Tem certeza de que deseja excluir permanentemente os ' + selectedIds.length + ' registros selecionados? Essa ação não pode ser desfeita.')) {
     return;
   }
-  
+
   var btnDel = document.getElementById('btn-delete-selected');
   var originalText = btnDel.textContent;
   btnDel.textContent = 'Excluindo...';
   btnDel.style.pointerEvents = 'none';
-  
+
   try {
     var errorCount = 0;
     for (var i = 0; i < selectedIds.length; i++) {
@@ -1130,12 +1138,12 @@ async function deleteSelected() {
         .from('assessments')
         .delete()
         .eq('id', id);
-        
+
       if (result.error) {
         console.error('Erro ao excluir ID ' + id + ':', result.error);
         errorCount++;
       } else {
-        allData = allData.filter(function(r) { return r.id != id; });
+        allData = allData.filter(function (r) { return r.id != id; });
       }
     }
 
@@ -1144,7 +1152,7 @@ async function deleteSelected() {
     } else {
       alert(selectedIds.length + ' registro(s) excluído(s) com sucesso!');
     }
-    
+
     selectedIds = [];
     updateStats();
     applyFilters();
@@ -1175,7 +1183,7 @@ function toggleActionMenu(event, index) {
 
 function closeAllActionMenus() {
   var menus = document.querySelectorAll('.action-dropdown');
-  menus.forEach(function(m) {
+  menus.forEach(function (m) {
     m.style.display = 'none';
   });
 }
@@ -1195,7 +1203,7 @@ function handleAction(action, index) {
 }
 
 // Close menus when clicking anywhere else
-document.addEventListener('click', function() {
+document.addEventListener('click', function () {
   closeAllActionMenus();
 });
 
@@ -1205,9 +1213,9 @@ document.addEventListener('click', function() {
 function openEditModal(index) {
   var row = filteredData[index];
   if (!row) return;
-  
+
   var state = getState(row);
-  
+
   document.getElementById('edit-id').value = row.id;
   document.getElementById('edit-empresa').value = getField(row, 'empresa', 'empresa');
   document.getElementById('edit-contato').value = getField(row, 'contato', 'contato');
@@ -1220,7 +1228,7 @@ function openEditModal(index) {
   document.getElementById('edit-tipologia').value = (state && state.tipologia) || 'vert';
   document.getElementById('edit-modelo-mo').value = (state && state.modeloMO) || 'propria';
   document.getElementById('edit-momento').value = (state && state.momento) || 'crescimento';
-  
+
   document.getElementById('edit-modal').style.display = 'flex';
 }
 
@@ -1230,11 +1238,11 @@ function closeEditModal() {
 
 async function saveEdit() {
   var id = document.getElementById('edit-id').value;
-  var row = allData.find(function(r) { return r.id == id; });
+  var row = allData.find(function (r) { return r.id == id; });
   if (!row) return;
 
   var state = getState(row);
-  
+
   var empresa = document.getElementById('edit-empresa').value;
   var contato = document.getElementById('edit-contato').value;
   var cargo = document.getElementById('edit-cargo').value;
@@ -1255,7 +1263,7 @@ async function saveEdit() {
   row.consultor = consultor;
   row.num_obras = numObras;
   row.orcamento_medio = orcamento;
-  
+
   state.empresa = empresa;
   state.contato = contato;
   state.cargo = cargo;
@@ -1267,10 +1275,10 @@ async function saveEdit() {
   state.tipologia = tipologia;
   state.modeloMO = modeloMO;
   state.momento = momento;
-  
+
   row.state = state;
   row._leadScore = calcLeadScore(row);
-  
+
   var totalScore = row.total_score || 0;
   var totalMax = row.total_max || 66;
   row.nivel = levelFromPct(totalScore / totalMax);
@@ -1289,14 +1297,14 @@ async function saveEdit() {
       nivel: row.nivel,
       state: row.state
     };
-    
+
     var result = await supabaseClient
       .from('assessments')
       .update(updatePayload)
       .eq('id', id);
 
     if (result.error) throw result.error;
-    
+
     alert('Diagnóstico atualizado com sucesso!');
     closeEditModal();
     updateStats();
@@ -1312,7 +1320,7 @@ async function saveEdit() {
 // ═══════════════════════════════════════════
 async function deleteRow(id, name) {
   if (!confirm('Tem certeza de que deseja excluir permanentemente o diagnóstico da empresa "' + name + '"?')) return;
-  
+
   try {
     var result = await supabaseClient
       .from('assessments')
@@ -1320,10 +1328,10 @@ async function deleteRow(id, name) {
       .eq('id', id);
 
     if (result.error) throw result.error;
-    
+
     alert('Diagnóstico excluído com sucesso!');
-    allData = allData.filter(function(r) { return r.id != id; });
-    selectedIds = selectedIds.filter(function(x) { return x != id; });
+    allData = allData.filter(function (r) { return r.id != id; });
+    selectedIds = selectedIds.filter(function (x) { return x != id; });
     updateStats();
     applyFilters();
   } catch (err) {

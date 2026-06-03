@@ -246,7 +246,7 @@ function showScreen(id) {
   var screens = document.querySelectorAll('.screen');
   for(var i=0;i<screens.length;i++) screens[i].classList.remove('active');
   document.getElementById(id).classList.add('active');
-  window.scrollTo(0,0);
+  window.scrollTo({top: 0, behavior: 'smooth'});
 }
 
 function updateProgress() {
