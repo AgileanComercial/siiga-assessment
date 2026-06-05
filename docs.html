@@ -1,0 +1,805 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Documentação · SIIGA Assessment</title>
+<meta name="description" content="Documentação técnica completa do SIIGA Assessment — arquitetura, fluxo de diagnóstico, modelo de maturidade, cálculo de ROI e integrações.">
+<link href="https://fonts.googleapis.com/css2?family=Bai+Jamjuree:wght@300;400;600;700&family=Manrope:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+:root {
+  --orange: #ff5f1f;
+  --orange-dim: rgba(255,95,31,0.10);
+  --orange-mid: rgba(255,95,31,0.25);
+  --black: #0f1115;
+  --black2: #1a1d24;
+  --black3: #22222e;
+  --gray: #4a4558;
+  --gray2: #6b6580;
+  --gray3: #9d99ae;
+  --light: #f4f1fc;
+  --white: #ffffff;
+  --teal: #2dd4bf;
+  --green: #34d399;
+  --blue: #60a5fa;
+  --purple: #a78bfa;
+  --red: #f87171;
+  --r: 12px;
+  --r2: 8px;
+  --r3: 6px;
+  --font-display: 'Bai Jamjuree', sans-serif;
+  --font-body: 'Manrope', sans-serif;
+  --font-mono: 'JetBrains Mono', monospace;
+}
+
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+html { font-size: 16px; scroll-behavior: smooth; }
+body {
+  font-family: var(--font-body);
+  background: var(--black);
+  color: rgba(255,255,255,0.88);
+  min-height: 100vh;
+  line-height: 1.7;
+}
+
+/* ── TOP NAV ── */
+.top-nav {
+  position: fixed; top: 0; left: 0; right: 0; z-index: 200;
+  display: flex; align-items: center; justify-content: space-between;
+  padding: 12px 28px;
+  background: rgba(15,17,21,0.82);
+  backdrop-filter: blur(20px); -webkit-backdrop-filter: blur(20px);
+  border-bottom: 1px solid rgba(255,255,255,0.08);
+}
+.nav-logo img { height: 26px; }
+.nav-links { display: flex; gap: 6px; align-items: center; }
+.nav-link {
+  font-size: 12px; color: var(--gray3); text-decoration: none;
+  padding: 6px 14px; border-radius: 6px; transition: all 0.2s;
+  font-weight: 500;
+}
+.nav-link:hover { color: white; background: rgba(255,255,255,0.06); }
+.nav-link.active { color: var(--orange); background: var(--orange-dim); font-weight: 600; }
+
+/* ── SIDEBAR ── */
+.docs-layout { display: grid; grid-template-columns: 260px 1fr; min-height: 100vh; padding-top: 54px; }
+.sidebar {
+  position: sticky; top: 54px; height: calc(100vh - 54px);
+  overflow-y: auto; padding: 28px 20px;
+  border-right: 1px solid rgba(255,255,255,0.06);
+  background: rgba(15,17,21,0.5);
+}
+.sidebar::-webkit-scrollbar { width: 3px; }
+.sidebar::-webkit-scrollbar-thumb { background: rgba(255,255,255,0.08); border-radius: 3px; }
+.sidebar-section { margin-bottom: 24px; }
+.sidebar-title {
+  font-family: var(--font-display); font-size: 10px; font-weight: 700;
+  text-transform: uppercase; letter-spacing: 0.12em;
+  color: var(--gray2); margin-bottom: 10px; padding-left: 12px;
+}
+.sidebar-link {
+  display: block; padding: 7px 12px; border-radius: 6px;
+  font-size: 13px; color: rgba(255,255,255,0.55);
+  text-decoration: none; transition: all 0.2s;
+  border-left: 2px solid transparent; margin-bottom: 2px;
+}
+.sidebar-link:hover { color: white; background: rgba(255,255,255,0.04); border-left-color: rgba(255,255,255,0.15); }
+.sidebar-link.active { color: var(--orange); background: var(--orange-dim); border-left-color: var(--orange); font-weight: 600; }
+
+/* ── MAIN CONTENT ── */
+.doc-main { padding: 40px 48px 80px; max-width: 900px; }
+
+.doc-hero {
+  margin-bottom: 48px; padding-bottom: 32px;
+  border-bottom: 1px solid rgba(255,255,255,0.06);
+}
+.doc-hero h1 {
+  font-family: var(--font-display); font-size: 36px; font-weight: 700;
+  margin-bottom: 10px; line-height: 1.2;
+}
+.doc-hero h1 span { color: var(--orange); }
+.doc-hero p { font-size: 15px; color: var(--gray3); max-width: 600px; }
+
+.doc-badge {
+  display: inline-flex; align-items: center; gap: 6px;
+  padding: 4px 12px; border-radius: 20px;
+  font-size: 10px; font-weight: 700; letter-spacing: 0.1em;
+  text-transform: uppercase; margin-bottom: 14px;
+}
+.badge-orange { background: var(--orange-dim); color: var(--orange); border: 1px solid var(--orange-mid); }
+.badge-blue { background: rgba(96,165,250,0.1); color: var(--blue); border: 1px solid rgba(96,165,250,0.25); }
+.badge-teal { background: rgba(45,212,191,0.1); color: var(--teal); border: 1px solid rgba(45,212,191,0.25); }
+.badge-green { background: rgba(52,211,153,0.1); color: var(--green); border: 1px solid rgba(52,211,153,0.25); }
+.badge-purple { background: rgba(167,139,250,0.1); color: var(--purple); border: 1px solid rgba(167,139,250,0.25); }
+.badge-gray { background: rgba(255,255,255,0.05); color: var(--gray3); border: 1px solid rgba(255,255,255,0.1); }
+
+section { margin-bottom: 48px; scroll-margin-top: 80px; }
+section h2 {
+  font-family: var(--font-display); font-size: 22px; font-weight: 700;
+  margin-bottom: 16px; padding-bottom: 10px;
+  border-bottom: 1px solid rgba(255,255,255,0.06);
+  display: flex; align-items: center; gap: 10px;
+}
+section h2 .sec-icon {
+  width: 32px; height: 32px; border-radius: 8px;
+  display: flex; align-items: center; justify-content: center;
+  font-size: 16px; flex-shrink: 0;
+}
+section h3 {
+  font-family: var(--font-display); font-size: 16px; font-weight: 700;
+  margin: 20px 0 10px; color: rgba(255,255,255,0.95);
+}
+
+p { margin-bottom: 12px; color: rgba(255,255,255,0.72); font-size: 14px; }
+
+/* ── CARDS ── */
+.info-card {
+  padding: 18px 20px; border-radius: var(--r);
+  border: 1px solid rgba(255,255,255,0.06);
+  background: rgba(255,255,255,0.02);
+  margin-bottom: 12px; transition: all 0.25s;
+}
+.info-card:hover { border-color: rgba(255,255,255,0.12); background: rgba(255,255,255,0.035); transform: translateY(-1px); }
+.info-card .card-title { font-family: var(--font-display); font-size: 14px; font-weight: 700; margin-bottom: 6px; color: white; }
+.info-card .card-desc { font-size: 13px; color: var(--gray3); line-height: 1.6; }
+
+.info-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin: 16px 0; }
+.info-grid-3 { grid-template-columns: repeat(3, 1fr); }
+
+.stat-card {
+  padding: 16px; border-radius: var(--r2);
+  border: 1px solid rgba(255,255,255,0.07);
+  background: rgba(255,255,255,0.025); text-align: center;
+}
+.stat-card .stat-value { font-family: var(--font-display); font-size: 28px; font-weight: 700; }
+.stat-card .stat-label { font-size: 11px; color: var(--gray2); text-transform: uppercase; letter-spacing: 0.08em; margin-top: 4px; }
+
+/* ── CODE BLOCKS ── */
+.code-block {
+  background: rgba(0,0,0,0.4); border: 1px solid rgba(255,255,255,0.06);
+  border-radius: var(--r2); padding: 16px 20px; margin: 14px 0;
+  font-family: var(--font-mono); font-size: 13px;
+  color: var(--teal); line-height: 1.7; overflow-x: auto;
+}
+.code-block .comment { color: var(--gray2); }
+.code-block .keyword { color: var(--purple); }
+.code-block .string { color: var(--green); }
+.code-block .number { color: var(--orange); }
+
+code {
+  font-family: var(--font-mono); font-size: 12px;
+  background: rgba(255,255,255,0.06); padding: 2px 7px;
+  border-radius: 4px; color: var(--teal);
+}
+
+/* ── TABLES ── */
+.doc-table { width: 100%; border-collapse: collapse; margin: 14px 0; font-size: 13px; }
+.doc-table th {
+  text-align: left; padding: 10px 14px; font-size: 11px;
+  text-transform: uppercase; letter-spacing: 0.08em;
+  color: var(--gray2); background: rgba(255,255,255,0.03);
+  border-bottom: 1px solid rgba(255,255,255,0.08); font-weight: 600;
+}
+.doc-table td {
+  padding: 11px 14px; border-bottom: 1px solid rgba(255,255,255,0.04);
+  color: rgba(255,255,255,0.75); vertical-align: top;
+}
+.doc-table tr:hover td { background: rgba(255,255,255,0.02); }
+.doc-table tr:last-child td { border-bottom: none; }
+
+/* ── ALERTS ── */
+.alert {
+  padding: 14px 18px; border-radius: var(--r2);
+  margin: 16px 0; font-size: 13px; line-height: 1.65;
+  display: flex; align-items: flex-start; gap: 10px;
+}
+.alert .alert-icon { font-size: 18px; flex-shrink: 0; margin-top: 1px; }
+.alert-info { background: rgba(96,165,250,0.08); border: 1px solid rgba(96,165,250,0.2); color: rgba(255,255,255,0.8); }
+.alert-warn { background: rgba(251,146,60,0.08); border: 1px solid rgba(251,146,60,0.2); color: rgba(255,255,255,0.8); }
+.alert-success { background: rgba(52,211,153,0.08); border: 1px solid rgba(52,211,153,0.2); color: rgba(255,255,255,0.8); }
+
+/* ── FLOW DIAGRAM ── */
+.flow-steps { display: flex; flex-direction: column; gap: 0; margin: 16px 0; }
+.flow-step {
+  display: grid; grid-template-columns: 50px 1fr; gap: 0;
+}
+.flow-marker { display: flex; flex-direction: column; align-items: center; }
+.flow-dot {
+  width: 36px; height: 36px; border-radius: 50%;
+  display: flex; align-items: center; justify-content: center;
+  font-size: 14px; font-weight: 700; flex-shrink: 0; z-index: 1;
+}
+.flow-line { width: 2px; flex: 1; background: rgba(255,255,255,0.08); margin: 0 auto; min-height: 20px; }
+.flow-body { padding: 4px 0 24px 12px; }
+.flow-body h4 { font-family: var(--font-display); font-size: 14px; font-weight: 700; margin-bottom: 4px; }
+.flow-body p { font-size: 13px; color: var(--gray3); margin-bottom: 0; }
+
+/* ── PILL LIST ── */
+.pill-list { display: flex; flex-wrap: wrap; gap: 6px; margin: 10px 0; }
+.pill {
+  padding: 4px 12px; border-radius: 20px; font-size: 11px; font-weight: 600;
+  background: rgba(255,255,255,0.05); color: var(--gray3);
+  border: 1px solid rgba(255,255,255,0.08);
+}
+
+/* ── RESPONSIVE ── */
+@media (max-width: 900px) {
+  .docs-layout { grid-template-columns: 1fr; }
+  .sidebar { display: none; }
+  .doc-main { padding: 28px 20px 60px; }
+  .info-grid { grid-template-columns: 1fr; }
+  .info-grid-3 { grid-template-columns: 1fr; }
+}
+
+/* ── SCROLLBAR ── */
+::-webkit-scrollbar { width: 6px; }
+::-webkit-scrollbar-track { background: transparent; }
+::-webkit-scrollbar-thumb { background: rgba(255,255,255,0.08); border-radius: 3px; }
+::-webkit-scrollbar-thumb:hover { background: rgba(255,255,255,0.15); }
+
+/* ── ANIMATIONS ── */
+@keyframes fadeIn { from { opacity: 0; transform: translateY(12px); } to { opacity: 1; transform: translateY(0); } }
+section { animation: fadeIn 0.5s ease forwards; }
+</style>
+</head>
+<body>
+
+<!-- TOP NAV -->
+<nav class="top-nav">
+  <div class="nav-logo">
+    <a href="/" style="text-decoration:none;display:flex;align-items:center;gap:10px">
+      <span style="font-family:var(--font-display);font-size:15px;font-weight:700;color:white">SIIGA <span style="color:var(--orange)">Assessment</span></span>
+    </a>
+  </div>
+  <div class="nav-links">
+    <a href="/" class="nav-link">← Diagnóstico</a>
+    <a href="/admin" class="nav-link">Admin</a>
+    <a href="/docs" class="nav-link active">Docs</a>
+  </div>
+</nav>
+
+<div class="docs-layout">
+
+  <!-- SIDEBAR -->
+  <aside class="sidebar">
+    <div class="sidebar-section">
+      <div class="sidebar-title">Visão Geral</div>
+      <a href="#overview" class="sidebar-link active">Sobre o Projeto</a>
+      <a href="#architecture" class="sidebar-link">Arquitetura</a>
+      <a href="#tech-stack" class="sidebar-link">Stack Tecnológica</a>
+    </div>
+    <div class="sidebar-section">
+      <div class="sidebar-title">Fluxo do Diagnóstico</div>
+      <a href="#flow" class="sidebar-link">Fluxo Completo</a>
+      <a href="#block0" class="sidebar-link">Bloco 0 · Contexto</a>
+      <a href="#pilars" class="sidebar-link">4 Pilares SIIGA</a>
+      <a href="#mo-block" class="sidebar-link">Bloco MO</a>
+      <a href="#focused" class="sidebar-link">Diagnóstico Focado</a>
+    </div>
+    <div class="sidebar-section">
+      <div class="sidebar-title">Modelos</div>
+      <a href="#maturity" class="sidebar-link">Modelo de Maturidade</a>
+      <a href="#scoring" class="sidebar-link">Score Ponderado</a>
+      <a href="#roi" class="sidebar-link">Cálculo de ROI</a>
+      <a href="#lead-scoring" class="sidebar-link">Lead Scoring</a>
+    </div>
+    <div class="sidebar-section">
+      <div class="sidebar-title">Integrações</div>
+      <a href="#supabase" class="sidebar-link">Supabase (Backend)</a>
+      <a href="#pdf" class="sidebar-link">Geração de PDF</a>
+      <a href="#ai" class="sidebar-link">Análise com IA</a>
+    </div>
+    <div class="sidebar-section">
+      <div class="sidebar-title">Páginas</div>
+      <a href="#pages" class="sidebar-link">Mapa de Páginas</a>
+      <a href="#deploy" class="sidebar-link">Deploy (Vercel)</a>
+    </div>
+  </aside>
+
+  <!-- MAIN CONTENT -->
+  <main class="doc-main">
+
+    <!-- HERO -->
+    <div class="doc-hero">
+      <div class="doc-badge badge-orange">📖 Documentação Técnica</div>
+      <h1>SIIGA <span>Assessment</span></h1>
+      <p>Documentação completa do sistema de diagnóstico de maturidade de gestão de obras, desenvolvido para a Agilean. Cobre arquitetura, fluxos, modelos de cálculo e integrações.</p>
+      <div style="display:flex;gap:8px;margin-top:16px;flex-wrap:wrap">
+        <span class="pill" style="color:var(--orange);border-color:var(--orange-mid)">v2.0</span>
+        <span class="pill">HTML + JS + CSS</span>
+        <span class="pill">Supabase</span>
+        <span class="pill">Vercel</span>
+        <span class="pill">Chart.js</span>
+      </div>
+    </div>
+
+    <!-- OVERVIEW -->
+    <section id="overview">
+      <h2><div class="sec-icon" style="background:var(--orange-dim)">🎯</div> Sobre o Projeto</h2>
+      <p>O <strong>SIIGA Assessment</strong> é uma ferramenta de diagnóstico comercial desenvolvida para a <strong>Agilean</strong>. Seu objetivo é avaliar a maturidade da gestão de obras de construtoras através do método <strong>SIIGA</strong> (Sistema Integrado e Inteligente de Gestão Ágil), estruturado em 4 pilares interdependentes.</p>
+      <p>O sistema captura dados da operação do prospect, calcula um score de maturidade ponderado, estima o potencial de ganho financeiro com a adoção do método e gera um relatório executivo completo — tudo em uma única sessão de diagnóstico guiado.</p>
+
+      <div class="info-grid">
+        <div class="info-card">
+          <div class="card-title">🏗 Para quem?</div>
+          <div class="card-desc">Consultores comerciais da Agilean que conduzem diagnósticos presenciais ou remotos com prospects (construtoras e incorporadoras).</div>
+        </div>
+        <div class="info-card">
+          <div class="card-title">📊 O que gera?</div>
+          <div class="card-desc">Radar de maturidade SIIGA, Mapa de Oportunidades, estimativa de ROI por componente e Road Map de 90 dias com plano de ação.</div>
+        </div>
+        <div class="info-card">
+          <div class="card-title">⏱ Duração</div>
+          <div class="card-desc">Diagnóstico completo: ~40 minutos (21 perguntas + bloco MO condicional). Diagnóstico focado: ~10-26 min.</div>
+        </div>
+        <div class="info-card">
+          <div class="card-title">💾 Persistência</div>
+          <div class="card-desc">Dados salvos em Supabase (cloud) e localStorage (draft). Suporta continuação de sessão interrompida.</div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ARCHITECTURE -->
+    <section id="architecture">
+      <h2><div class="sec-icon" style="background:rgba(96,165,250,0.1)">🏛</div> Arquitetura</h2>
+      <p>O projeto é uma <strong>Single Page Application (SPA)</strong> pura — sem framework. A navegação entre telas é controlada por JavaScript vanilla, alternando a visibilidade de <code>&lt;div class="screen"&gt;</code> com a classe <code>.active</code>.</p>
+
+      <h3>Estrutura de Arquivos</h3>
+      <div class="code-block">
+<span class="comment">📂 Diagnostico Siiga/</span>
+├── <span class="string">index.html</span>        <span class="comment">← App principal (SPA com todas as telas)</span>
+├── <span class="string">script.js</span>         <span class="comment">← Lógica do diagnóstico, cálculos e renders</span>
+├── <span class="string">styles.css</span>        <span class="comment">← Design system completo (dark theme)</span>
+├── <span class="string">admin.html</span>        <span class="comment">← Painel administrativo (standalone)</span>
+├── <span class="string">admin.js</span>          <span class="comment">← Lógica do admin (CRUD de diagnósticos)</span>
+├── <span class="string">docs.html</span>         <span class="comment">← Esta documentação</span>
+├── <span class="string">vercel.json</span>       <span class="comment">← Config do Vercel (cleanUrls)</span>
+├── <span class="string">package.json</span>      <span class="comment">← Dependências (jsdom para testes)</span>
+└── <span class="string">test.js</span>           <span class="comment">← Testes automatizados</span>
+      </div>
+
+      <h3>Modelo de Telas (Screens)</h3>
+      <p>O <code>index.html</code> contém todas as telas como <code>&lt;div class="screen"&gt;</code>. A navegação é feita via <code>showScreen(id)</code>:</p>
+      <table class="doc-table">
+        <thead>
+          <tr><th>Screen ID</th><th>Descrição</th><th>Quando aparece</th></tr>
+        </thead>
+        <tbody>
+          <tr><td><code>screen-cover</code></td><td>Tela inicial — dados da empresa e consultor</td><td>Abertura da aplicação</td></tr>
+          <tr><td><code>screen-b0</code></td><td>Perguntas do Bloco 0 (contexto estratégico)</td><td>Após preencher dados da empresa</td></tr>
+          <tr><td><code>screen-transition</code></td><td>Apresentação SIIGA + seleção de pilares</td><td>Após B0, antes do diagnóstico</td></tr>
+          <tr><td><code>screen-phase</code></td><td>Perguntas das fases (F1-F4 + MO)</td><td>Diagnóstico completo</td></tr>
+          <tr><td><code>screen-focused</code></td><td>Perguntas no modo focado</td><td>Diagnóstico focado (1-3 pilares)</td></tr>
+          <tr><td><code>screen-phase-result</code></td><td>Resultado parcial de cada fase</td><td>Ao concluir cada fase</td></tr>
+          <tr><td><code>screen-radar</code></td><td>Radar Chart + scores + potencial</td><td>Ao concluir todas as fases</td></tr>
+          <tr><td><code>screen-aha</code></td><td>Tela de "Aha Moment" com ganhos detalhados</td><td>Após radar, antes do relatório</td></tr>
+          <tr><td><code>screen-report</code></td><td>Relatório executivo completo</td><td>Tela final do diagnóstico</td></tr>
+        </tbody>
+      </table>
+    </section>
+
+    <!-- TECH STACK -->
+    <section id="tech-stack">
+      <h2><div class="sec-icon" style="background:rgba(167,139,250,0.1)">⚡</div> Stack Tecnológica</h2>
+      <div class="info-grid info-grid-3">
+        <div class="stat-card">
+          <div class="stat-value" style="font-size:22px;color:var(--orange)">HTML</div>
+          <div class="stat-label">Estrutura + Telas</div>
+        </div>
+        <div class="stat-card">
+          <div class="stat-value" style="font-size:22px;color:var(--blue)">CSS</div>
+          <div class="stat-label">Design System</div>
+        </div>
+        <div class="stat-card">
+          <div class="stat-value" style="font-size:22px;color:var(--green)">JS Vanilla</div>
+          <div class="stat-label">Lógica e Renders</div>
+        </div>
+      </div>
+
+      <h3>Dependências Externas (CDN)</h3>
+      <table class="doc-table">
+        <thead><tr><th>Biblioteca</th><th>Versão</th><th>Uso</th></tr></thead>
+        <tbody>
+          <tr><td><strong>Chart.js</strong></td><td>4.4.1</td><td>Gráfico Radar de maturidade</td></tr>
+          <tr><td><strong>html2canvas</strong></td><td>1.4.1</td><td>Captura de tela para geração de PDF</td></tr>
+          <tr><td><strong>jsPDF</strong></td><td>2.5.1</td><td>Geração do relatório em PDF</td></tr>
+          <tr><td><strong>Supabase JS</strong></td><td>v2</td><td>Backend — persistência de diagnósticos</td></tr>
+        </tbody>
+      </table>
+
+      <h3>Fontes</h3>
+      <div class="pill-list">
+        <span class="pill" style="color:var(--orange);border-color:var(--orange-mid)">Bai Jamjuree — Títulos / Display</span>
+        <span class="pill" style="color:var(--blue);border-color:rgba(96,165,250,0.25)">Manrope — Corpo / Body text</span>
+      </div>
+    </section>
+
+    <!-- FLOW -->
+    <section id="flow">
+      <h2><div class="sec-icon" style="background:var(--orange-dim)">🔄</div> Fluxo Completo do Diagnóstico</h2>
+      <p>O diagnóstico segue um fluxo linear com bifurcação na tela de transição, onde o prospect pode escolher entre diagnóstico completo ou focado.</p>
+
+      <div class="flow-steps">
+        <div class="flow-step">
+          <div class="flow-marker">
+            <div class="flow-dot" style="background:var(--orange-dim);color:var(--orange)">1</div>
+            <div class="flow-line"></div>
+          </div>
+          <div class="flow-body">
+            <h4>Tela de Cobertura</h4>
+            <p>Captura dados: Empresa, Contato, Cargo, E-mail, Telefone, Consultor. Validação obrigatória de todos os campos.</p>
+          </div>
+        </div>
+        <div class="flow-step">
+          <div class="flow-marker">
+            <div class="flow-dot" style="background:rgba(167,139,250,0.15);color:var(--purple)">2</div>
+            <div class="flow-line"></div>
+          </div>
+          <div class="flow-body">
+            <h4>Bloco 0 — Contexto Estratégico (6 perguntas)</h4>
+            <p>Nº de obras, orçamento médio, prazo, tipologia, modelo de MO, momento estratégico, estrutura de time e orçamento (2 scored).</p>
+          </div>
+        </div>
+        <div class="flow-step">
+          <div class="flow-marker">
+            <div class="flow-dot" style="background:rgba(96,165,250,0.15);color:var(--blue)">3</div>
+            <div class="flow-line"></div>
+          </div>
+          <div class="flow-body">
+            <h4>Tela de Transição — Seleção de Pilares</h4>
+            <p>Apresentação do método SIIGA. Prospect escolhe: Diagnóstico Completo (todos os pilares) ou Diagnóstico Focado (1-4 pilares com priorização).</p>
+          </div>
+        </div>
+        <div class="flow-step">
+          <div class="flow-marker">
+            <div class="flow-dot" style="background:rgba(52,211,153,0.15);color:var(--green)">4</div>
+            <div class="flow-line"></div>
+          </div>
+          <div class="flow-body">
+            <h4>Fases F1 → F2 → F3 → MO → F4</h4>
+            <p>21 perguntas no fluxo completo (+ até 7 de MO condicional). Cada pergunta é escala 0-3. Resultado parcial ao final de cada fase.</p>
+          </div>
+        </div>
+        <div class="flow-step">
+          <div class="flow-marker">
+            <div class="flow-dot" style="background:rgba(255,255,255,0.06);color:var(--gray3)">5</div>
+            <div class="flow-line"></div>
+          </div>
+          <div class="flow-body">
+            <h4>Radar + Aha Moment + Relatório</h4>
+            <p>Gráfico radar com posição atual vs. mercado vs. referência SIIGA. Tela de Aha com detalhamento de ganhos. Relatório executivo com Road Map de 90 dias.</p>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- BLOCK 0 -->
+    <section id="block0">
+      <h2><div class="sec-icon" style="background:rgba(167,139,250,0.1)">🎲</div> Bloco 0 · Contexto Estratégico</h2>
+      <p>O Bloco 0 captura os dados da operação que alimentam os cálculos de ROI e contextualizam as recomendações. Contém <strong>6 telas</strong>:</p>
+      <table class="doc-table">
+        <thead><tr><th>Código</th><th>Tipo</th><th>O que captura</th><th>Scored?</th></tr></thead>
+        <tbody>
+          <tr><td><code>B0.1</code></td><td>Input numérico</td><td>Nº obras, orçamento médio, prazo médio</td><td>Não</td></tr>
+          <tr><td><code>B0.2</code></td><td>Múltipla escolha</td><td>Tipologia (vertical, horizontal, MCMV, comercial, diversificado)</td><td>Não</td></tr>
+          <tr><td><code>B0.3</code></td><td>Múltipla escolha</td><td>Estrutura de time de gestão (0-3)</td><td>✅ Sim</td></tr>
+          <tr><td><code>B0.4</code></td><td>Múltipla escolha</td><td>Modelo de MO (própria, mista, terceirizada)</td><td>Não</td></tr>
+          <tr><td><code>B0.5</code></td><td>Múltipla escolha</td><td>Momento estratégico</td><td>Não</td></tr>
+          <tr><td><code>B0.6</code></td><td>Múltipla escolha</td><td>Estrutura do orçamento (0-3)</td><td>✅ Sim</td></tr>
+        </tbody>
+      </table>
+      <div class="alert alert-info">
+        <span class="alert-icon">💡</span>
+        <div>A resposta de <strong>B0.4 (Modelo de MO)</strong> determina quais perguntas do Bloco MO serão exibidas: MO própria mostra perguntas MO.1-MO.4, terceirizada mostra MO.5-MO.7, e mista mostra todas.</div>
+      </div>
+    </section>
+
+    <!-- PILARS -->
+    <section id="pilars">
+      <h2><div class="sec-icon" style="background:rgba(96,165,250,0.1)">🏛</div> Os 4 Pilares SIIGA</h2>
+      <p>O método SIIGA é estruturado em 4 fases interdependentes. <strong>Cada fase depende da anterior</strong> — sem planejamento, não há proteção; sem proteção, não há produção gerida; sem dados, não há controle.</p>
+
+      <div class="info-grid">
+        <div class="info-card" style="border-left:3px solid var(--purple)">
+          <div class="doc-badge badge-purple">Pilar 1</div>
+          <div class="card-title">Planejamento Estratégico</div>
+          <div class="card-desc">7 perguntas · Score máx: 21 · Peso: 30%<br>Linha de Base, Curva S, integração orçamento, suprimentos, cronograma bancário.</div>
+        </div>
+        <div class="info-card" style="border-left:3px solid var(--teal)">
+          <div class="doc-badge badge-teal">Pilar 2</div>
+          <div class="card-title">Proteção da Execução</div>
+          <div class="card-desc">4 perguntas · Score máx: 12 · Peso: 20%<br>Lookahead, gestão de restrições, antecipação de riscos, reprogramação.</div>
+        </div>
+        <div class="info-card" style="border-left:3px solid var(--green)">
+          <div class="doc-badge badge-green">Pilar 3</div>
+          <div class="card-title">Gestão da Produção</div>
+          <div class="card-desc">6 perguntas · Score máx: 18 · Peso: 30%<br>Programação semanal, check-in/out diário, avanço físico, qualidade × pagamento.</div>
+        </div>
+        <div class="info-card" style="border-left:3px solid var(--gray3)">
+          <div class="doc-badge badge-gray">Pilar 4</div>
+          <div class="card-title">Controle e Performance</div>
+          <div class="card-desc">4 perguntas · Score máx: 12 · Peso: 20%<br>Fechamento técnico, reunião executiva, painel integrado, pagamento por evidência.</div>
+        </div>
+      </div>
+    </section>
+
+    <!-- MO BLOCK -->
+    <section id="mo-block">
+      <h2><div class="sec-icon" style="background:rgba(52,211,153,0.1)">👷</div> Bloco MO · Gestão de Mão de Obra</h2>
+      <p>Bloco condicional que aparece entre F3 e F4 no diagnóstico completo. As perguntas são filtradas pelo modelo de MO selecionado no B0.4:</p>
+      <table class="doc-table">
+        <thead><tr><th>Código</th><th>Tipo MO</th><th>Tema</th></tr></thead>
+        <tbody>
+          <tr><td><code>MO.1</code></td><td>Própria</td><td>Transparência de metas para equipes</td></tr>
+          <tr><td><code>MO.2</code></td><td>Própria</td><td>Visibilidade de improdutividade individual</td></tr>
+          <tr><td><code>MO.3</code></td><td>Própria</td><td>Gestão de aditivos e verbas extras</td></tr>
+          <tr><td><code>MO.4</code></td><td>Própria</td><td>Eficiência do fechamento de folha</td></tr>
+          <tr><td><code>MO.5</code></td><td>Terceirizada</td><td>Alinhamento de metas com empreiteiros</td></tr>
+          <tr><td><code>MO.6</code></td><td>Terceirizada</td><td>Comunicação de bloqueios de pagamento</td></tr>
+          <tr><td><code>MO.7</code></td><td>Terceirizada</td><td>Eficiência do fechamento de medição</td></tr>
+        </tbody>
+      </table>
+    </section>
+
+    <!-- FOCUSED -->
+    <section id="focused">
+      <h2><div class="sec-icon" style="background:var(--orange-dim)">🎯</div> Diagnóstico Focado</h2>
+      <p>Na tela de transição, o prospect pode selecionar <strong>pilares específicos</strong> ao invés de fazer o diagnóstico completo. O fluxo focado permite:</p>
+      <ul style="margin:12px 0 12px 20px;color:var(--gray3);font-size:14px">
+        <li>Selecionar 1 a 4 pilares individualmente</li>
+        <li>Definir prioridade por arraste (quando 2+ pilares)</li>
+        <li>Estimativa de tempo ajustada (~10 min por pilar)</li>
+        <li>Aviso automático se F4 for selecionado sem F1/F2</li>
+      </ul>
+      <div class="alert alert-warn">
+        <span class="alert-icon">⚠️</span>
+        <div>No modo focado, os pilares não selecionados recebem score 0 no cálculo geral. O Radar mostra apenas os pilares diagnosticados como "avaliados" e os demais como "não avaliados".</div>
+      </div>
+    </section>
+
+    <!-- MATURITY MODEL -->
+    <section id="maturity">
+      <h2><div class="sec-icon" style="background:rgba(52,211,153,0.1)">⚖️</div> Modelo de Maturidade</h2>
+      <p>Cada pergunta é avaliada em escala de <strong>0 a 3</strong>:</p>
+      <div class="info-grid" style="grid-template-columns:repeat(4,1fr)">
+        <div class="stat-card" style="border-top:2px solid var(--red)">
+          <div class="stat-value" style="font-size:24px;color:var(--red)">0</div>
+          <div class="stat-label">Prática Inexistente</div>
+        </div>
+        <div class="stat-card" style="border-top:2px solid var(--orange)">
+          <div class="stat-value" style="font-size:24px;color:var(--orange)">1</div>
+          <div class="stat-label">Prática Informal</div>
+        </div>
+        <div class="stat-card" style="border-top:2px solid var(--blue)">
+          <div class="stat-value" style="font-size:24px;color:var(--blue)">2</div>
+          <div class="stat-label">Prática Parcial</div>
+        </div>
+        <div class="stat-card" style="border-top:2px solid var(--green)">
+          <div class="stat-value" style="font-size:24px;color:var(--green)">3</div>
+          <div class="stat-label">Prática Estruturada</div>
+        </div>
+      </div>
+
+      <h3>Faixas de Maturidade (Score Geral)</h3>
+      <table class="doc-table">
+        <thead><tr><th>Faixa</th><th>Nível</th><th>Descrição</th></tr></thead>
+        <tbody>
+          <tr><td><strong style="color:var(--red)">0 – 34</strong></td><td>Gestão Reativa</td><td>Base inexistente. Decisões por feeling e planilhas desconectadas</td></tr>
+          <tr><td><strong style="color:var(--orange)">35 – 54</strong></td><td>Em Construção</td><td>Práticas parciais, baixa padronização e integração</td></tr>
+          <tr><td><strong style="color:var(--blue)">55 – 74</strong></td><td>Estruturado</td><td>Processo existe, rotina funciona, dado parcialmente confiável</td></tr>
+          <tr><td><strong style="color:var(--green)">75 – 89</strong></td><td>Avançado</td><td>Rotina, dados e indicadores gerando decisões estruturadas</td></tr>
+          <tr><td><strong style="color:var(--green)">90 – 100</strong></td><td>Referência SIIGA</td><td>Benchmark de mercado — ciclo virtuoso operando</td></tr>
+        </tbody>
+      </table>
+    </section>
+
+    <!-- SCORING -->
+    <section id="scoring">
+      <h2><div class="sec-icon" style="background:rgba(96,165,250,0.1)">🧮</div> Score Ponderado</h2>
+      <p>O score geral é calculado com pesos diferenciados por pilar, refletindo o impacto de cada fase na maturidade total:</p>
+
+      <div class="code-block">
+<span class="comment">// Fórmula do Score Ponderado (0-100)</span>
+
+pct_F1 = score_F1 / <span class="number">21</span>  →  contribuição_F1 = pct_F1 × <span class="number">30</span>
+pct_F2 = score_F2 / <span class="number">12</span>  →  contribuição_F2 = pct_F2 × <span class="number">20</span>
+pct_F3 = score_F3 / <span class="number">18</span>  →  contribuição_F3 = pct_F3 × <span class="number">30</span>
+pct_F4 = score_F4 / <span class="number">12</span>  →  contribuição_F4 = pct_F4 × <span class="number">20</span>
+
+<span class="keyword">Score Geral</span> = contribuição_F1 + F2 + F3 + F4  <span class="comment">(0 a 100)</span>
+      </div>
+
+      <div class="alert alert-info">
+        <span class="alert-icon">📐</span>
+        <div><strong>Por que esses pesos?</strong> F1 (30%) e F3 (30%) são os fundamentos — sem planejamento, nada funciona; sem dados de produção, não há controle. F2 (20%) e F4 (20%) são complementares e dependem das outras.</div>
+      </div>
+    </section>
+
+    <!-- ROI -->
+    <section id="roi">
+      <h2><div class="sec-icon" style="background:var(--orange-dim)">💰</div> Cálculo de ROI</h2>
+      <p>O potencial de ganho é estimado com 5 componentes, cada um com pressupostos conservadores documentados:</p>
+
+      <div class="info-card" style="border-left:3px solid var(--blue);margin-bottom:12px">
+        <div class="card-title" style="color:var(--blue)">⏱ C1 — Otimização do Time de Gestão</div>
+        <div class="card-desc">
+          <code>Ganho = 12,25 dias/mês × R$800/dia × prazo médio</code><br>
+          Liberação de 12,25 dias/mês por obra nas rotinas de gestão (medição, indicadores, reprogramação, folha, qualidade).
+        </div>
+      </div>
+      <div class="info-card" style="border-left:3px solid var(--red);margin-bottom:12px">
+        <div class="card-title" style="color:var(--red)">🔧 C2 — Redução de Retrabalhos</div>
+        <div class="card-desc">
+          <code>Ganho = Orçamento × 10% × 40% = Orçamento × 4%</code><br>
+          Referência CBIC: 10-15% do custo é desperdiçado com retrabalhos. SIIGA reduz pelo menos 40%.
+        </div>
+      </div>
+      <div class="info-card" style="border-left:3px solid var(--green);margin-bottom:12px">
+        <div class="card-title" style="color:var(--green)">🚀 C3 — Ganho em Velocidade</div>
+        <div class="card-desc">
+          <code>Ganho = Orçamento × 10% × 15% = Orçamento × 1,5%</code><br>
+          Aumento de 10% na velocidade de produção, aplicado sobre os 15% de custos proporcionais ao tempo.
+        </div>
+      </div>
+      <div class="info-card" style="border-left:3px solid var(--orange);margin-bottom:12px">
+        <div class="card-title" style="color:var(--orange)">👷 C4 — Redução de Estouro de MO</div>
+        <div class="card-desc">
+          <code>MO Própria: Orçamento × 45% × 15% × 70%</code><br>
+          <code>MO Mista: Orçamento × 45% × 50% × 15% × 70%</code><br>
+          <code>MO Terceirizada: Zero (risco do empreiteiro)</code>
+        </div>
+      </div>
+      <div class="info-card" style="border-left:3px solid var(--purple)">
+        <div class="card-title" style="color:var(--purple)">📋 C5 — Erros de Medição</div>
+        <div class="card-desc">
+          <code>Ganho = Orçamento × 45% × 2% = Orçamento × 0,9%</code><br>
+          Desvios por erros em planilhas e medições manuais. Aplica-se a todos os modelos de MO.
+        </div>
+      </div>
+    </section>
+
+    <!-- LEAD SCORING -->
+    <section id="lead-scoring">
+      <h2><div class="sec-icon" style="background:rgba(52,211,153,0.1)">🏷</div> Lead Scoring</h2>
+      <p>O sistema classifica automaticamente cada prospect em um Lead Score (A, B, C) com base em critérios combinados de volume de negócio, cargo e momento estratégico.</p>
+
+      <table class="doc-table">
+        <thead><tr><th>Score</th><th>Perfil</th><th>Critérios</th></tr></thead>
+        <tbody>
+          <tr>
+            <td><span style="color:var(--green);font-weight:700">A</span></td>
+            <td>Hot Lead</td>
+            <td>Orçamento elevado + Cargo C-Level/Sócio/Diretor + Momento de crescimento + Muitas obras</td>
+          </tr>
+          <tr>
+            <td><span style="color:var(--blue);font-weight:700">B</span></td>
+            <td>Qualified Lead</td>
+            <td>Operação média + Cargo gerencial + Score de maturidade intermediário</td>
+          </tr>
+          <tr>
+            <td><span style="color:#fbbf24;font-weight:700">C</span></td>
+            <td>Nurture Lead</td>
+            <td>Operação menor ou cargo operacional + Menos urgência de decisão</td>
+          </tr>
+        </tbody>
+      </table>
+    </section>
+
+    <!-- SUPABASE -->
+    <section id="supabase">
+      <h2><div class="sec-icon" style="background:rgba(52,211,153,0.1)">🗄</div> Supabase (Backend)</h2>
+      <p>O projeto utiliza <strong>Supabase</strong> como BaaS (Backend as a Service) para persistir os diagnósticos concluídos.</p>
+
+      <h3>Tabela: <code>diagnosticos</code></h3>
+      <p>Cada diagnóstico concluído é salvo como uma row contendo o estado completo serializado em JSON, além de campos indexáveis para filtros no admin.</p>
+
+      <h3>Funcionalidades</h3>
+      <ul style="margin:12px 0 12px 20px;color:var(--gray3);font-size:14px">
+        <li><strong>INSERT</strong> — ao concluir o diagnóstico (tela de Radar)</li>
+        <li><strong>SELECT</strong> — painel admin carrega todos os registros</li>
+        <li><strong>UPDATE</strong> — edição de dados do prospect no admin</li>
+        <li><strong>DELETE</strong> — exclusão individual ou em lote no admin</li>
+      </ul>
+
+      <div class="alert alert-warn">
+        <span class="alert-icon">🔐</span>
+        <div>O Supabase usa a chave <strong>anon (pública)</strong>. A segurança real deve ser configurada via Row Level Security (RLS) no Supabase Dashboard.</div>
+      </div>
+    </section>
+
+    <!-- PDF -->
+    <section id="pdf">
+      <h2><div class="sec-icon" style="background:rgba(96,165,250,0.1)">📄</div> Geração de PDF</h2>
+      <p>O relatório pode ser exportado como PDF usando <strong>html2canvas</strong> (captura dos cards como imagem) + <strong>jsPDF</strong> (montagem do documento).</p>
+      <ul style="margin:12px 0 12px 20px;color:var(--gray3);font-size:14px">
+        <li>Formato A4, orientação retrato</li>
+        <li>Cada card do relatório é renderizado como imagem e paginado</li>
+        <li>Suporte a impressão via <code>window.print()</code> com estilos <code>@media print</code></li>
+      </ul>
+    </section>
+
+    <!-- AI -->
+    <section id="ai">
+      <h2><div class="sec-icon" style="background:var(--orange-dim)">🤖</div> Análise com IA</h2>
+      <p>O botão <strong>"Gerar Análise Consultiva"</strong> na tela de relatório permite gerar uma análise narrativa personalizada usando IA (API configurável).</p>
+      <p>O sistema envia o contexto completo do diagnóstico (scores, gaps, dados da empresa) como prompt estruturado e recebe uma análise consultiva formatada.</p>
+    </section>
+
+    <!-- PAGES -->
+    <section id="pages">
+      <h2><div class="sec-icon" style="background:rgba(167,139,250,0.1)">🗺</div> Mapa de Páginas</h2>
+      <table class="doc-table">
+        <thead><tr><th>URL</th><th>Arquivo</th><th>Descrição</th></tr></thead>
+        <tbody>
+          <tr><td><code>/</code></td><td>index.html</td><td>Aplicação principal — diagnóstico completo (SPA)</td></tr>
+          <tr><td><code>/admin</code></td><td>admin.html</td><td>Painel administrativo — CRUD de diagnósticos, filtros, exportação CSV</td></tr>
+          <tr><td><code>/docs</code></td><td>docs.html</td><td>Documentação técnica (esta página)</td></tr>
+        </tbody>
+      </table>
+    </section>
+
+    <!-- DEPLOY -->
+    <section id="deploy">
+      <h2><div class="sec-icon" style="background:rgba(52,211,153,0.1)">🚀</div> Deploy (Vercel)</h2>
+      <p>O projeto é deployado na <strong>Vercel</strong> como site estático. A configuração é mínima:</p>
+
+      <div class="code-block">
+<span class="comment">// vercel.json</span>
+{
+  <span class="string">"cleanUrls"</span>: <span class="keyword">true</span>
+}
+      </div>
+
+      <p>A flag <code>cleanUrls: true</code> permite acessar <code>/admin</code> ao invés de <code>/admin.html</code> e <code>/docs</code> ao invés de <code>/docs.html</code>.</p>
+
+      <h3>Deploy</h3>
+      <ul style="margin:12px 0 12px 20px;color:var(--gray3);font-size:14px">
+        <li>Conecte o repositório Git à Vercel</li>
+        <li>Framework preset: <strong>Other</strong> (sem framework)</li>
+        <li>Build command: nenhum (arquivos estáticos)</li>
+        <li>Output directory: <code>./</code> (root)</li>
+        <li>Cada push na branch principal faz deploy automático</li>
+      </ul>
+
+      <div class="alert alert-success">
+        <span class="alert-icon">✅</span>
+        <div>Não há build step — os arquivos são servidos diretamente como estáticos. Isso garante deploys instantâneos e zero configuração de build.</div>
+      </div>
+    </section>
+
+  </main>
+</div>
+
+<!-- SIDEBAR ACTIVE LINK TRACKING -->
+<script>
+(function() {
+  var links = document.querySelectorAll('.sidebar-link');
+  var sections = [];
+  links.forEach(function(link) {
+    var id = link.getAttribute('href');
+    if (id && id.startsWith('#')) {
+      var el = document.querySelector(id);
+      if (el) sections.push({ el: el, link: link });
+    }
+  });
+
+  function updateActive() {
+    var scrollY = window.scrollY + 120;
+    var current = null;
+    for (var i = sections.length - 1; i >= 0; i--) {
+      if (sections[i].el.offsetTop <= scrollY) {
+        current = sections[i];
+        break;
+      }
+    }
+    links.forEach(function(l) { l.classList.remove('active'); });
+    if (current) current.link.classList.add('active');
+  }
+
+  window.addEventListener('scroll', updateActive, { passive: true });
+  updateActive();
+})();
+</script>
+
+</body>
+</html>
