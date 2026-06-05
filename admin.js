@@ -1132,22 +1132,29 @@ async function deleteSelected() {
 
   try {
     var errorCount = 0;
+    var rlsCount = 0;
     for (var i = 0; i < selectedIds.length; i++) {
       var id = selectedIds[i];
       var result = await supabaseClient
         .from('assessments')
         .delete()
-        .eq('id', id);
+        .eq('id', Number(id))
+        .select();
 
       if (result.error) {
         console.error('Erro ao excluir ID ' + id + ':', result.error);
         errorCount++;
+      } else if (!result.data || result.data.length === 0) {
+        console.warn('Nenhum registro excluído para o ID ' + id + '. Possível bloqueio de RLS.');
+        rlsCount++;
       } else {
         allData = allData.filter(function (r) { return r.id != id; });
       }
     }
 
-    if (errorCount > 0) {
+    if (rlsCount > 0) {
+      alert('Erro: A exclusão de ' + rlsCount + ' registro(s) foi negada pelas políticas de Row Level Security (RLS) do Supabase. Verifique se a política de DELETE está habilitada.');
+    } else if (errorCount > 0) {
       alert('Aviso: ' + errorCount + ' registro(s) não puderam ser excluídos. Verifique o console para mais detalhes.');
     } else {
       alert(selectedIds.length + ' registro(s) excluído(s) com sucesso!');
@@ -1301,9 +1308,15 @@ async function saveEdit() {
     var result = await supabaseClient
       .from('assessments')
       .update(updatePayload)
-      .eq('id', id);
+      .eq('id', Number(id))
+      .select();
 
     if (result.error) throw result.error;
+
+    if (!result.data || result.data.length === 0) {
+      alert('Erro: A atualização foi negada pelas políticas de Row Level Security (RLS) do Supabase. Verifique se a política de UPDATE está habilitada.');
+      return;
+    }
 
     alert('Diagnóstico atualizado com sucesso!');
     closeEditModal();
@@ -1325,9 +1338,15 @@ async function deleteRow(id, name) {
     var result = await supabaseClient
       .from('assessments')
       .delete()
-      .eq('id', id);
+      .eq('id', Number(id))
+      .select();
 
     if (result.error) throw result.error;
+
+    if (!result.data || result.data.length === 0) {
+      alert('Erro: A exclusão foi negada pelas políticas de Row Level Security (RLS) do Supabase. Verifique se a política de DELETE está habilitada.');
+      return;
+    }
 
     alert('Diagnóstico excluído com sucesso!');
     allData = allData.filter(function (r) { return r.id != id; });
