@@ -240,6 +240,29 @@ var PQ = {
 };
 
 // ═══════════════════════════════════════════
+//  GAP TITLES — short label per question code
+//  (used both in the per-phase result screen and in the
+//  final "Mapa de Oportunidades" of the report)
+// ═══════════════════════════════════════════
+var GAP_TITLES = {
+  'F1.1':'Formalidade do planejamento','F1.2':'Técnica de planejamento',
+  'F1.3':'Dimensionamento de equipes','F1.4':'Integração orçamento × planejamento',
+  'F1.5':'Integração planejamento × suprimentos','F1.6':'Acompanhamento da Curva S',
+  'F1.7':'Cronograma bancário',
+  'F2.1':'Lookahead / gestão de restrições','F2.2':'Antecipação de riscos de parada',
+  'F2.3':'Planejamento de MO no médio prazo','F2.4':'Ciclo de reprogramação',
+  'F3.1':'Programação semanal','F3.2':'Check-out e check-in diário',
+  'F3.3':'Rastreabilidade de desvios','F3.4':'Frequência de coleta do avanço',
+  'F3.5':'Qualidade vinculada ao pagamento','F3.6':'Análise intermediária de MO',
+  'F4.1':'Fechamento técnico de período','F4.2':'Reunião executiva com diretoria',
+  'F4.3':'Visão integrada de indicadores','F4.4':'Pagamento por evidência',
+  'MO.1':'Transparência de metas para equipes','MO.2':'Visibilidade de improdutividade',
+  'MO.3':'Gestão de aditivos de verba','MO.4':'Eficiência do fechamento de folha',
+  'MO.5':'Alinhamento de metas com empreiteiros','MO.6':'Comunicação de bloqueios de pagamento',
+  'MO.7':'Eficiência do fechamento de medição'
+};
+
+// ═══════════════════════════════════════════
 //  HELPERS
 // ═══════════════════════════════════════════
 function showScreen(id) {
@@ -632,30 +655,12 @@ function showPhaseResult(bk) {
   var insight = bd.insight(pct);
 
   var gapItems = '';
-  // Short gap titles per question code
-  var gapTitles = {
-    'F1.1':'Formalidade do planejamento','F1.2':'Técnica de planejamento',
-    'F1.3':'Dimensionamento de equipes','F1.4':'Integração orçamento × planejamento',
-    'F1.5':'Acompanhamento da Curva S','F1.6':'Cronograma bancário',
-    'F1.7':'Integração planejamento × suprimentos',
-    'F2.1':'Lookahead / gestão de restrições','F2.2':'Antecipação de riscos de parada',
-    'F2.3':'Planejamento de MO no médio prazo','F2.4':'Ciclo de reprogramação',
-    'F3.1':'Programação semanal','F3.2':'Check-out e check-in diário',
-    'F3.3':'Rastreabilidade de desvios','F3.4':'Frequência de coleta do avanço',
-    'F3.5':'Qualidade vinculada ao pagamento','F3.6':'Análise intermediária de MO',
-    'F4.1':'Fechamento técnico de período','F4.2':'Reunião executiva com diretoria',
-    'F4.3':'Performance HUB — visão integrada','F4.4':'Pagamento por Evidência',
-    'MO.1':'Transparência de metas para equipes','MO.2':'Visibilidade de improdutividade',
-    'MO.3':'Gestão de aditivos de verba','MO.4':'Eficiência do fechamento de folha',
-    'MO.5':'Alinhamento de metas com empreiteiros','MO.6':'Comunicação de bloqueios de pagamento',
-    'MO.7':'Eficiência do fechamento de medição'
-  };
   var gapQs = (bk === 'mo') ? getFilteredQs(bd) : bd.qs;
   var moScoresForGap = S.scores.mo || {};
   for(var i=0;i<gapQs.length;i++) {
     var qScore = (bk === 'mo') ? (moScoresForGap[gapQs[i].code] || 0) : (arr ? (arr[i]||0) : 0);
     if(qScore <= 1) {
-      var gtitle = gapTitles[gapQs[i].code] || gapQs[i].code;
+      var gtitle = GAP_TITLES[gapQs[i].code] || gapQs[i].code;
       gapItems += '<li style="font-size:12px;color:var(--gray2);margin-bottom:4px;display:flex;gap:8px;align-items:center"><span style="color:var(--orange);font-size:16px;line-height:1;flex-shrink:0">→</span><span><strong style="color:white">'+gapQs[i].code+'</strong> · '+gtitle+'</span></li>';
     }
   }
@@ -1164,7 +1169,10 @@ function buildReport() {
   var opps = generateOpportunities();
   var oppHtml = '';
   opps.forEach(function(r) {
-    oppHtml += '<tr><td>'+r.gap+'</td><td><span class="gap-tag" style="background:'+r.color+'22;color:'+r.color+'">'+r.phase+'</span></td><td>'+r.impact+'</td></tr>';
+    oppHtml += '<tr><td>'+r.gap+'</td>' +
+      '<td><span class="gap-tag" style="background:'+r.color+'22;color:'+r.color+'">'+r.phase+'</span></td>' +
+      '<td><span class="gap-tag" style="background:'+r.sevColor+'22;color:'+r.sevColor+'">'+r.severidade+'</span></td>' +
+      '<td>'+r.impact+'</td></tr>';
   });
   document.getElementById('opp-body').innerHTML = oppHtml;
 
@@ -1211,19 +1219,94 @@ function buildReport() {
   buildRoadmap();
 }
 
+// Strips interviewer-only guidance (e.g. "Nota de condução: ...") from a
+// question's `reveals` text before it is shown to the client in the PDF.
+// Also drops trailing method-jargon asides that don't read well out of context.
+function cleanImpactText(reveals) {
+  if(!reveals) return '';
+  var txt = reveals.split('Nota de condução:')[0].trim();
+  return txt;
+}
+
+// Light contextualization — appends a clause tied to the client's own
+// operation (tipologia / modelo de MO / porte) when the phase/question
+// makes that relevant, instead of a single generic sentence for everyone.
+function contextualizeImpact(code, baseText) {
+  var obras = S.numObras || 0;
+  var mo = S.modeloMO;
+  var suffix = '';
+  if(code.indexOf('MO.') === 0 && obras > 1) {
+    suffix = ' Em ' + obras + ' obras simultâneas, esse gap se multiplica — não é um problema pontual de uma obra, é um padrão de operação.';
+  } else if(code === 'F1.5' && S.tipologia === 'mcmv') {
+    suffix = ' Em MCMV, onde a margem já é apertada, compra emergencial é o que mais corrói o resultado do empreendimento.';
+  } else if((mo === 'terceirizada' || mo === 'mista') && (code === 'MO.5' || code === 'MO.6' || code === 'MO.7')) {
+    suffix = ' Como a operação trabalha com empreiteiros, esse gap aparece diretamente como conflito de medição no fechamento mensal.';
+  } else if((mo === 'propria' || mo === 'mista') && (code === 'MO.1' || code === 'MO.2' || code === 'MO.3' || code === 'MO.4')) {
+    suffix = ' Com equipe própria, esse gap aparece direto na folha — é custo que sai do caixa todo mês sem visibilidade.';
+  }
+  return baseText + suffix;
+}
+
 function generateOpportunities() {
   var opps = [];
-  var f1 = S.scores.f1||[], f2 = S.scores.f2||[], f3 = S.scores.f3||[], f4 = S.scores.f4||[];
-  if((f1[0]||0)<=1) opps.push({gap:'Sem linha de base técnica com equipes dimensionadas',phase:'F1',color:'#1B4F8A',impact:'Obras sem LB têm 20–30% mais estouro de prazo. Cada semana de atraso tem custo de oportunidade direto.'});
-  if((f1[1]||0)<=1) opps.push({gap:'Planejamento sem Linha de Balanço por lotes',phase:'F1',color:'#1B4F8A',impact:'Impossível visualizar gargalos antecipadamente. Decisões de equipe são feitas no feeling.'});
-  if((f1[4]||0)<=1) opps.push({gap:'Suprimentos desconectado do planejamento',phase:'F1',color:'#1B4F8A',impact:'Compras emergenciais têm custo 15–25% maior. Paradas por material faltante são evitáveis.'});
-  if((f1[5]||0)<=1) opps.push({gap:'Sem acompanhamento estratégico da Curva S',phase:'F1',color:'#1B4F8A',impact:'Desvios de prazo são identificados semanas tarde. Sem projeção de término, não há decisão estruturada de recuperação.'});
-  if((f1[6]||0)<=1) opps.push({gap:'Cronograma bancário desconectado do planejamento',phase:'F1',color:'#1B4F8A',impact:'Retrabalho duplo em toda reprogramação. Exposição de caixa invisível gera risco financeiro não mapeado.'});
-  if((f2[0]||0)<=1) opps.push({gap:'Sem lookahead estruturado e gestão de restrições',phase:'F2',color:'#0D7C8C',impact:'Restrições aparecem quando já atrasaram. Antecipação reduz paradas não planejadas em até 40%.'});
-  if((f3[0]||0)<=1) opps.push({gap:'Sem plano semanal e cadência diária (Last Planner)',phase:'F3',color:'#0D6B45',impact:'Obra opera sem feedback real. Uma semana de decisão perdida a cada ciclo.'});
-  if((f3[2]||0)<=1) opps.push({gap:'Avanço físico coletado por estimativa mensal',phase:'F3',color:'#0D6B45',impact:'Dado chega semanas atrasado. Improdutividade de MO invisível até o fechamento.'});
-  if((f4[0]||0)<=1) opps.push({gap:'Reunião executiva sem dados estruturados',phase:'F4',color:'#4a4558',impact:'Decisões tomadas no feeling. Cada reunião termina com narrativa — não com plano.'});
-  return opps.slice(0,7);
+  var phases = [
+    {key:'f1', label:'F1', color:'#1B4F8A'},
+    {key:'f2', label:'F2', color:'#0D7C8C'},
+    {key:'f3', label:'F3', color:'#0D6B45'},
+    {key:'f4', label:'F4', color:'#4a4558'}
+  ];
+
+  // F1–F4: walk every question, not just a hardcoded subset
+  phases.forEach(function(p) {
+    var bd = PQ[p.key];
+    var arr = S.scores[p.key] || [];
+    bd.qs.forEach(function(q, i) {
+      var score = arr[i] || 0;
+      if(score <= 1) {
+        var base = cleanImpactText(q.reveals) || (GAP_TITLES[q.code] || q.code);
+        opps.push({
+          code: q.code,
+          gap: GAP_TITLES[q.code] || q.code,
+          phase: p.label,
+          color: p.color,
+          score: score,
+          severidade: score === 0 ? 'Crítico' : 'Atenção',
+          sevColor: score === 0 ? '#f87171' : '#fb923c',
+          impact: contextualizeImpact(q.code, base)
+        });
+      }
+    });
+  });
+
+  // Bloco MO — antes ficava totalmente fora do mapa de oportunidades
+  var moBd = PQ.mo;
+  var moQs = getFilteredQs(moBd);
+  var moScores = S.scores.mo || {};
+  moQs.forEach(function(q) {
+    var score = moScores[q.code] || 0;
+    if(score <= 1) {
+      var base = cleanImpactText(q.reveals) || (GAP_TITLES[q.code] || q.code);
+      opps.push({
+        code: q.code,
+        gap: GAP_TITLES[q.code] || q.code,
+        phase: 'MO',
+        color: '#fb923c',
+        score: score,
+        severidade: score === 0 ? 'Crítico' : 'Atenção',
+        sevColor: score === 0 ? '#f87171' : '#fb923c',
+        impact: contextualizeImpact(q.code, base)
+      });
+    }
+  });
+
+  // Ordena: mais críticos primeiro, depois pela sequência do método (F1→F2→F3→MO→F4)
+  var phaseRank = {F1:1, F2:2, F3:3, MO:4, F4:5};
+  opps.sort(function(a, b) {
+    if(a.score !== b.score) return a.score - b.score;
+    return (phaseRank[a.phase]||9) - (phaseRank[b.phase]||9);
+  });
+
+  return opps.slice(0, 12);
 }
 
 function calculateROI() {
@@ -2706,3 +2789,4 @@ function importDiagnostico(input) {
 // Init
 checkAndOfferResume();
 if(document.getElementById('c-data')) document.getElementById('c-data').value = new Date().toISOString().split('T')[0];
+fix: motor de gaps cobre 24 perguntas + MO
