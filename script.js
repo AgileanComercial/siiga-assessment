@@ -2789,4 +2789,4 @@ function importDiagnostico(input) {
 // Init
 checkAndOfferResume();
 if(document.getElementById('c-data')) document.getElementById('c-data').value = new Date().toISOString().split('T')[0];
-fix: motor de gaps cobre 24 perguntas + MO
+ 
