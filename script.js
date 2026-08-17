@@ -4,8 +4,12 @@
 const SUPABASE_URL = 'https://ghtdfhupjoddfwiqzdpa.supabase.co';
 const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImdodGRmaHVwam9kZGZ3aXF6ZHBhIiwicm9sZSI6ImFub24iLCJpYXQiOjE3Nzk3MjY4MTYsImV4cCI6MjA5NTMwMjgxNn0.d0FDQk-P_xTWslTN2zIfxi8wNpxpf1Xwz5AhX3cnUnc';
 
-const supabase = (window.supabase && SUPABASE_URL !== 'YOUR_SUPABASE_URL_HERE') 
-  ? window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY) 
+// Renomeado de "supabase" para "sbClient": o UMD do @supabase/supabase-js@2
+// declara um "var supabase" global, que colide com um "const supabase" aqui
+// (SyntaxError: Identifier 'supabase' has already been declared), impedindo
+// TODO o script.js de rodar. Bug pré-existente, não relacionado ao ROI real.
+const sbClient = (window.supabase && SUPABASE_URL !== 'YOUR_SUPABASE_URL_HERE')
+  ? window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY)
   : null;
 
 // ═══════════════════════════════════════════
@@ -15,8 +19,18 @@ var S = {
   empresa:'', consultor:'', contato:'', cargo:'', email:'', telefone:'', data:'',
   numObras:5, orcamentoMedio:8000000, prazoMedio:18, numObrasRange:'', orcamentoRange:'',
   tipologia:'', modeloMO:'', momento:'',
-  scores:{ b03:0, b06:0, f1:[0,0,0,0,0,0,0], f2:[0,0,0,0], f3:[0,0,0,0,0,0], mo:{}, f4:[0,0,0,0] },
-  showMO: false
+  scores:{ b03:0, b06:0, f1:[0,0,0,0,0,0,0,0], f2:[0,0,0,0,0], f3:[0,0,0,0,0,0,0], mo:{}, f4:[0,0,0,0,0] },
+  showMO: false,
+  // Dados para o cálculo de ROI real (calculadora-roi-agilean) — coletados dentro das fases relacionadas
+  // custoHora: fixo (ROI_REAL_K.CUSTO_HORA_TECNICA) — não é mais perguntado ao cliente
+  // diasAtual: derivado da resposta de MO.4/MO.7 — não é mais perguntado ao cliente (evita duplicidade)
+  roi2: {
+    folha: 0,
+    hDiaAtual: 0, hSemQualidade: 0,
+    fluxoPlanejar: 0, fluxoCurto: 0, fluxoMedio: 0, fluxoReprogramar: 0,
+    fluxoMedir: 0, fluxoConferir: 0, fluxoERP: 0, fluxoCruzar: 0
+  },
+  mensalidade: 2000, captura: 0.50
 };
 
 var currentBlock = 'b0';
@@ -24,6 +38,34 @@ var currentQIdx = 0;
 var phaseOrder = ['f1','f2','f3','f4'];
 var currentPhaseIdx = 0;
 var radarChartInst = null;
+var RADAR_STATE = null; // último dado usado no radar — reaproveitado para desenhar a versão clara do PDF
+
+// Desenha o radar SIIGA num <canvas>. light=true usa cores para fundo branco
+// (usado na exportação do PDF); light=false (padrão) usa o tema escuro do app.
+function drawRadarChart(canvasEl, state, light) {
+  var gridColor   = light ? 'rgba(0,0,0,0.10)'  : 'rgba(255,255,255,0.07)';
+  var tickColor   = light ? 'rgba(0,0,0,0.35)'  : 'rgba(255,255,255,0.25)';
+  var labelColor  = light ? 'rgba(0,0,0,0.65)'  : 'rgba(255,255,255,0.65)';
+  var marketColor = light ? 'rgba(0,0,0,0.28)'  : 'rgba(255,255,255,0.25)';
+  var marketFill  = light ? 'rgba(0,0,0,0.03)'  : 'rgba(255,255,255,0.03)';
+  return new Chart(canvasEl.getContext('2d'), {
+    type:'radar',
+    data:{
+      labels: state.labels,
+      datasets:[
+        {label:'Sua empresa',data:state.clientPct.map(function(p){return Math.round(p*100);}),borderColor:'#ff5f1f',backgroundColor:'rgba(255,95,31,0.12)',borderWidth:2.5,pointRadius:4,pointBackgroundColor:'#ff5f1f'},
+        {label:'Média de mercado',data:state.benchmark.map(function(p){return Math.round(p*100);}),borderColor:marketColor,backgroundColor:marketFill,borderWidth:1.5,pointRadius:3,borderDash:[5,3]},
+        {label:'Referência SIIGA',data:state.reference.map(function(p){return Math.round(p*100);}),borderColor:'#34d399',backgroundColor:'rgba(52,211,153,0.14)',borderWidth:1.5,pointRadius:3,borderDash:[3,3]}
+      ]
+    },
+    options:{
+      responsive: !light,
+      animation: light ? false : undefined,
+      scales:{r:{min:0,max:100,ticks:{stepSize:25,color:tickColor,backdropColor:'transparent',font:{size:9}},grid:{color:gridColor},angleLines:{color:gridColor},pointLabels:{color:function(ctx){ return ctx.index === state.worstIdx ? '#dc2626' : labelColor; },font:function(ctx){ return {family:'Bai Jamjuree',size:12,weight: ctx.index === state.worstIdx ? '700' : '600'}; }}}},
+      plugins:{legend:{display:false}}
+    }
+  });
+}
 
 // ═══════════════════════════════════════════
 //  DATA
@@ -125,6 +167,11 @@ var PQ = {
       { code:'F1.5', text:'Existe integração entre o planejamento da obra e o processo de suprimentos — o cronograma de compras é definido com base nas datas de início de cada pacote planejado?', reveals:'ROI direto em compras (menos urgência, melhor negociação). A ausência explica grande parte das paradas por material faltante.',
         anchor:'A integração planejamento × suprimentos é um dos ganhos mais rápidos e visíveis quando o SIIGA é implantado. Cada compra emergencial tem custo oculto que nunca aparece no relatório.',
         opts:[{l:'Suprimentos totalmente reativo',s:'Compra quando percebe que vai faltar',score:0},{l:'Alinhamento informal eventual',s:'Avisamos compras quando lembramos',score:1},{l:'Cronograma de compras existe, desconectado do planejamento',s:'Temos um cronograma mas não bate com o plano de obra',score:2},{l:'Cronograma gerado a partir do planejamento',s:'Compras alinhadas com o planejamento e reprogramações de forma automática',score:3}]
+      },
+      { code:'F1.ROI', type:'numgrid', text:'Para dimensionar o potencial de ganho da sua operação, informe:', reveals:'Esses dados alimentam o cálculo de ROI real do diagnóstico — tempo hoje gasto em rotinas manuais de gestão.',
+        fields:[
+          {key:'fluxoPlanejar', label:'Horas/mês gastas planejando o cronograma', type:'number', placeholder:'Ex: 16'}
+        ]
       }
     ]
   },
@@ -150,6 +197,13 @@ var PQ = {
       },
       { code:'F2.4', text:'Ao final de cada ciclo de execução — mensal, bimestral ou conforme o ritmo da obra — existe uma reprogramação formal, revisando o que foi feito e construindo novo plano?', reveals:'Cultura de reprogramação. Não fixamos a frequência — o que importa é se o ciclo existe, seja qual for o intervalo.',
         opts:[{l:'Planejamento original até o fim',s:'Não reprogramamos — seguimos o plano inicial',score:0},{l:'Ajustes informais ocasionais',s:'Quando o desvio é muito grande, conversamos',score:1},{l:'Reprogramação periódica sem dados formais',s:'Fazemos mas é mais no feeling',score:2},{l:'Ciclo formal de reprogramação com PPC e análise de causas',s:'Dados reais alimentam o novo plano',score:3}]
+      },
+      { code:'F2.ROI', type:'numgrid', text:'Quanto tempo sua equipe gasta hoje nas rotinas de curto e médio prazo?', reveals:'Tempo gasto nessas rotinas manuais é diretamente recuperável com o SIIGA.',
+        fields:[
+          {key:'fluxoCurto', label:'Horas/mês criando o curto prazo', type:'number', placeholder:'Ex: 4'},
+          {key:'fluxoMedio', label:'Horas/mês controlando o médio prazo', type:'number', placeholder:'Ex: 4'},
+          {key:'fluxoReprogramar', label:'Horas/mês reprogramando', type:'number', placeholder:'Ex: 14'}
+        ]
       }
     ]
   },
@@ -181,6 +235,15 @@ var PQ = {
       },
       { code:'F3.6', text:'No meio do período — quinzenal ou semanalmente — existe análise de resultado intermediário: funcionários ou equipes com produção abaixo do esperado, empreiteiros com mais não conformidades?', reveals:'Análise intermediária de MO improdutiva e qualidade de empreiteiros — separa gestão que age antes do fechamento da que descobre o problema depois.',
         opts:[{l:'Sem análise intermediária',s:'Só sabemos no fechamento do mês',score:0},{l:'Análise verbal eventual na reunião',s:'Comentamos quando alguém percebe',score:1},{l:'Análise periódica sem dado formal',s:'Temos percepção mas sem número',score:2},{l:'Relatório quinzenal com ranking de produtividade e NCs por empreiteiro',s:'Dado formal guia decisão de realocação',score:3}]
+      },
+      { code:'F3.ROI', type:'numgrid', text:'Para dimensionar o ganho operacional, informe os dados abaixo sobre o fechamento e a rotina de produção:', reveals:'Base para o cálculo de horas recuperadas por mês e por obra. Os dias de fechamento já foram capturados no Bloco MO.',
+        fields:[
+          {key:'hDiaAtual', label:'Horas/dia dedicadas a esse fechamento', type:'number', placeholder:'Ex: 6'},
+          {key:'fluxoMedir', label:'Horas/mês medindo avanço físico', type:'number', placeholder:'Ex: 20'},
+          {key:'hSemQualidade', label:'Horas/semana conferindo qualidade', type:'number', placeholder:'Ex: 5'},
+          {key:'fluxoConferir', label:'Horas/mês conferindo planilhas', type:'number', placeholder:'Ex: 12'},
+          {key:'fluxoERP', label:'Horas/mês passando medição para o ERP', type:'number', placeholder:'Ex: 10'}
+        ]
       }
     ]
   },
@@ -210,6 +273,11 @@ var PQ = {
       },
       { code:'MO.7', moType:'terc', text:'O fechamento da medição dos empreiteiros consome quanto tempo do seu time por mês?', reveals:'Eficiência do fechamento de medição. Medição que leva uma semana é feita na base da negociação — não do registro.',
         opts:[{l:'5 dias ou mais',s:'Uma semana inteira ou mais',score:0},{l:'3–4 dias',s:'Boa parte da semana',score:1},{l:'2 dias',s:'Dois dias de trabalho intenso',score:2},{l:'1 dia ou menos',s:'Processo fluido com dados já estruturados',score:3}]
+      },
+      { code:'MO.ROI1', moType:'propria', type:'numgrid', text:'Para o cálculo financeiro do ROI, informe a folha de mão de obra própria:', reveals:'Alimenta o cálculo de recuperação financeira por retrabalho e pagamentos indevidos.',
+        fields:[
+          {key:'folha', label:'Folha de mão de obra própria / mês (R$)', type:'currency', placeholder:'Ex: R$ 300.000'}
+        ]
       }
     ]
   },
@@ -234,6 +302,11 @@ var PQ = {
       },
       { code:'F4.4', text:'O fechamento mensal de folha e medição de empreiteiros é baseado nas evidências de produção geradas ao longo do mês — com aprovação hierárquica e registro de exceções — ou é mais um fechamento sem base objetiva de produção?', reveals:'Maturidade do ciclo financeiro mensal. Aplica-se a MO própria (folha) e terceirizada (medição). O que diferencia não é o tipo de MO — é o nível de rastreabilidade e evidência por trás do pagamento.',
         opts:[{l:'Fechamento sem base objetiva',s:'Por estimativa ou negociação — sem dado de produção como referência',score:0},{l:'Critério informal baseado em observação',s:'Engenheiro ou gestor decide pelo que viu — sem registro auditável',score:1},{l:'Critério definido, sem rastreabilidade digital e sem fluxo hierárquico',s:'Temos regra, mas sem aprovação formal e sem registro de exceções',score:2},{l:'Sugestão automática baseada em produção real + FVS aprovada, com aprovação por instâncias e exceções registradas com justificativa',s:'Ciclo financeiro rastreável e auditável — paga pelo que foi produzido com qualidade comprovada',score:3}]
+      },
+      { code:'F4.ROI', type:'numgrid', text:'Quanto tempo sua equipe gasta hoje cruzando dados de diferentes fontes para montar a visão executiva?', reveals:'Tempo gasto compilando planilhas manualmente antes das reuniões de resultado.',
+        fields:[
+          {key:'fluxoCruzar', label:'Horas/mês cruzando dados de diferentes fontes', type:'number', placeholder:'Ex: 18'}
+        ]
       }
     ]
   }
@@ -250,7 +323,7 @@ function showScreen(id) {
 }
 
 function updateProgress() {
-  var totalQ = B0Q.length + 7 + 4 + 5 + 7 + 3;
+  var totalQ = B0Q.length + 7 + 4 + 5 + 7 + 3 + 6; // +6 = novas perguntas numgrid de ROI (F1,F2,F3,F4,MO×2)
   var done = (currentBlock!=='b0') ? B0Q.length : currentQIdx;
   if(currentBlock==='phase') {
     done += B0Q.length;
@@ -508,6 +581,25 @@ function renderPhaseQ() {
     moNotice = '<div class="cond-notice">🎯 ' + moLabel + '</div>';
   }
 
+  if(q.type === 'numgrid') {
+    var fieldsHtml = q.fields.map(function(f) {
+      var savedVal = S.roi2[f.key];
+      if(f.type === 'currency') {
+        return '<div class="input-group"><label>'+f.label+'</label>' +
+          '<input class="text-input" id="rg-'+f.key+'" type="text" inputmode="numeric" placeholder="'+f.placeholder+'" oninput="fmtOrcamento(this)" value="'+(savedVal ? fmtBRL(savedVal) : '')+'"></div>';
+      }
+      return '<div class="input-group"><label>'+f.label+'</label>' +
+        '<input class="text-input" id="rg-'+f.key+'" type="number" min="0" placeholder="'+f.placeholder+'" value="'+(savedVal || '')+'"></div>';
+    }).join('');
+    card.innerHTML = moNotice +
+      '<div class="phase-badge '+bd.badgeClass+'">'+bd.label+'</div>' +
+      '<div class="q-code">'+q.code+' · Pergunta '+(currentQIdx+1)+' de '+total+'</div>' +
+      '<div class="q-text">'+q.text+'</div>' +
+      '<div class="q-reveals">'+q.reveals+'</div>' +
+      '<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:14px;margin-top:8px">' + fieldsHtml + '</div>';
+    return;
+  }
+
   var arrKey = (bk==='mo') ? 'mo' : bk;
   if(bk === 'mo') {
     if(!S.scores.mo || typeof S.scores.mo !== 'object' || Array.isArray(S.scores.mo)) S.scores.mo = {};
@@ -579,6 +671,18 @@ function nextQ() {
     var bk = phaseOrder[currentPhaseIdx];
     var bd = PQ[bk];
     var filteredQs = getFilteredQs(bd);
+    var curQ = filteredQs[currentQIdx];
+    if(curQ.type === 'numgrid') {
+      curQ.fields.forEach(function(f) {
+        var el = document.getElementById('rg-'+f.key);
+        if(!el) return;
+        if(f.type === 'currency') {
+          S.roi2[f.key] = el.dataset.raw ? parseInt(el.dataset.raw) : parseBRL(el.value);
+        } else if(el.value !== '') {
+          S.roi2[f.key] = parseFloat(el.value) || 0;
+        }
+      });
+    }
     if(currentQIdx < filteredQs.length - 1) {
       currentQIdx++;
       renderPhaseQ();
@@ -616,7 +720,7 @@ function showPhaseResult(bk) {
   var sum = 0;
   var maxP;
   if(bk === 'mo') {
-    var filteredQs = getFilteredQs(bd);
+    var filteredQs = getFilteredQs(bd).filter(function(q){ return q.type !== 'numgrid'; });
     maxP = filteredQs.length * 3;
     var moScores = S.scores.mo || {};
     filteredQs.forEach(function(q){ sum += (moScores[q.code] || 0); });
@@ -653,6 +757,7 @@ function showPhaseResult(bk) {
   var gapQs = (bk === 'mo') ? getFilteredQs(bd) : bd.qs;
   var moScoresForGap = S.scores.mo || {};
   for(var i=0;i<gapQs.length;i++) {
+    if(gapQs[i].type === 'numgrid') continue;
     var qScore = (bk === 'mo') ? (moScoresForGap[gapQs[i].code] || 0) : (arr ? (arr[i]||0) : 0);
     if(qScore <= 1) {
       var gtitle = gapTitles[gapQs[i].code] || gapQs[i].code;
@@ -886,6 +991,26 @@ function renderFocusedQ() {
   var total = filteredQs.length;
   document.getElementById('nav-step').textContent = bd.label.split('·')[0].trim() + ' · ' + (focusedQIdx+1) + '/' + total;
 
+  if(q.type === 'numgrid') {
+    var fieldsHtml = q.fields.map(function(f) {
+      var savedVal = S.roi2[f.key];
+      if(f.type === 'currency') {
+        return '<div class="input-group"><label>'+f.label+'</label>' +
+          '<input class="text-input" id="rg-'+f.key+'" type="text" inputmode="numeric" placeholder="'+f.placeholder+'" oninput="fmtOrcamento(this)" value="'+(savedVal ? fmtBRL(savedVal) : '')+'"></div>';
+      }
+      return '<div class="input-group"><label>'+f.label+'</label>' +
+        '<input class="text-input" id="rg-'+f.key+'" type="number" min="0" placeholder="'+f.placeholder+'" value="'+(savedVal || '')+'"></div>';
+    }).join('');
+    document.getElementById('focused-card').innerHTML =
+      '<div class="phase-badge ' + bd.badgeClass + '">' + bd.label + '</div>' +
+      '<div style="font-size:10px;color:var(--orange);text-transform:uppercase;letter-spacing:0.1em;margin-bottom:12px;font-weight:600">Diagnóstico Focado · Pergunta ' + (focusedQIdx+1) + ' de ' + total + '</div>' +
+      '<div class="q-code">' + q.code + '</div>' +
+      '<div class="q-text">' + q.text + '</div>' +
+      '<div class="q-reveals">' + q.reveals + '</div>' +
+      '<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:14px;margin-top:8px">' + fieldsHtml + '</div>';
+    return;
+  }
+
   var arrKey = focusedPilar === 'mo' ? 'mo' : focusedPilar;
   if(!Array.isArray(S.scores[arrKey])) S.scores[arrKey] = [];
   var savedScore = S.scores[arrKey][focusedQIdx];
@@ -923,6 +1048,18 @@ function selectFocusedOpt(optIdx, score) {
 function nextFocusedQ() {
   var bd = PQ[focusedPilar];
   var filteredQs = getFilteredQs(bd);
+  var curQ = filteredQs[focusedQIdx];
+  if(curQ.type === 'numgrid') {
+    curQ.fields.forEach(function(f) {
+      var el = document.getElementById('rg-'+f.key);
+      if(!el) return;
+      if(f.type === 'currency') {
+        S.roi2[f.key] = el.dataset.raw ? parseInt(el.dataset.raw) : parseBRL(el.value);
+      } else if(el.value !== '') {
+        S.roi2[f.key] = parseFloat(el.value) || 0;
+      }
+    });
+  }
   if(focusedQIdx < filteredQs.length - 1) {
     focusedQIdx++;
     renderFocusedQ();
@@ -951,7 +1088,7 @@ function showFocusedResult() {
   var arr = Array.isArray(S.scores[arrKey]) ? S.scores[arrKey] : [];
   var filteredQs = getFilteredQs(bd);
   var sum = arr.reduce(function(a,b){return a+(b||0);},0);
-  var maxP = filteredQs.length * 3;
+  var maxP = filteredQs.filter(function(q){ return q.type !== 'numgrid'; }).length * 3;
   var pct = sum / maxP;
   var level = levelFromPct(pct);
   var col = colorFromPct(pct);
@@ -974,6 +1111,7 @@ function showFocusedResult() {
   };
 
   filteredQs.forEach(function(q, i) {
+    if(q.type === 'numgrid') return;
     if((arr[i]||0) <= 1) {
       gapHtml += '<div style="display:flex;gap:10px;align-items:flex-start;padding:10px 12px;background:rgba(255,255,255,0.03);border-radius:6px;margin-bottom:6px">' +
         '<span style="color:var(--orange);font-size:16px;flex-shrink:0">→</span>' +
@@ -1082,24 +1220,19 @@ function buildAndShowRadar() {
   var teaserEl = document.getElementById('roi-teaser');
   if(teaserEl) teaserEl.textContent = fmtNum(roiTeaser.totalPortfolio || roiTeaser.total);
 
+  // Ponto 3a: eixo com maior gap vs. referência SIIGA — destacado e com rótulo de distância
+  var gaps = clientPct.map(function(p,i){ return reference[i]-p; });
+  var worstIdx = 0;
+  for(var gi=1; gi<gaps.length; gi++) { if(gaps[gi] > gaps[worstIdx]) worstIdx = gi; }
+  var worstGapPct = Math.round(gaps[worstIdx]*100);
+  var gapLabelEl = document.getElementById('radar-gap-label');
+  if(gapLabelEl) {
+    gapLabelEl.textContent = '📍 Maior oportunidade: ' + labels[worstIdx] + ' está ' + worstGapPct + ' pontos percentuais abaixo da Referência SIIGA';
+  }
+
+  RADAR_STATE = { clientPct: clientPct, benchmark: benchmark, reference: reference, labels: labels, worstIdx: worstIdx };
   if(radarChartInst) radarChartInst.destroy();
-  var ctx = document.getElementById('radarChart').getContext('2d');
-  radarChartInst = new Chart(ctx, {
-    type:'radar',
-    data:{
-      labels:['Fase 1','Fase 2','Fase 3','Fase 4'],
-      datasets:[
-        {label:'Sua empresa',data:clientPct.map(function(p){return Math.round(p*100);}),borderColor:'#ff5f1f',backgroundColor:'rgba(255,95,31,0.12)',borderWidth:2.5,pointRadius:4,pointBackgroundColor:'#ff5f1f'},
-        {label:'Média de mercado',data:benchmark.map(function(p){return Math.round(p*100);}),borderColor:'rgba(255,255,255,0.25)',backgroundColor:'rgba(255,255,255,0.03)',borderWidth:1.5,pointRadius:3,borderDash:[5,3]},
-        {label:'Referência SIIGA',data:reference.map(function(p){return Math.round(p*100);}),borderColor:'#34d399',backgroundColor:'rgba(52,211,153,0.05)',borderWidth:1.5,pointRadius:3,borderDash:[3,3]}
-      ]
-    },
-    options:{
-      responsive:true,
-      scales:{r:{min:0,max:100,ticks:{stepSize:25,color:'rgba(255,255,255,0.25)',backdropColor:'transparent',font:{size:9}},grid:{color:'rgba(255,255,255,0.07)'},angleLines:{color:'rgba(255,255,255,0.07)'},pointLabels:{color:'rgba(255,255,255,0.65)',font:{family:'Bai Jamjuree',size:12,weight:'600'}}}},
-      plugins:{legend:{display:false}}
-    }
-  });
+  radarChartInst = drawRadarChart(document.getElementById('radarChart'), RADAR_STATE, false);
 
   // Insights grid
   var colors = {f1:'#60a5fa',f2:'#2dd4bf',f3:'#34d399',f4:'#9ca3af'};
@@ -1198,7 +1331,7 @@ function buildReport() {
       '</tr>';
   });
   roiHtml += '<tr class="roi-total">' +
-    '<td colspan="2">POTENCIAL DE GANHO NO PORTFÓLIO</td>' +
+    '<td colspan="2">PERDA FINANCEIRA NO PORTFÓLIO</td>' +
     '<td style="text-align:right;color:#666">'+fmtNum(roi.totalPorObra)+'<br><span style="font-size:10px;font-weight:400">por obra</span></td>' +
     '<td style="text-align:right;color:var(--orange)">'+fmtNum(roi.totalPortfolio)+'</td>' +
     '</tr></tbody>';
@@ -1207,23 +1340,250 @@ function buildReport() {
   // Update prazo in pressupostos
   var presPrazo = document.getElementById('pres-prazo');
   if(presPrazo) presPrazo.textContent = (S.prazoMedio||18) + ' meses';
+  // ROI real (Estratégica + Operacional), com dados coletados do cliente
+  buildROIReal();
   // Road map
   buildRoadmap();
 }
 
+function roiCapturaLabel(fator) {
+  var pct = Math.round(fator*100);
+  if(pct <= 35) return 'Pessimista';
+  if(pct <= 55) return 'Conservador';
+  if(pct <= 80) return 'Realista';
+  return 'Pleno';
+}
+
+function buildROIReal() {
+  var mensInput = document.getElementById('roi2-mensalidade');
+  var capInput = document.getElementById('roi2-captura');
+  if(mensInput) S.mensalidade = mensInput.dataset.raw ? parseInt(mensInput.dataset.raw,10) : parseBRL(mensInput.value);
+  if(capInput && capInput.value !== '') S.captura = Math.max(0.30, Math.min(1, parseFloat(capInput.value)/100));
+
+  var r = calcROIReal(S.captura);
+  var fmtH = function(n){ return (n||0).toLocaleString('pt-BR',{maximumFractionDigits:1}) + ' h'; };
+  // Código de cores usado na coluna "Como é calculado": distingue o que é dado
+  // informado pelo cliente, o que é referência fixa de mercado, e o que é o
+  // fator do cenário escolhido — em vez de apontar "ver acima/abaixo".
+  var pC = function(t){ return '<strong style="color:#1B4F8A">'+t+'</strong>'; };
+  var pF = function(t){ return '<span style="color:#888">'+t+'</span>'; };
+  var pS = function(t){ return '<strong style="color:var(--orange)">'+t+'</strong>'; };
+  var roiRow = function(label, formula, val) {
+    return '<tr><td style="color:#333;font-size:12px">'+label+'</td>' +
+      '<td style="font-size:11px;line-height:1.5">'+(formula||'')+'</td>' +
+      '<td style="text-align:right;font-weight:600;white-space:nowrap" class="roi-val">'+val+'</td></tr>';
+  };
+  var roiLegend = '<div style="display:flex;flex-wrap:wrap;gap:16px;font-size:10px;color:#888;margin-bottom:10px">' +
+    '<span>'+pC('■')+' dado informado nesta operação</span>' +
+    '<span>'+pF('■')+' referência de mercado (Agilean/Lean Construction)</span>' +
+    '<span>'+pS('■')+' fator do cenário escolhido</span>' +
+  '</div>';
+  var roiCard = function(label, val) {
+    return '<div style="padding:11px;background:var(--light);border-radius:var(--r3)">' +
+      '<div style="font-size:10px;color:#999;text-transform:uppercase;letter-spacing:0.06em">'+label+'</div>' +
+      '<div style="font-family:Bai Jamjuree;font-size:18px;font-weight:700">'+val+'</div></div>';
+  };
+
+  var cfgEl = document.getElementById('roi2-config');
+  if(cfgEl) {
+    cfgEl.innerHTML =
+      '<div class="input-group"><label>Mensalidade Agilean (R$)</label>' +
+        '<input class="text-input" id="roi2-mensalidade" type="text" inputmode="numeric" oninput="fmtOrcamento(this);buildROIReal()" value="'+fmtBRL(S.mensalidade)+'"></div>' +
+      '<div class="input-group"><label>Fator de captura / Cenário (%)</label>' +
+        '<input class="text-input" id="roi2-captura" type="number" min="30" max="100" step="5" oninput="buildROIReal()" value="'+Math.round(S.captura*100)+'"></div>';
+  }
+
+  var sumEl = document.getElementById('roi2-summary');
+  if(sumEl) {
+    sumEl.innerHTML = 'Mensalidade considerada: <strong style="color:#333">'+fmtNum(S.mensalidade)+'</strong> · Cenário: <strong style="color:#333">'+Math.round(S.captura*100)+'% ('+roiCapturaLabel(S.captura)+')</strong>';
+  }
+
+  // Parâmetros base informados pelo cliente (alimentam as linhas de R$ abaixo)
+  var diasFechamento = getDiasFechamentoAtual();
+  var paramItem = function(label, val, isMarket) {
+    var color = isMarket ? '#888' : '#1B4F8A';
+    return '<div style="font-size:11px;color:#666">• '+label+': <strong style="color:'+color+'">'+val+'</strong></div>';
+  };
+  var paramsEl = document.getElementById('roi2-params-box');
+  if(paramsEl) {
+    paramsEl.innerHTML =
+      '<div style="font-size:10px;color:#888;margin-bottom:8px">'+pC('■')+' dado informado nesta operação &nbsp; '+pF('■')+' referência de mercado</div>' +
+      '<div style="display:grid;grid-template-columns:1fr 1fr;gap:6px">' +
+        paramItem('Folha de MO própria/mês', fmtNum(S.roi2.folha||0)) +
+        paramItem('Custo hora técnica', 'R$ '+ROI_REAL_K.CUSTO_HORA_TECNICA+'/h', true) +
+        paramItem('Dias p/ fechar medição/folha hoje', fmtNumBare(diasFechamento)+' dias <span style="color:#999;font-weight:400">(resposta do Bloco MO)</span>') +
+        paramItem('Horas/dia dedicadas a esse fechamento', fmtH(S.roi2.hDiaAtual)) +
+        paramItem('Horas/semana conferindo qualidade', fmtH(S.roi2.hSemQualidade)) +
+      '</div>';
+  }
+
+  var fluxosTableEl = document.getElementById('roi2-fluxos-table');
+  if(fluxosTableEl) {
+    var fluxoRows = ROI_REAL_FLUXOS.map(function(f) {
+      var horas = S.roi2[f.key] || 0;
+      var resultado = horas * f.ganho;
+      var pct = Math.round(f.ganho*100);
+      return '<tr>' +
+        '<td>'+FLUXO_LABELS[f.key]+'</td>' +
+        '<td style="text-align:center;color:#1B4F8A;font-weight:600">'+fmtH(horas)+'/mês</td>' +
+        '<td style="text-align:center"><span style="padding:2px 8px;border-radius:20px;font-size:10px;font-weight:700;background:rgba(52,211,153,0.15);color:#0d6b45">Economiza '+pct+'%</span></td>' +
+        '<td style="text-align:right" class="roi-val">'+fmtH(resultado)+'</td>' +
+        '</tr>';
+    }).join('');
+    fluxosTableEl.innerHTML =
+      '<thead><tr><th>Fluxo (rotina hoje manual)</th><th style="text-align:center">Horas informadas</th><th style="text-align:center">Economia com SIIGA</th><th style="text-align:right">Horas recuperadas</th></tr></thead>' +
+      '<tbody>' + fluxoRows +
+      '<tr class="roi-total"><td colspan="3">Total — base de "Economia nos fluxos" e "Capacidade de gestão"</td><td style="text-align:right">'+fmtH(r.operacional.subtotalFluxos)+'</td></tr>' +
+      '</tbody>';
+  }
+
+  var estEl = document.getElementById('roi2-estrategica');
+  if(estEl) {
+    estEl.innerHTML =
+      '<div style="display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin-bottom:12px">' +
+        roiCard('ROI Mensal', Math.round(r.estrategica.roi*100)+'%') +
+        roiCard('Payback', isFinite(r.estrategica.payback) ? fmtNumBare(r.estrategica.payback)+' meses' : '—') +
+        roiCard('Ganho Líquido/mês', fmtNum(r.estrategica.ganhoLiquido)) +
+      '</div>' +
+      roiLegend +
+      '<table class="roi-table"><thead><tr><th>Item</th><th>Como é calculado</th><th style="text-align:right">Valor</th></tr></thead><tbody>' +
+        roiRow('Retrabalho administrativo liberado ('+fmtH(r.estrategica.horasAdmLib)+')',
+          pC('Dias de fechamento informados')+' × 8h/dia × '+pF('R$115/h')+' × '+pS('fator do cenário'),
+          fmtNum(r.estrategica.rec1)) +
+        roiRow('Pagamentos por retrabalho evitados',
+          pC('Folha de MO própria informada')+' × '+pF('5% de retrabalho')+' × '+pS('fator do cenário'),
+          fmtNum(r.estrategica.rec2)) +
+        roiRow('Pagamentos indevidos rastreados',
+          pC('Folha de MO própria informada')+' × '+pF('5% indevidos × 80% sem sobreposição')+' × '+pS('fator do cenário'),
+          fmtNum(r.estrategica.rec3)) +
+        roiRow('<strong>Recuperação financeira total</strong>', '<span style="color:#999">Soma das 3 linhas acima</span>', '<strong>'+fmtNum(r.estrategica.recTotal)+'</strong>') +
+        roiRow('Capacidade de gestão liberada ('+fmtH(r.estrategica.horasLib)+')',
+          pC('Soma dos 8 fluxos informados')+' (quadro "De onde vêm as horas") × '+pS('fator do cenário')+' × '+pF('R$115/h'),
+          fmtNum(r.estrategica.valorCapacidade)) +
+        roiRow('Investimento Agilean (mensalidade)', '<span style="color:#999">Valor definido pelo consultor</span>', '− '+fmtNum(S.mensalidade)) +
+      '</tbody></table>';
+  }
+
+  var opEl = document.getElementById('roi2-operacional');
+  if(opEl) {
+    opEl.innerHTML =
+      '<div style="display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin-bottom:12px">' +
+        roiCard('Horas recuperadas/mês', fmtH(r.operacional.hMes)) +
+        roiCard('Horas recuperadas/obra', fmtH(r.operacional.hObra)) +
+        roiCard('% da jornada liberada', (Math.round(r.operacional.pctJornada*1000)/10)+'%') +
+      '</div>' +
+      roiLegend +
+      '<table class="roi-table"><thead><tr><th>Item</th><th>Como é calculado</th><th style="text-align:right">Valor</th></tr></thead><tbody>' +
+        roiRow('Economia nos fluxos de gestão',
+          pC('Soma das horas informadas nos 8 fluxos')+' (quadro "De onde vêm as horas") × '+pF('% de economia por fluxo'),
+          fmtH(r.operacional.subtotalFluxos)) +
+        roiRow('Fechamento de medição mais rápido',
+          '('+pC('dias × horas/dia informados hoje')+') − (mesmos dados × '+pF('70% de redução SIIGA')+')',
+          fmtH(r.operacional.fechRapido)) +
+        roiRow('Fim da conferência manual de qualidade',
+          pC('Horas/semana informadas')+' × '+pF('4,33 semanas/mês'),
+          fmtH(r.operacional.fimConf)) +
+        roiRow('Desconto de sobreposição entre blocos',
+          '<span style="color:#999">Soma bruta das linhas acima</span> × '+pF('15% de sobreposição'),
+          '− '+fmtH(r.operacional.descBlocos)) +
+        roiRow('<strong>Potencial pleno (antes do fator de captura)</strong>', '<span style="color:#999">Soma bruta − desconto de sobreposição</span>', '<strong>'+fmtH(r.operacional.potPleno)+'</strong>') +
+      '</tbody></table>';
+  }
+
+  var cenTableEl = document.getElementById('roi2-cenarios-table');
+  if(cenTableEl) {
+    var cenRows = ROI_REAL_CENARIOS.map(function(c) {
+      var isAtivo = Math.abs(c.fator - S.captura) < 0.001;
+      var rc = calcROIReal(c.fator);
+      var rowStyle = isAtivo
+        ? 'background:rgba(255,95,31,0.08);border-left:3px solid var(--orange)'
+        : '';
+      var nomeCell = isAtivo
+        ? '<strong style="color:var(--orange)">✓ '+c.nome+'</strong>'
+        : c.nome;
+      return '<tr style="'+rowStyle+'">' +
+        '<td>'+nomeCell+'</td>' +
+        '<td style="text-align:center;color:#666">'+Math.round(c.fator*100)+'%</td>' +
+        '<td style="text-align:right" class="roi-val">'+Math.round(rc.estrategica.roi*100)+'%</td>' +
+        '<td style="text-align:right" class="roi-val">'+fmtNum(rc.estrategica.ganhoLiquido)+'</td>' +
+        '<td style="text-align:right" class="roi-val">'+fmtH(rc.operacional.hMes)+'</td>' +
+        '</tr>';
+    }).join('');
+    cenTableEl.innerHTML =
+      '<thead><tr>' +
+        '<th>Cenário</th><th style="text-align:center">Fator</th>' +
+        '<th style="text-align:right">ROI Mensal</th>' +
+        '<th style="text-align:right">Ganho Líquido/mês</th>' +
+        '<th style="text-align:right">Horas/mês</th>' +
+      '</tr></thead><tbody>' + cenRows + '</tbody>';
+  }
+}
+
+// Título curto + impacto (consequência/custo) para cada pergunta pontuada.
+// Cobre F1-F4 e MO por completo — antes só ~9 das ~28 perguntas eram avaliadas aqui.
+var GAP_INFO = {
+  'F1.1':{title:'Formalidade do planejamento', impact:'Sem aprovação formal antes do início, a obra herda decisões de última hora que já deveriam estar travadas na largada.'},
+  'F1.2':{title:'Técnica de planejamento', impact:'Sem Linha de Balanço por lotes, é impossível visualizar gargalos antecipadamente — decisões de equipe são feitas no feeling.'},
+  'F1.3':{title:'Dimensionamento de equipes', impact:'Equipes dimensionadas por estimativa geram folga ou furo de mão de obra que só aparece quando o atraso já aconteceu.'},
+  'F1.4':{title:'Integração orçamento × planejamento', impact:'Orçamento e planejamento desconectados escondem desvio de custo até o fechamento — quando já é tarde para agir.'},
+  'F1.5':{title:'Acompanhamento da Curva S', impact:'Desvios de prazo são identificados semanas depois. Sem projeção de término, não há decisão estruturada de recuperação.'},
+  'F1.6':{title:'Cronograma bancário', impact:'Retrabalho duplo em toda reprogramação. Exposição de caixa invisível gera risco financeiro não mapeado.'},
+  'F1.7':{title:'Integração planejamento × suprimentos', impact:'Compras emergenciais têm custo 15–25% maior. Paradas por material faltante são evitáveis.'},
+  'F2.1':{title:'Lookahead / gestão de restrições', impact:'Restrições aparecem quando já atrasaram. Antecipação reduz paradas não planejadas em até 40%.'},
+  'F2.2':{title:'Antecipação de riscos de parada', impact:'Sem visibilidade de risco com semanas de antecedência, cada parada vira surpresa — e surpresa tem custo de produção parada.'},
+  'F2.3':{title:'Planejamento de MO no médio prazo', impact:'Equipe não confirmada para as próximas semanas é risco imediato de parada por falta de mão de obra.'},
+  'F2.4':{title:'Ciclo de reprogramação', impact:'Sem ciclo formal de reprogramação, os mesmos desvios se acumulam de mês em mês sem correção estrutural.'},
+  'F3.1':{title:'Programação semanal', impact:'Obra opera sem feedback real. Uma semana de decisão perdida a cada ciclo.'},
+  'F3.2':{title:'Check-out e check-in diário', impact:'Sem ritual diário, o engenheiro descobre os problemas do canteiro de forma descoordenada — depois que já impactaram o dia.'},
+  'F3.3':{title:'Rastreabilidade de desvios', impact:'Sem registro e causa raiz, os mesmos problemas se repetem indefinidamente — sem nenhuma curva de aprendizado.'},
+  'F3.4':{title:'Frequência de coleta do avanço', impact:'Avanço físico coletado por estimativa mensal. Dado chega semanas atrasado — improdutividade de MO fica invisível até o fechamento.'},
+  'F3.5':{title:'Qualidade vinculada ao pagamento', impact:'Sem vínculo entre qualidade aprovada e pagamento, paga-se por produção que pode precisar de retrabalho.'},
+  'F3.6':{title:'Análise intermediária de MO', impact:'Sem análise quinzenal, funcionários e empreiteiros improdutivos só são identificados no fechamento — quando o custo já foi gerado.'},
+  'F4.1':{title:'Fechamento técnico de período', impact:'Sem fechamento técnico estruturado, os dados gerados nas Fases 1, 2 e 3 morrem na semana — a próxima reprogramação recomeça do zero.'},
+  'F4.2':{title:'Reunião executiva com diretoria', impact:'Reunião executiva sem dados estruturados. Decisões tomadas no feeling — cada reunião termina com narrativa, não com plano.'},
+  'F4.3':{title:'Performance HUB — visão integrada', impact:'Sem painel único, alguém precisa compilar manualmente prazo, custo e qualidade antes de cada reunião — tempo gasto montando o dado, não decidindo.'},
+  'F4.4':{title:'Pagamento por Evidência', impact:'Fechamento sem base objetiva de produção paga por estimativa ou negociação — sem rastreabilidade e sem auditoria possível.'},
+  'MO.1':{title:'Transparência de metas para equipes', impact:'Quando o operário não sabe o que vai ganhar, não tem como se comprometer com uma meta — a produtividade fica ao acaso.'},
+  'MO.2':{title:'Visibilidade de improdutividade', impact:'Funcionário improdutivo é custo sem dono. Em múltiplas obras simultâneas, esse gap se multiplica — não é problema de uma obra, é padrão de operação.'},
+  'MO.3':{title:'Gestão de aditivos de verba', impact:'Verba extra aprovada só depois de executada distorce o custo real de cada serviço e cria passivo de ajuste.'},
+  'MO.4':{title:'Eficiência do fechamento de folha', impact:'Cada dia de engenharia gasto fechando folha é um dia a menos de gestão ativa da obra — e indica ausência de dados estruturados.'},
+  'MO.5':{title:'Alinhamento de metas com empreiteiros', impact:'Empreiteiro sem meta clara trabalha no ritmo dele — não no ritmo da obra.'},
+  'MO.6':{title:'Comunicação de bloqueios de pagamento', impact:'Empreiteiro que descobre pendência de qualidade só no fechamento gera conflito mensal garantido.'},
+  'MO.7':{title:'Eficiência do fechamento de medição', impact:'Medição de empreiteiros que leva uma semana é fechada na base da negociação — não do registro.'}
+};
+
 function generateOpportunities() {
   var opps = [];
-  var f1 = S.scores.f1||[], f2 = S.scores.f2||[], f3 = S.scores.f3||[], f4 = S.scores.f4||[];
-  if((f1[0]||0)<=1) opps.push({gap:'Sem linha de base técnica com equipes dimensionadas',phase:'F1',color:'#1B4F8A',impact:'Obras sem LB têm 20–30% mais estouro de prazo. Cada semana de atraso tem custo de oportunidade direto.'});
-  if((f1[1]||0)<=1) opps.push({gap:'Planejamento sem Linha de Balanço por lotes',phase:'F1',color:'#1B4F8A',impact:'Impossível visualizar gargalos antecipadamente. Decisões de equipe são feitas no feeling.'});
-  if((f1[4]||0)<=1) opps.push({gap:'Suprimentos desconectado do planejamento',phase:'F1',color:'#1B4F8A',impact:'Compras emergenciais têm custo 15–25% maior. Paradas por material faltante são evitáveis.'});
-  if((f1[5]||0)<=1) opps.push({gap:'Sem acompanhamento estratégico da Curva S',phase:'F1',color:'#1B4F8A',impact:'Desvios de prazo são identificados semanas tarde. Sem projeção de término, não há decisão estruturada de recuperação.'});
-  if((f1[6]||0)<=1) opps.push({gap:'Cronograma bancário desconectado do planejamento',phase:'F1',color:'#1B4F8A',impact:'Retrabalho duplo em toda reprogramação. Exposição de caixa invisível gera risco financeiro não mapeado.'});
-  if((f2[0]||0)<=1) opps.push({gap:'Sem lookahead estruturado e gestão de restrições',phase:'F2',color:'#0D7C8C',impact:'Restrições aparecem quando já atrasaram. Antecipação reduz paradas não planejadas em até 40%.'});
-  if((f3[0]||0)<=1) opps.push({gap:'Sem plano semanal e cadência diária (Last Planner)',phase:'F3',color:'#0D6B45',impact:'Obra opera sem feedback real. Uma semana de decisão perdida a cada ciclo.'});
-  if((f3[2]||0)<=1) opps.push({gap:'Avanço físico coletado por estimativa mensal',phase:'F3',color:'#0D6B45',impact:'Dado chega semanas atrasado. Improdutividade de MO invisível até o fechamento.'});
-  if((f4[0]||0)<=1) opps.push({gap:'Reunião executiva sem dados estruturados',phase:'F4',color:'#4a4558',impact:'Decisões tomadas no feeling. Cada reunião termina com narrativa — não com plano.'});
-  return opps.slice(0,7);
+
+  function pushGaps(bk, arr, qs) {
+    arr = arr || [];
+    qs.forEach(function(q, i) {
+      if(q.type === 'numgrid') return;
+      var score = arr[i] || 0;
+      if(score <= 1) {
+        var info = GAP_INFO[q.code] || { title: q.code, impact: q.reveals || '' };
+        opps.push({ gap: info.title, phase: bk.toUpperCase(), color: PQ[bk].colorHex, impact: info.impact, score: score });
+      }
+    });
+  }
+  pushGaps('f1', S.scores.f1, PQ.f1.qs);
+  pushGaps('f2', S.scores.f2, PQ.f2.qs);
+  pushGaps('f3', S.scores.f3, PQ.f3.qs);
+  pushGaps('f4', S.scores.f4, PQ.f4.qs);
+
+  // MO usa objeto por código (não array por índice) e é filtrado por modelo de MO
+  var moScores = S.scores.mo || {};
+  getFilteredQs(PQ.mo).forEach(function(q) {
+    if(q.type === 'numgrid') return;
+    var score = moScores[q.code] || 0;
+    if(score <= 1) {
+      var info = GAP_INFO[q.code] || { title: q.code, impact: q.reveals || '' };
+      opps.push({ gap: info.title, phase: 'MO', color: PQ.mo.colorHex, impact: info.impact, score: score });
+    }
+  });
+
+  opps.sort(function(a,b){ return a.score - b.score; }); // pior score primeiro
+  return opps.slice(0, 10);
 }
 
 function calculateROI() {
@@ -1349,6 +1709,124 @@ function calculateROI() {
   };
 }
 
+// ═══════════════════════════════════════════
+//  ROI REAL — portado de calculadora-roi-agilean.html
+//  Usa os dados coletados no diagnóstico (S.roi2) em vez de
+//  estimativas teóricas baseadas só no score de maturidade.
+// ═══════════════════════════════════════════
+var ROI_REAL_K = {
+  CUSTO_HORA_ADM: 115,        // R$/h reforço administrativo
+  CUSTO_HORA_TECNICA: 115,    // R$/h equipe de gestão — fixo, não perguntado ao cliente
+  PCT_RETRABALHO: 0.05,       // pagamentos de retrabalho sobre a folha
+  PCT_INDEVIDOS: 0.05,        // pagamentos indevidos sem rastreio sobre a folha
+  DESC_SOBREPOSICAO: 0.20,    // sobreposição entre riscos (Estratégica)
+  DESC_BLOCOS_ENG: 0.15,      // sobreposição entre blocos (Operacional)
+  GANHO_PLANEJAR: 0.40,       // fluxo "Planejar cronograma"
+  GANHO_PADRAO: 0.90,         // demais fluxos
+  JORNADA: 176,               // horas úteis/mês
+  HORAS_DIA: 8,               // conversão horas → dias
+  FATOR_AGILEAN: 0.30         // valor "com Agilean" = valor atual × 0,30 (redução de 70%)
+};
+
+var ROI_REAL_FLUXOS = [
+  { key:'fluxoPlanejar',    ganho: ROI_REAL_K.GANHO_PLANEJAR },
+  { key:'fluxoCurto',       ganho: ROI_REAL_K.GANHO_PADRAO },
+  { key:'fluxoMedio',       ganho: ROI_REAL_K.GANHO_PADRAO },
+  { key:'fluxoMedir',       ganho: ROI_REAL_K.GANHO_PADRAO },
+  { key:'fluxoReprogramar', ganho: ROI_REAL_K.GANHO_PADRAO },
+  { key:'fluxoCruzar',      ganho: ROI_REAL_K.GANHO_PADRAO },
+  { key:'fluxoConferir',    ganho: ROI_REAL_K.GANHO_PADRAO },
+  { key:'fluxoERP',         ganho: ROI_REAL_K.GANHO_PADRAO }
+];
+
+var FLUXO_LABELS = {
+  fluxoPlanejar:    'Planejar cronograma',
+  fluxoCurto:       'Criar curto prazo',
+  fluxoMedio:       'Controlar médio prazo',
+  fluxoMedir:       'Medir',
+  fluxoReprogramar: 'Reprogramar',
+  fluxoCruzar:      'Cruzar dados',
+  fluxoConferir:    'Conferir planilhas',
+  fluxoERP:         'Passar medição para o ERP'
+};
+
+var ROI_REAL_CENARIOS = [
+  { nome:'Pessimista',  fator:0.30 },
+  { nome:'Conservador', fator:0.50 },
+  { nome:'Realista',    fator:0.70 },
+  { nome:'Pleno',       fator:1.00 }
+];
+
+// Converte a resposta categórica de MO.4/MO.7 (0-3) em uma estimativa de dias
+// para fechar medição/folha — evita perguntar de novo o que o Bloco MO já capturou.
+function diasFromMOScore(score) {
+  var map = { 0:6, 1:3.5, 2:2, 3:1 };
+  return map[score] !== undefined ? map[score] : 5;
+}
+
+function getDiasFechamentoAtual() {
+  var mo = S.scores.mo || {};
+  var temPropria = mo['MO.4'] !== undefined;
+  var temTerc = mo['MO.7'] !== undefined;
+  if(temPropria && temTerc) return (diasFromMOScore(mo['MO.4']) + diasFromMOScore(mo['MO.7'])) / 2;
+  if(temPropria) return diasFromMOScore(mo['MO.4']);
+  if(temTerc) return diasFromMOScore(mo['MO.7']);
+  return 5; // fallback conservador se o Bloco MO ainda não foi respondido
+}
+
+function calcROIReal(fator) {
+  var r = S.roi2 || {};
+  var K = ROI_REAL_K;
+  fator = (fator === undefined || fator === null) ? (S.captura || 0.50) : fator;
+  var prazo = S.prazoMedio || 18;
+  var mensalidade = S.mensalidade || 0;
+  var diasAtual = getDiasFechamentoAtual();
+
+  var diasAgilean = diasAtual * K.FATOR_AGILEAN;
+  var hDiaAgilean  = (r.hDiaAtual||0) * K.FATOR_AGILEAN;
+
+  // ---- Operacional ----
+  var subtotalFluxos = ROI_REAL_FLUXOS.reduce(function(acc, f) {
+    return acc + (r[f.key]||0) * f.ganho;
+  }, 0);
+  var fechRapido = Math.max(0, diasAtual*(r.hDiaAtual||0) - diasAgilean*hDiaAgilean);
+  var fimConf = (r.hSemQualidade||0) * 4.33;
+  var subtotalRotina = fechRapido + fimConf;
+  var bruto = subtotalFluxos + subtotalRotina;
+  var descBlocos = bruto * K.DESC_BLOCOS_ENG;
+  var potPleno = bruto * (1 - K.DESC_BLOCOS_ENG);
+  var hMes = potPleno * fator;
+  var hObra = hMes * prazo;
+  var pctJornada = hMes / K.JORNADA;
+
+  // ---- Estratégica ----
+  // horasLib deriva do detalhamento operacional (subtotalFluxos), em vez de
+  // uma estimativa genérica separada de "horas de gestão" + "eficiência".
+  var horasAdmLib = Math.max(0, diasAtual - diasAgilean) * K.HORAS_DIA;
+  var rec1 = horasAdmLib * K.CUSTO_HORA_ADM * fator;
+  var rec2 = (r.folha||0) * K.PCT_RETRABALHO * fator;
+  var rec3 = (r.folha||0) * K.PCT_INDEVIDOS * (1 - K.DESC_SOBREPOSICAO) * fator;
+  var recTotal = rec1 + rec2 + rec3;
+  var horasLib = subtotalFluxos * fator;
+  var valorCapacidade = horasLib * K.CUSTO_HORA_TECNICA;
+  var ganhoLiquido = recTotal + valorCapacidade - mensalidade;
+  var roiPct = mensalidade > 0 ? ganhoLiquido / mensalidade : 0;
+  var payback = ganhoLiquido > 0 ? mensalidade / ganhoLiquido : Infinity;
+
+  return {
+    fator: fator, mensalidade: mensalidade, prazo: prazo,
+    operacional: {
+      subtotalFluxos: subtotalFluxos, fechRapido: fechRapido, fimConf: fimConf,
+      subtotalRotina: subtotalRotina, bruto: bruto, descBlocos: descBlocos,
+      potPleno: potPleno, hMes: hMes, hObra: hObra, pctJornada: pctJornada
+    },
+    estrategica: {
+      horasAdmLib: horasAdmLib, rec1: rec1, rec2: rec2, rec3: rec3, recTotal: recTotal,
+      horasLib: horasLib, valorCapacidade: valorCapacidade, ganhoLiquido: ganhoLiquido,
+      roi: roiPct, payback: payback
+    }
+  };
+}
 
 function buildRoadmap() {
   var f1p = getAvgPct('f1');
@@ -1581,7 +2059,9 @@ function buildRoadmap() {
 // ═══════════════════════════════════════════
 function restartAssessment() {
   clearDraft();
-  S = {empresa:'',consultor:'',contato:'',cargo:'',email:'',telefone:'',data:'',numObras:5,orcamentoMedio:8000000,prazoMedio:18,numObrasRange:'',orcamentoRange:'',tipologia:'',modeloMO:'',momento:'',scores:{b03:0,b06:0,f1:[0,0,0,0,0,0,0],f2:[0,0,0,0],f3:[0,0,0,0,0,0],mo:{},f4:[0,0,0,0]},showMO:false};
+  S = {empresa:'',consultor:'',contato:'',cargo:'',email:'',telefone:'',data:'',numObras:5,orcamentoMedio:8000000,prazoMedio:18,numObrasRange:'',orcamentoRange:'',tipologia:'',modeloMO:'',momento:'',scores:{b03:0,b06:0,f1:[0,0,0,0,0,0,0,0],f2:[0,0,0,0,0],f3:[0,0,0,0,0,0,0],mo:{},f4:[0,0,0,0,0]},showMO:false,
+    roi2:{folha:0,hDiaAtual:0,hSemQualidade:0,fluxoPlanejar:0,fluxoCurto:0,fluxoMedio:0,fluxoReprogramar:0,fluxoMedir:0,fluxoConferir:0,fluxoERP:0,fluxoCruzar:0},
+    mensalidade:2000, captura:0.50};
   currentBlock='b0'; currentQIdx=0; currentPhaseIdx=0; phaseOrder=['f1','f2','f3','f4'];
   radarChartInst=null;
   document.getElementById('c-empresa').value='';
@@ -1623,6 +2103,88 @@ function fmtOrcamento(input) {
 // ═══════════════════════════════════════════
 //  PDF GENERATION
 // ═══════════════════════════════════════════
+// Aplica o tema claro / texto escuro (mesma lógica de antes) diretamente sobre
+// um container REAL (não um clone de iframe do html2canvas) — usado pela
+// captura seção-por-seção do generatePDF.
+function applyPdfLightTheme(root) {
+  root.style.background = 'white';
+  root.style.color = '#1a1a1a';
+
+  root.querySelectorAll('.no-print,.btn-row,.top-nav,#progress-bar').forEach(function(b){
+    b.style.display = 'none';
+  });
+
+  root.querySelectorAll('.card,.card-wide').forEach(function(c){
+    c.style.background = 'white';
+    c.style.border = '1px solid #e0e0e0';
+    c.style.boxShadow = '0 1px 4px rgba(0,0,0,0.08)';
+    c.style.color = '#1a1a1a';
+  });
+
+  // Fix ALL text elements — força texto escuro e reforça peso da fonte.
+  root.querySelectorAll('p,div,span,li,td,th,h1,h2,h3,h4,h5,label').forEach(function(el) {
+    var cs = window.getComputedStyle(el);
+    var col = cs.color;
+    var fontSize = parseFloat(cs.fontSize) || 0;
+    var fontWeight = parseInt(cs.fontWeight, 10) || 400;
+    var darkened = false;
+    if(col === 'rgb(255, 255, 255)' || col === 'rgba(255, 255, 255, 1)') {
+      el.style.color = '#1a1a1a';
+      darkened = true;
+    } else if(col.indexOf('rgba') >= 0) {
+      var parts = col.match(/[\d.]+/g);
+      if(parts && parseFloat(parts[3]) < 0.7) {
+        el.style.color = '#1a1a1a';
+        darkened = true;
+      }
+    } else {
+      var m = col.match(/^rgb\((\d+),\s*(\d+),\s*(\d+)\)$/);
+      if(m) {
+        var r = +m[1], g = +m[2], b = +m[3];
+        if(Math.abs(r-g) < 12 && Math.abs(g-b) < 12 && r > 60 && r < 220) {
+          el.style.color = fontSize >= 11 ? '#1a1a1a' : '#444444';
+          darkened = true;
+        }
+      }
+    }
+    if(darkened && fontSize >= 11 && fontWeight < 500) {
+      el.style.fontWeight = '500';
+    }
+  });
+
+  root.querySelectorAll('[style*="color:var(--orange)"], [style*="color: var(--orange)"]').forEach(function(e){
+    e.style.color = '#ff5f1f';
+  });
+
+  root.querySelectorAll('*').forEach(function(el) {
+    if(el.style && el.style.color && el.style.color.indexOf('var(') >= 0) {
+      if(el.style.color.indexOf('orange') >= 0) el.style.color = '#ff5f1f';
+      else if(el.style.color.indexOf('gray') >= 0) el.style.color = '#666';
+      else el.style.color = '#1a1a1a';
+    }
+    if(el.style && el.style.background && el.style.background.indexOf('var(') >= 0) {
+      el.style.background = 'white';
+    }
+    if(el.style && el.style.borderColor && el.style.borderColor.indexOf('var(') >= 0) {
+      el.style.borderColor = '#e0e0e0';
+    }
+  });
+
+  root.querySelectorAll('.score-bar').forEach(function(b){
+    b.style.background = '#f0f0f0';
+  });
+
+  root.querySelectorAll('.rep-sec-title').forEach(function(t){
+    t.style.color = '#ff5f1f';
+    t.style.borderColor = '#ff5f1f';
+  });
+
+  root.querySelectorAll('table td, table th').forEach(function(c){
+    c.style.color = '#1a1a1a';
+    c.style.borderColor = '#e0e0e0';
+  });
+}
+
 function generatePDF(fromAdmin) {
   // Build report content first
   if(fromAdmin) {
@@ -1651,176 +2213,168 @@ function generatePDF(fromAdmin) {
   // Wait for render then capture
   setTimeout(function() {
     var reportEl = document.getElementById('screen-report');
-    var originalBg = reportEl.style.background;
-    reportEl.style.background = 'white';
+    var wrapper = reportEl.querySelector(':scope > div');
+    var sections = wrapper ? Array.prototype.slice.call(wrapper.children) : [];
 
-    html2canvas(reportEl, {
-      scale: 1.8,
-      useCORS: true,
-      allowTaint: true,
-      backgroundColor: '#ffffff',
-      scrollY: 0,
-      windowWidth: 960,
-      onclone: function(doc) {
-        // Force light theme on entire document
-        var body = doc.body;
-        body.style.background = 'white';
-        body.style.color = '#1a1a1a';
-
-        // Make report screen visible and light
-        var el = doc.getElementById('screen-report');
-        if(el) {
-          el.style.display = 'block';
-          el.style.minHeight = 'auto';
-          el.style.padding = '24px';
-          el.style.background = 'white';
-          el.style.color = '#1a1a1a';
-        }
-
-        // Hide nav elements
-        doc.querySelectorAll('.no-print,.btn-row,.top-nav,#progress-bar').forEach(function(b){
-          b.style.display = 'none';
-        });
-
-        // Fix all cards
-        doc.querySelectorAll('.card,.card-wide').forEach(function(c){
-          c.style.background = 'white';
-          c.style.border = '1px solid #e0e0e0';
-          c.style.boxShadow = '0 1px 4px rgba(0,0,0,0.08)';
-          c.style.color = '#1a1a1a';
-        });
-
-        // Fix ALL text elements — force dark text
-        doc.querySelectorAll('p,div,span,li,td,th,h1,h2,h3,h4,h5,label').forEach(function(el) {
-          var cs = window.getComputedStyle(el);
-          var col = cs.color;
-          // If text is white/very light, force dark
-          if(col === 'rgb(255, 255, 255)' || col === 'rgba(255, 255, 255, 1)') {
-            el.style.color = '#1a1a1a';
-          } else if(col.indexOf('rgba') >= 0) {
-            // rgba with low opacity on dark bg — make opaque dark
-            var parts = col.match(/[\d.]+/g);
-            if(parts && parseFloat(parts[3]) < 0.7) {
-              el.style.color = '#555';
-            }
-          }
-        });
-
-        // Preserve orange as brand color
-        doc.querySelectorAll('[style*="color:var(--orange)"], [style*="color: var(--orange)"]').forEach(function(e){
-          e.style.color = '#ff5f1f';
-        });
-
-        // Fix inline styles with CSS variables
-        doc.querySelectorAll('*').forEach(function(el) {
-          if(el.style && el.style.color && el.style.color.indexOf('var(') >= 0) {
-            if(el.style.color.indexOf('orange') >= 0) el.style.color = '#ff5f1f';
-            else if(el.style.color.indexOf('gray') >= 0) el.style.color = '#666';
-            else el.style.color = '#1a1a1a';
-          }
-          if(el.style && el.style.background && el.style.background.indexOf('var(') >= 0) {
-            el.style.background = 'white';
-          }
-          if(el.style && el.style.borderColor && el.style.borderColor.indexOf('var(') >= 0) {
-            el.style.borderColor = '#e0e0e0';
-          }
-        });
-
-        // Fix score bars and badges
-        doc.querySelectorAll('.score-bar').forEach(function(b){
-          b.style.background = '#f0f0f0';
-        });
-
-        // Fix rep-sec-title (section titles)
-        doc.querySelectorAll('.rep-sec-title').forEach(function(t){
-          t.style.color = '#ff5f1f';
-          t.style.borderColor = '#ff5f1f';
-        });
-
-        // Fix table cells
-        doc.querySelectorAll('table td, table th').forEach(function(c){
-          c.style.color = '#1a1a1a';
-          c.style.borderColor = '#e0e0e0';
-        });
-      }
-    }).then(function(canvas) {
-      reportEl.style.background = originalBg;
+    if(sections.length === 0) {
       document.body.removeChild(loadDiv);
+      alert('Erro ao gerar PDF: conteúdo do relatório não encontrado.');
+      return;
+    }
 
-      var jsPDF = window.jspdf ? window.jspdf.jsPDF : window.jsPDF;
-      var pdf = new jsPDF({
-        orientation: 'portrait',
-        unit: 'mm',
-        format: 'a4',
-        compress: true
-      });
+    // Canvas gigante (a página inteira de uma vez) sai com o texto "borrado/apagado"
+    // no html2canvas — é uma limitação de qualidade em canvases muito grandes/altos.
+    // Por isso capturamos SEÇÃO POR SEÇÃO (cada card em um canvas pequeno e nítido)
+    // e cada grupo de seções que cabe numa página do PDF já nasce como uma página —
+    // isso também resolve, de graça, o corte de seção no meio entre páginas.
+    var CONTENT_PX_WIDTH = 920; // == max-width do wrapper do relatório
+    var jsPDFNS = window.jspdf ? window.jspdf.jsPDF : window.jsPDF;
+    var pdf = new jsPDFNS({ orientation: 'portrait', unit: 'mm', format: 'a4', compress: true });
+    var pageW = pdf.internal.pageSize.getWidth();
+    var pageH = pdf.internal.pageSize.getHeight();
+    var margin = 10;
+    var contentWMm = pageW - margin * 2;
+    var mmPerPx = contentWMm / CONTENT_PX_WIDTH;
 
-      var pageW = pdf.internal.pageSize.getWidth();
-      var pageH = pdf.internal.pageSize.getHeight();
-      var margin = 10;
-      var contentW = pageW - margin * 2;
-      var imgW = canvas.width;
-      var imgH = canvas.height;
-      var ratio = contentW / (imgW / 3.779527559); // px to mm at 96dpi
-      var scaledW = contentW;
-      var scaledH = (imgH / imgW) * scaledW;
-      var imgData = canvas.toDataURL('image/jpeg', 0.92);
+    var heightsPx = sections.map(function(s){ return s.getBoundingClientRect().height; });
 
-      // Add header bar on first page
-      pdf.setFillColor(255, 95, 31);
-      pdf.rect(0, 0, pageW, 8, 'F');
-
-      // Add pages
-      var yOffset = 10;
-      var remainingH = scaledH;
-      var srcY = 0;
-      var pageNum = 0;
-
-      while(remainingH > 0) {
-        var availH = pageH - margin - (pageNum === 0 ? 10 : margin);
-        var chunkH = Math.min(remainingH, availH);
-        var srcH = (chunkH / scaledH) * imgH;
-
-        // Create chunk canvas
-        var chunkCanvas = document.createElement('canvas');
-        chunkCanvas.width = imgW;
-        chunkCanvas.height = srcH;
-        var ctx = chunkCanvas.getContext('2d');
-        ctx.fillStyle = '#ffffff';
-        ctx.fillRect(0, 0, imgW, srcH);
-        ctx.drawImage(canvas, 0, srcY, imgW, srcH, 0, 0, imgW, srcH);
-        var chunkData = chunkCanvas.toDataURL('image/jpeg', 0.92);
-
-        if(pageNum > 0) {
-          pdf.addPage();
-          pdf.setFillColor(255, 95, 31);
-          pdf.rect(0, 0, pageW, 3, 'F');
-        }
-
-        var yPos = pageNum === 0 ? yOffset : margin;
-        pdf.addImage(chunkData, 'JPEG', margin, yPos, scaledW, chunkH);
-
-        // Footer
-        pdf.setFontSize(7);
-        pdf.setTextColor(150, 150, 150);
-        pdf.text('SIIGA Assessment · Agilean · Avaliação de Maturidade', margin, pageH - 4);
-        pdf.text('Página ' + (pageNum+1), pageW - margin - 15, pageH - 4);
-
-        srcY += srcH;
-        remainingH -= chunkH;
-        pageNum++;
+    // Bin-packing simples: agrupa seções consecutivas até estourar a altura da página.
+    var pageGroups = [];
+    var cur = [], curHMm = 0;
+    for(var i = 0; i < sections.length; i++) {
+      var hMm = heightsPx[i] * mmPerPx;
+      var availMm = pageGroups.length === 0 ? (pageH - margin - 10) : (pageH - margin - margin);
+      if(cur.length > 0 && (curHMm + hMm) > availMm) {
+        pageGroups.push(cur);
+        cur = [];
+        curHMm = 0;
       }
+      cur.push(i);
+      curHMm += hMm;
+    }
+    if(cur.length > 0) pageGroups.push(cur);
 
-      // Save PDF
+    var pageIdx = 0;
+    var globalPageNum = 0; // numeração real do PDF — inclui a página do Radar antes das seções
+
+    function finish() {
       var empresa = (S.empresa || 'diagnostico').replace(/[^a-zA-Z0-9]/g, '_');
       var data = (S.data || new Date().toISOString().split('T')[0]);
       pdf.save('SIIGA_Assessment_' + empresa + '_' + data + '.pdf');
+      document.body.removeChild(loadDiv);
       showToast('PDF gerado com sucesso!');
+    }
 
-    }).catch(function(err) {
+    function fail(err) {
       document.body.removeChild(loadDiv);
       console.error('PDF error:', err);
       alert('Erro ao gerar PDF. Tente usar o botão Imprimir como alternativa.');
+    }
+
+    // Adiciona uma página ao PDF a partir de um canvas já capturado (radar ou seção do relatório).
+    function addImagePage(canvas) {
+      var imgW = canvas.width, imgH = canvas.height;
+      var wMm = contentWMm;
+      var hMm = (imgH / imgW) * wMm;
+      var imgData = canvas.toDataURL('image/png');
+
+      if(globalPageNum > 0) pdf.addPage();
+      pdf.setFillColor(255, 95, 31);
+      pdf.rect(0, 0, pageW, globalPageNum === 0 ? 8 : 3, 'F');
+
+      var yPos = globalPageNum === 0 ? 10 : margin;
+      pdf.addImage(imgData, 'PNG', margin, yPos, wMm, hMm);
+
+      pdf.setFontSize(7);
+      pdf.setTextColor(150, 150, 150);
+      pdf.text('SIIGA Assessment · Agilean · Avaliação de Maturidade', margin, pageH - 4);
+      pdf.text('Página ' + (globalPageNum + 1), pageW - margin - 15, pageH - 4);
+
+      globalPageNum++;
+    }
+
+    function renderPage() {
+      if(pageIdx >= pageGroups.length) { finish(); return; }
+
+      var idxList = pageGroups[pageIdx];
+      var temp = document.createElement('div');
+      temp.style.cssText = 'position:fixed;left:-99999px;top:0;width:' + CONTENT_PX_WIDTH + 'px;background:white;';
+      idxList.forEach(function(i){ temp.appendChild(sections[i].cloneNode(true)); });
+      document.body.appendChild(temp);
+      applyPdfLightTheme(temp);
+
+      html2canvas(temp, {
+        scale: 2,
+        useCORS: true,
+        allowTaint: true,
+        backgroundColor: '#ffffff'
+      }).then(function(canvas) {
+        document.body.removeChild(temp);
+        addImagePage(canvas);
+        pageIdx++;
+        renderPage();
+      }).catch(function(err) {
+        if(temp.parentNode) document.body.removeChild(temp);
+        fail(err);
+      });
+    }
+
+    // Radar SIIGA vira a primeira página do PDF — hoje só existia dentro do app,
+    // nunca aparecia no relatório exportado. O <canvas> do gráfico precisa virar
+    // <img> antes de clonar, porque clonar um canvas não copia o desenho.
+    function captureRadarPage() {
+      return new Promise(function(resolve) {
+        // RADAR_STATE normalmente já existe de quando o usuário passou pela tela
+        // do Radar durante o diagnóstico. Recalcula se faltar (ex: PDF gerado
+        // direto pelo admin) — a função só precisa rodar, não precisa da tela visível.
+        if(!RADAR_STATE && typeof buildAndShowRadar === 'function') {
+          try { buildAndShowRadar(); showScreen('screen-report'); } catch(e) {}
+        }
+        var radarCard = document.querySelector('#screen-radar > .card');
+        if(!radarCard || !RADAR_STATE) { resolve(null); return; }
+
+        // Clona o card num container isolado (não mexe na tela ao vivo, nem
+        // precisa dela visível). O <canvas> clonado nasce sem desenho — em vez
+        // de copiar o bitmap do gráfico escuro do app, desenhamos um gráfico
+        // NOVO com cores para fundo branco (o do app usa branco/cinza claro
+        // nas grades e rótulos, invisível num PDF de fundo branco).
+        var temp = document.createElement('div');
+        temp.style.cssText = 'position:fixed;left:-99999px;top:0;width:' + CONTENT_PX_WIDTH + 'px;background:white;';
+        var clone = radarCard.cloneNode(true);
+        temp.appendChild(clone);
+        document.body.appendChild(temp);
+
+        var clonedCanvas = clone.querySelector('#radarChart');
+        var tempChart = null;
+        if(clonedCanvas) {
+          clonedCanvas.removeAttribute('style');
+          clonedCanvas.width = 360;
+          clonedCanvas.height = 360;
+          tempChart = drawRadarChart(clonedCanvas, RADAR_STATE, true);
+        }
+
+        applyPdfLightTheme(temp);
+
+        html2canvas(temp, {
+          scale: 2,
+          useCORS: true,
+          allowTaint: true,
+          backgroundColor: '#ffffff'
+        }).then(function(canvas) {
+          if(tempChart) tempChart.destroy();
+          document.body.removeChild(temp);
+          resolve(canvas);
+        }).catch(function() {
+          if(tempChart) tempChart.destroy();
+          if(temp.parentNode) document.body.removeChild(temp);
+          resolve(null);
+        });
+      });
+    }
+
+    captureRadarPage().then(function(radarCanvas) {
+      if(radarCanvas) addImagePage(radarCanvas);
+      renderPage();
     });
   }, 400);
 }
@@ -1929,7 +2483,8 @@ function buildDiagnosticoJSON() {
       pilarPriority: S.pilarPriority || [],
       portfolioTotal: (S.numObras||0) * (S.orcamentoMedio||0),
       estruturaTime: { score: S.scores.b03||0, nivel: nivel((S.scores.b03||0)/3*100) },
-      nivelOrcamento: { score: S.scores.b06||0, nivel: nivel((S.scores.b06||0)/3*100) }
+      nivelOrcamento: { score: S.scores.b06||0, nivel: nivel((S.scores.b06||0)/3*100) },
+      roiReal: { dados: S.roi2 || {}, mensalidade: S.mensalidade||0, captura: S.captura||0.5 }
     },
     fases: {
       fase1: { scores: S.scores.f1||[], somatorio: (S.scores.f1||[]).reduce(function(a,b){return a+(b||0);},0), maximo: maxes.f1, percentual: f1pct, nivel: nivel(f1pct) },
@@ -2247,18 +2802,18 @@ function revealAha(guess) {
   var contrastMsg = '';
   if(guess === 'low') {
     contrastMsg = perObra < 500000
-      ? 'Você estava certo — e isso já representa uma oportunidade significativa. 💡'
-      : 'Nossa estimativa é <strong style="color:var(--orange)">' + fmtNum(perObra) + ' por obra</strong> — mais do que você imaginou.';
+      ? 'Você estava certo — e isso já representa uma perda relevante. 💡'
+      : 'Você está perdendo <strong style="color:var(--orange)">' + fmtNum(perObra) + ' por obra</strong> — mais do que você imaginou.';
   } else if(guess === 'mid') {
     contrastMsg = perObra >= 500000 && perObra <= 2000000
-      ? 'Você estava na faixa certa! Nossa estimativa é <strong style="color:var(--orange)">' + fmtNum(perObra) + ' por obra</strong>. 🎯'
+      ? 'Você estava na faixa certa! Você está perdendo <strong style="color:var(--orange)">' + fmtNum(perObra) + ' por obra</strong>. 🎯'
       : perObra < 500000
-        ? 'Nossa estimativa é <strong style="color:var(--orange)">' + fmtNum(perObra) + ' por obra</strong> — conservadora, mas real.'
-        : 'Acima do que você imaginou: <strong style="color:var(--orange)">' + fmtNum(perObra) + ' por obra</strong>. 🔥';
+        ? 'Você está perdendo <strong style="color:var(--orange)">' + fmtNum(perObra) + ' por obra</strong> — conservador, mas real.'
+        : 'Acima do que você imaginou: você está perdendo <strong style="color:var(--orange)">' + fmtNum(perObra) + ' por obra</strong>. 🔥';
   } else {
     contrastMsg = perObra >= 2000000
-      ? 'Você sabia que era grande. Nossa estimativa confirma: <strong style="color:var(--orange)">' + fmtNum(perObra) + ' por obra</strong>. 🔥'
-      : 'Nossa estimativa é <strong style="color:var(--orange)">' + fmtNum(perObra) + ' por obra</strong> — um número conservador mas concreto.';
+      ? 'Você sabia que era grande. Nossa estimativa confirma: você está perdendo <strong style="color:var(--orange)">' + fmtNum(perObra) + ' por obra</strong>. 🔥'
+      : 'Você está perdendo <strong style="color:var(--orange)">' + fmtNum(perObra) + ' por obra</strong> — um número conservador mas concreto.';
   }
   document.getElementById('aha-contrast-text').innerHTML = contrastMsg;
 
@@ -2308,7 +2863,7 @@ function revealAha(guess) {
   document.getElementById('aha-per-obra-sm').textContent = fmtNum(perObra);
   document.getElementById('aha-nobs').textContent = obras + (obras === 1 ? ' obra' : ' obras');
   document.getElementById('aha-total').textContent = fmtNum(total);
-  document.getElementById('aha-multiplier-text').textContent = 'Sua operação tem ' + obras + (obras===1?' obra':' obras') + '. O potencial total do portfólio é:';
+  document.getElementById('aha-multiplier-text').textContent = 'Sua operação tem ' + obras + (obras===1?' obra':' obras') + '. A perda total estimada no portfólio é:';
 
   // Qualitative gains — 6 items in 3-col grid
   var quals = [
@@ -2524,9 +3079,9 @@ async function confirmSave() {
   clearDraft();
 
   // Enviar para o Supabase
-  if(supabase) {
+  if(sbClient) {
     try {
-      const { data, error } = await supabase.from('assessments').insert([{
+      const { data, error } = await sbClient.from('assessments').insert([{
         id: record.id,
         nome: record.nome,
         empresa: record.empresa,

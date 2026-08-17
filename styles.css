@@ -130,6 +130,8 @@ h1,h2,h3,h4{font-family:'Bai Jamjuree',sans-serif}
 .roi-table td{padding:11px 10px;font-size:12px;border-bottom:1px solid var(--light2);color:#333}
 .roi-table tr.roi-total td{font-family:'Bai Jamjuree';font-size:14px;font-weight:700;background:rgba(255,95,31,0.05);border-top:2px solid rgba(255,95,31,0.2);border-bottom:none}
 .roi-val{color:var(--orange);font-weight:600}
+#roi2-config .text-input{background:#fff;border-color:#ddd;color:#1a1a1a}
+#roi2-config .input-group label{color:#888}
 .roadmap-tl{display:flex;flex-direction:column;gap:0}
 .sprint{display:grid;grid-template-columns:120px 1fr;gap:0}
 .sprint-marker{display:flex;flex-direction:column;align-items:center;padding-right:20px}
