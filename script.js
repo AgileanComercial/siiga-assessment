@@ -1305,49 +1305,57 @@ function renderQualitativeGains() {
   var mo = S.modeloMO || 'terceirizada';
   var obras = S.numObras || 1;
 
-  // Card 1: Gargalo Raiz
-  var card1 = { icon: '🎯', title: '', desc: '' };
-  if (f1p < 0.60 || f2p < 0.60) {
-    card1.title = 'Linha de Balanço e Antecipação de Restrições';
-    card1.desc = 'A obra sai do modo "apagar incêndio". Com a Linha de Balanço digital e o lookahead de 4 semanas, os desvios de prazo e gargalos de suprimentos são identificados antes de virarem custo no canteiro.';
-  } else {
-    card1.title = 'Previsibilidade de Produção e Ritmo Contínuo';
-    card1.desc = 'O canteiro ganha fluxo contínuo. As metas semanais claras e o acompanhamento diário garantem que o planejado chegue até a ponta, evitando paradas de equipe e oscilações de ritmo.';
-  }
+  // -------------------------------------------------------------
+  // BALÕES FIXOS (2 Obrigatórios):
+  // -------------------------------------------------------------
+  // 1. Fixo: Gestão Integrada Ponta a Ponta
+  var cardFixo1 = {
+    icon: '🔄',
+    title: 'Gestão Integrada Ponta a Ponta',
+    desc: 'Conexão em tempo real entre planejamento executivo, canteiro e ERP. Todas as etapas operam em fluxo contínuo sem retrabalho de planilhas.'
+  };
 
-  // Card 2: Copilotos de IA (Produtividade da Engenharia)
-  var card2 = {
+  // 2. Fixo: Engenharia 10x com Copilotos de IA
+  var cardFixo2 = {
     icon: '🤖',
     title: 'Engenharia 10x com Copilotos de IA',
-    desc: 'Nossos Copilotos de IA (Planejamento, Associação com Orçamento e Operacional) assumem os fluxos mais pesados da engenharia — como cruzar EAP com orçamento e ajustar programações. A equipe economiza dezenas de horas de trabalho braçal e foca no canteiro.'
+    desc: 'Copilotos de IA (Planejamento, Associação com Orçamento e Operacional) assumem o trabalho braçal de cruzar dados e monitorar restrições.'
   };
 
-  // Card 3: Governança de Mão de Obra e Qualidade
-  var card3 = { icon: '', title: '', desc: '' };
-  if (mo === 'propria') {
-    card3.icon = '👷';
-    card3.title = 'Rastreabilidade de Folha e Produtividade HH';
-    card3.desc = 'Fim do apagão de produtividade. Os apontamentos diários mostram exatamente o rendimento de cada equipe e colaborador, reduzindo horas extras desnecessárias e pagamentos indevidos.';
+  // 3. Dinâmico: Gargalo de Planejamento OU Qualidade
+  var cardDinamico1 = { icon: '🎯', title: '', desc: '' };
+  if (f1p < 0.65 || f2p < 0.65) {
+    cardDinamico1.title = 'Linha de Balanço e Antecipação de Restrições';
+    cardDinamico1.desc = 'Lookahead de 4 semanas e indicador IRR identificam e removem restrições de suprimentos antes que virem atraso no canteiro.';
   } else {
-    card3.icon = '🤝';
-    card3.title = 'Medição por Evidência e Fim do Conflito com Empreiteiros';
-    card3.desc = 'Fim das negociações exaustivas no fechamento. A medição é feita sobre o que foi conferido no canteiro com FVS aprovada. Menos atrito, pagamento justo e qualidade garantida antes da liberação financeira.';
+    cardDinamico1.icon = '✅';
+    cardDinamico1.title = 'Qualidade como Trava de Pagamento (FVS)';
+    cardDinamico1.desc = 'FVS digital no fluxo diário do canteiro. A medição e a folha só são aprovadas com evidência de serviço e qualidade aprovada.';
   }
 
-  // Card 4: Escalabilidade & Integrações ERP
-  var card4 = {
-    icon: '📈',
-    title: 'Escalabilidade com Integração Nativa aos ERPs',
-    desc: 'Conexão direta com os principais ERPs do mercado (Sienge, TOTVS, Informakon, Mega e UAU). Os dados de avanço e medição fluem automaticamente, permitindo gerenciar ' + obras + ' obra(s) mantendo a equipe enxuta.'
-  };
+  // 4. Dinâmico: Modelo de MO OU Escalabilidade
+  var cardDinamico2 = { icon: '🤝', title: '', desc: '' };
+  if (mo === 'propria') {
+    cardDinamico2.icon = '👷';
+    cardDinamico2.title = 'Rastreabilidade de Folha e Produtividade HH';
+    cardDinamico2.desc = 'Apontamento diário no canteiro com rendimento por equipe em tempo real, reduzindo horas extras e pagamentos indevidos.';
+  } else if (mo === 'terceirizada') {
+    cardDinamico2.icon = '🤝';
+    cardDinamico2.title = 'Medição por Evidência sem Conflito com Empreiteiros';
+    cardDinamico2.desc = 'Medição objetiva registrada no canteiro via app. O fechamento mensal vira uma validação rápida e auditável de dados reais.';
+  } else {
+    cardDinamico2.icon = '📈';
+    cardDinamico2.title = 'Escalabilidade com Integração Nativa aos ERPs';
+    cardDinamico2.desc = 'Conexão nativa aos ERPs (Sienge, TOTVS, Informakon, Mega e UAU), gerenciando ' + obras + ' obra(s) com equipe enxuta.';
+  }
 
-  var cards = [card1, card2, card3, card4];
+  var cards = [cardFixo1, cardFixo2, cardDinamico1, cardDinamico2];
   grid.innerHTML = cards.map(function(c) {
-    return '<div style="padding:12px 14px;border-radius:8px;border:1px solid #e8e8e8;background:#fff;display:flex;gap:12px;align-items:flex-start">' +
-      '<div style="font-size:20px;flex-shrink:0">' + c.icon + '</div>' +
+    return '<div style="padding:10px 12px;border-radius:8px;border:1px solid #e8e8e8;background:#fff;display:flex;gap:10px;align-items:flex-start">' +
+      '<div style="font-size:18px;flex-shrink:0">' + c.icon + '</div>' +
       '<div>' +
-        '<div style="font-family:\'Bai Jamjuree\';font-size:12px;font-weight:700;color:#14141b;margin-bottom:3px">' + c.title + '</div>' +
-        '<div style="font-size:11px;color:#555;line-height:1.5">' + c.desc + '</div>' +
+        '<div style="font-family:\'Bai Jamjuree\';font-size:11.5px;font-weight:700;color:#14141b;margin-bottom:2px">' + c.title + '</div>' +
+        '<div style="font-size:10.5px;color:#555;line-height:1.45">' + c.desc + '</div>' +
       '</div>' +
     '</div>';
   }).join('');
@@ -1449,10 +1457,74 @@ function renderRotinaComparativa() {
   }).join('');
 }
 
+function renderPerdasComposicao(roi) {
+  var box = document.getElementById('perdas-composicao-box');
+  if (!box || !roi) return;
+
+  var portfolio = (S.numObras || 1) * (S.orcamentoMedio || 8000000);
+  var perdaTotal = roi.totalPortfolio || 1;
+  var perdaPct = Math.round((perdaTotal / (portfolio || 1)) * 100);
+
+  var pctEl = document.getElementById('perdas-pct-total');
+  if (pctEl) pctEl.textContent = perdaPct + '% do portfólio estimado em risco';
+
+  var catColors = {
+    mo: '#ff5f1f',
+    retrabalho: '#e11d48',
+    time: '#2563eb',
+    velocidade: '#0d9488',
+    erros: '#7c3aed'
+  };
+
+  var barraHtml = '';
+  var gridHtml = '';
+
+  roi.items.forEach(function(item) {
+    var val = item.portfolio || 0;
+    var pct = Math.round((val / perdaTotal) * 100);
+    var col = catColors[item.key] || '#64748b';
+
+    barraHtml += '<div style="width:' + pct + '%;background:' + col + ';height:100%" title="' + item.label + ': ' + pct + '%"></div>';
+
+    gridHtml += '<div style="padding:8px 10px;background:#f8fafc;border-radius:6px;border-left:3px solid ' + col + '">' +
+      '<div style="font-size:10px;color:#64748b;font-weight:600">' + item.label + '</div>' +
+      '<div style="font-family:\'Bai Jamjuree\';font-size:12px;font-weight:700;color:#1e293b">' + fmtNum(val) + ' <span style="font-size:10px;font-weight:500;color:#64748b">(' + pct + '%)</span></div>' +
+    '</div>';
+  });
+
+  var barraEl = document.getElementById('perdas-barra-comparativa');
+  if (barraEl) barraEl.innerHTML = barraHtml;
+
+  var gridEl = document.getElementById('perdas-categorias-grid');
+  if (gridEl) gridEl.innerHTML = gridHtml;
+}
+
 function buildReport() {
   renderQualitativeGains();
   renderNextSteps();
   renderRotinaComparativa();
+
+  // Títulos dinâmicos por empresa
+  var nomeEmpresa = S.empresa || 'sua empresa';
+
+  var tDiag = document.getElementById('rep-title-diag');
+  if (tDiag) tDiag.textContent = 'Diagnóstico SIIGA da ' + nomeEmpresa;
+
+  var tGaps = document.getElementById('rep-title-gaps');
+  if (tGaps) tGaps.textContent = 'Gaps do Processo atual da ' + nomeEmpresa;
+
+  var tGanhos = document.getElementById('rep-title-ganhos');
+  if (tGanhos) tGanhos.textContent = 'Ganhos para a ' + nomeEmpresa + ' — SIIGA com Agilean';
+
+  var subGanhos = document.getElementById('rep-sub-ganhos');
+  if (subGanhos) {
+    subGanhos.textContent = 'Com base nos gaps identificados, o plano de aumento da maturidade Lean para a ' + nomeEmpresa + ' contempla os seguintes ajustes em seus processos, estruturando o método SIIGA e a tecnologia Agilean para estancar perdas e destravar a produtividade da sua operação:';
+  }
+
+  var tRoadmap = document.getElementById('rep-title-roadmap');
+  if (tRoadmap) {
+    tRoadmap.textContent = 'Roadmap de Implementação SIIGA para a ' + nomeEmpresa;
+  }
 
   var maxes = {f1:21,f2:12,f3:18,f4:12};
   var colors = {f1:'#1B4F8A',f2:'#0D7C8C',f3:'#0D6B45',f4:'#4a4558'};
@@ -1501,6 +1573,7 @@ function buildReport() {
 
   // ROI table
   var roi = calculateROI();
+  renderPerdasComposicao(roi);
   var roiHtml = '<thead><tr>' +
     '<th>Fonte de Ganho</th>' +
     '<th>Pressuposto</th>' +
@@ -1519,10 +1592,10 @@ function buildReport() {
       '<td style="text-align:right;font-weight:600" class="roi-val">'+fmtNum(item.portfolio)+'</td>' +
       '</tr>';
   });
-  roiHtml += '<tr class="roi-total">' +
-    '<td colspan="2">PERDA FINANCEIRA NO PORTFÓLIO</td>' +
-    '<td style="text-align:right;color:#666">'+fmtNum(roi.totalPorObra)+'<br><span style="font-size:10px;font-weight:400">por obra</span></td>' +
-    '<td style="text-align:right;color:var(--orange)">'+fmtNum(roi.totalPortfolio)+'</td>' +
+  roiHtml += '<tr class="roi-total" style="background:#f4f4f6;border-top:2px solid #ddd">' +
+    '<td colspan="3" style="font-weight:700;padding:10px 12px">PERDA FINANCEIRA NO PORTFÓLIO</td>' +
+    '<td style="text-align:right;color:#555;font-weight:600;white-space:nowrap;padding:10px 12px">'+fmtNum(roi.totalPorObra)+' / obra</td>' +
+    '<td style="text-align:right;color:var(--orange);font-weight:700;white-space:nowrap;padding:10px 12px">'+fmtNum(roi.totalPortfolio)+'</td>' +
     '</tr></tbody>';
   document.getElementById('roi-table-el').innerHTML = roiHtml;
 
@@ -2313,7 +2386,11 @@ function applyPdfLightTheme(root) {
   });
 
   // Fix ALL text elements — força texto escuro e reforça peso da fonte.
+  // Exceção: elementos dentro de cards com fundo intencionalmente escuro
+  // (depoimentos, barra do fluxo construtivo) mantêm suas cores originais —
+  // texto branco sobre fundo escuro já tem contraste correto e não deve ser escurecido.
   root.querySelectorAll('p,div,span,li,td,th,h1,h2,h3,h4,h5,label').forEach(function(el) {
+    if (el.closest('[style*="background:#14141b"], [style*="background: #14141b"]')) return;
     var cs = window.getComputedStyle(el);
     var col = cs.color;
     var fontSize = parseFloat(cs.fontSize) || 0;
@@ -2354,10 +2431,22 @@ function applyPdfLightTheme(root) {
       else el.style.color = '#1a1a1a';
     }
     if(el.style && el.style.background && el.style.background.indexOf('var(') >= 0) {
-      el.style.background = 'white';
+      // var(--orange-dim)/var(--orange-mid) são fundos suaves — NUNCA devem virar laranja sólido.
+      // var(--orange) sólido é cor de marca e deve persistir (senão texto branco sobre ele some).
+      if(el.style.background.indexOf('orange-dim') >= 0 || el.style.background.indexOf('orange-mid') >= 0) {
+        el.style.background = '#fff4ed';
+      } else if(el.style.background.indexOf('orange') >= 0) {
+        el.style.background = '#ff5f1f';
+      } else {
+        el.style.background = 'white';
+      }
     }
     if(el.style && el.style.borderColor && el.style.borderColor.indexOf('var(') >= 0) {
-      el.style.borderColor = '#e0e0e0';
+      if(el.style.borderColor.indexOf('orange-mid') >= 0 || el.style.borderColor.indexOf('orange-dim') >= 0) {
+        el.style.borderColor = '#ffd6c0';
+      } else {
+        el.style.borderColor = '#e0e0e0';
+      }
     }
   });
 
@@ -2371,6 +2460,8 @@ function applyPdfLightTheme(root) {
   });
 
   root.querySelectorAll('table td, table th').forEach(function(c){
+    // Preserva contraste de tabelas dentro de cards intencionalmente escuros (nenhuma hoje, mas defensivo)
+    if (c.closest('[style*="background:#14141b"], [style*="background: #14141b"]')) return;
     c.style.color = '#1a1a1a';
     c.style.borderColor = '#e0e0e0';
   });

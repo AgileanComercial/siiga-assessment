@@ -346,12 +346,12 @@ function maskPhone(input){var d=input.value.replace(/\D/g,'');if(d.length>11)d=d
     </div>
 
     <div class="card card-wide rep-mb">
-      <div class="rep-sec-title">1. Análise do Processo Atual</div>
+      <div class="rep-sec-title" id="rep-title-diag">Diagnóstico SIIGA</div>
       <div class="rep-ins-grid" id="rep-ins"></div>
     </div>
 
     <div class="card card-wide rep-mb">
-      <div class="rep-sec-title">2. Mapa de Oportunidades</div>
+      <div class="rep-sec-title" id="rep-title-gaps">Gaps do Processo Atual</div>
       <p style="font-size:12px;color:#666;margin-bottom:14px">Gaps identificados no diagnóstico e seu impacto na operação atual.</p>
       <table class="opp-table"><thead><tr><th>Gap Identificado</th><th>Fase</th><th>Impacto</th></tr></thead><tbody id="opp-body"></tbody></table>
     </div>
@@ -359,7 +359,7 @@ function maskPhone(input){var d=input.value.replace(/\D/g,'');if(d.length>11)d=d
 
 
     <div class="card card-wide rep-mb">
-      <div class="rep-sec-title">Perdas Financeiras na Operação — SIIGA com Agilean</div>
+      <div class="rep-sec-title">Perdas Financeiras na Operação</div>
       <p style="font-size:12px;color:#666;margin-bottom:14px">Estimativa conservadora com base nos gaps identificados e nos pressupostos documentados abaixo. Valores indicativos da perda atual e do potencial de captura com o SIIGA.</p>
       <div id="roi-inputs" style="display:grid;grid-template-columns:repeat(3,1fr);gap:10px;margin-bottom:16px"></div>
       <table class="roi-table" id="roi-table-el"></table>
@@ -376,110 +376,153 @@ function maskPhone(input){var d=input.value.replace(/\D/g,'');if(d.length>11)d=d
         </div>
         <div style="margin-top:10px;font-size:11px;color:#888;font-style:italic">Valores baseados nas planilhas de ROI Agilean e em benchmarks de Lean Construction. Estimativa conservadora — não representa garantia contratual.</div>
       </div>
+
+      <!-- Composição Visual de Perdas x Portfólio -->
+      <div style="margin-top:14px;padding:14px 16px;background:#fff;border-radius:8px;border:1px solid #e2e8f0" id="perdas-composicao-box">
+        <div style="font-family:'Bai Jamjuree';font-size:12px;font-weight:700;color:#14141b;margin-bottom:10px;display:flex;justify-content:space-between;align-items:center">
+          <span>📊 Composição da Perda Identificada vs. Portfólio</span>
+          <span id="perdas-pct-total" style="color:var(--orange);font-size:11px;font-weight:700"></span>
+        </div>
+        <div style="height:12px;width:100%;background:#e2e8f0;border-radius:6px;overflow:hidden;display:flex;margin-bottom:12px" id="perdas-barra-comparativa"></div>
+        <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:8px" id="perdas-categorias-grid"></div>
+      </div>
+
       <div style="margin-top:12px;padding:14px 16px;background:rgba(255,95,31,0.04);border-radius:var(--r3);border:1px solid rgba(255,95,31,0.15)">
         <div style="font-size:11px;color:#888;margin-bottom:3px">Essa é a ordem de grandeza da oportunidade identificada na sua operação hoje.</div>
         <div style="font-size:13px;color:#333">Na próxima conversa, vamos mostrar como capturar esses resultados com o SIIGA implantado pela Agilean — passo a passo, nos primeiros 90 dias.</div>
       </div>
     </div>
 
+    <!-- 4. SEÇÃO DE GANHOS -->
     <div class="card card-wide rep-mb" id="qualitative-section">
-      <div class="rep-sec-title">Ganhos Além do Número</div>
-      <p style="font-size:12px;color:#666;margin-bottom:14px">
-        Além da perda financeira quantificável, o SIIGA implantado com Agilean entrega transformações de gestão personalizadas para o perfil da sua operação.
+      <div class="rep-sec-title" id="rep-title-ganhos">Ganhos para a Empresa — SIIGA com Agilean</div>
+      <p style="font-size:12px;color:#666;margin-bottom:14px" id="rep-sub-ganhos">
+        Com base nos gaps identificados, o plano de aumento da maturidade Lean contempla os seguintes ajustes em seus processos, estruturando o método SIIGA e a tecnologia Agilean para estancar perdas e destravar a produtividade da sua operação:
       </p>
 
-      <!-- Smart Grid 2x2 de Cards Dinâmicos -->
-      <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:18px" id="qualitative-grid"></div>
-
-      <!-- Quadro Comparativo Antes x Depois -->
-      <div style="border-top:1px solid #eee;padding-top:16px;margin-top:14px">
+      <!-- 1º: Tabela de Transformação da Rotina Operacional -->
+      <div style="margin-bottom:16px">
         <div style="font-family:'Bai Jamjuree';font-size:13px;font-weight:700;color:#14141b;margin-bottom:10px;display:flex;align-items:center;gap:8px">
-          <span>🔄</span><span>Transformação da Rotina Operacional: Como sua obra passa a rodar</span>
+          <span>🔄</span><span>Transformação da Rotina Operacional — Como sua obra passa a rodar com SIIGA e Agilean</span>
         </div>
-        <table class="roi-table" style="width:100%;font-size:11px;margin-bottom:12px">
+        <table class="roi-table" style="width:100%;font-size:11px;margin-bottom:14px">
           <thead>
             <tr>
-              <th style="width:20%">Rotina de Gestão</th>
+              <th style="width:22%">Rotina de Gestão</th>
               <th style="width:24%;color:#666">Ferramenta Utilizada Hoje</th>
-              <th style="width:28%;color:#b45309">Gargalos Atuais</th>
-              <th style="width:28%;color:var(--orange)">Com SIIGA & Agilean</th>
+              <th style="width:27%;color:#b45309">Gargalos Atuais</th>
+              <th style="width:27%;color:var(--orange)">Potencial de Melhoria</th>
             </tr>
           </thead>
           <tbody id="rotina-comparativa-body"></tbody>
         </table>
+      </div>
 
-        <!-- Badges de Autoridade e Escala -->
-        <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:8px;background:#f9f9fb;padding:10px 14px;border-radius:8px;border:1px solid #ebebf0;text-align:center">
-          <div><span style="font-weight:700;color:var(--orange);font-size:12px">+1.500</span><div style="font-size:10px;color:#666">Canteiros gerenciados</div></div>
-          <div><span style="font-weight:700;color:var(--orange);font-size:12px">70M m²</span><div style="font-size:10px;color:#666">Construídos com Agilean</div></div>
-          <div><span style="font-weight:700;color:var(--orange);font-size:12px">2x mais</span><div style="font-size:10px;color:#666">Aderência de prazo</div></div>
-          <div><span style="font-weight:700;color:var(--orange);font-size:12px">API Nativa</span><div style="font-size:10px;color:#666">Sienge, TOTVS, Informakon, Mega, UAU</div></div>
+      <!-- 2º: Smart Grid 2x2 de Balões de Ganhos (2 Fixos + 2 Dinâmicos) -->
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:14px" id="qualitative-grid"></div>
+
+      <!-- 3º: Badges de Resultados Agilean (Base da Página de Ganhos) -->
+      <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:8px;background:#f9f9fb;padding:8px 12px;border-radius:8px;border:1px solid #ebebf0;text-align:center;margin-bottom:14px">
+        <div><span style="font-weight:700;color:var(--orange);font-size:12px">+1.500</span><div style="font-size:10px;color:#666">Canteiros gerenciados</div></div>
+        <div><span style="font-weight:700;color:var(--orange);font-size:12px">70M m²</span><div style="font-size:10px;color:#666">Construídos com Agilean</div></div>
+        <div><span style="font-weight:700;color:var(--orange);font-size:12px">2x mais</span><div style="font-size:10px;color:#666">Aderência de prazo</div></div>
+        <div><span style="font-weight:700;color:var(--orange);font-size:12px">API Nativa</span><div style="font-size:10px;color:#666">Sienge, TOTVS, Informakon, Mega, UAU</div></div>
+      </div>
+
+      <!-- DEPOIMENTOS EXPANDIDOS (PREENCHE 100% DO FINAL DA PÁGINA 4) -->
+      <div style="border-top:1px solid #eee;padding-top:16px;margin-top:6px">
+        <div style="font-family:'Bai Jamjuree';font-size:13.5px;font-weight:700;color:#14141b;margin-bottom:12px;display:flex;align-items:center;gap:8px">
+          <span>💬</span><span>O que dizem nossos clientes</span>
         </div>
+        <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:14px">
 
-        <!-- SIIGA — Sistema Integrado e Inteligente de Gestão Agilean -->
-        <div style="margin-top:14px;padding-top:14px;border-top:1px solid #eee">
-          <div style="font-family:'Bai Jamjuree';font-size:13px;font-weight:700;color:#14141b;margin-bottom:10px">SIIGA — Sistema Integrado e Inteligente de Gestão Agilean</div>
-          <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px">
-            <div style="padding:12px 14px;background:#f8f8f8;border-radius:8px;border:1px solid #e8e8e8">
-              <div style="font-size:9.5px;font-weight:700;text-transform:uppercase;letter-spacing:0.08em;color:var(--orange);margin-bottom:8px">Origem do Método</div>
-              <div style="margin-bottom:7px"><div style="font-size:11px;font-weight:700;color:#14141b">Last Planner System</div><div style="font-size:10px;color:#666;line-height:1.4">Embutido nos algoritmos — sequenciamento, balanceamento de fluxo e causa raiz.</div></div>
-              <div style="margin-bottom:7px"><div style="font-size:11px;font-weight:700;color:#14141b">+25 anos de experiência em campo</div><div style="font-size:10px;color:#666;line-height:1.4">De MCMV a alto padrão, carteiras de centenas de obras simultâneas.</div></div>
-              <div style="margin-bottom:7px"><div style="font-size:11px;font-weight:700;color:#14141b">+10 anos de dados estruturados</div><div style="font-size:10px;color:#666;line-height:1.4">Sequências, durações e padrões de produtividade. Nenhuma big tech tem esses dados.</div></div>
-              <div><div style="font-size:11px;font-weight:700;color:#14141b">Boas práticas das obras de maior sucesso</div><div style="font-size:10px;color:#666;line-height:1.4">O que as melhores construtoras brasileiras fazem diferente — sistematizado em método.</div></div>
+          <!-- Depoimento 1: Dimas -->
+          <div style="padding:20px 22px;border-radius:10px;background:#14141b;display:flex;flex-direction:column;justify-content:space-between;min-height:240px">
+            <div>
+              <div style="display:inline-block;padding:4px 8px;background:rgba(255,95,31,0.2);color:var(--orange);border-radius:4px;font-size:9.5px;font-weight:700;margin-bottom:10px">✦ Gestão de Mão de Obra</div>
+              <div style="font-size:12px;color:rgba(255,255,255,0.92);line-height:1.7;font-style:italic;margin-bottom:14px">
+                "O Agilean nos trouxe praticidade e soluções reais para acompanhar a mão de obra em grandes construções. Nossas obras têm entre 150 e 200 pessoas e era um desafio gerenciar e integrar todos os recursos. Agora tenho tempo para analisar, criar estratégias e focar no que agrega valor."
+              </div>
             </div>
-            <div style="padding:12px 14px;background:#14141b;border-radius:8px">
-              <div style="font-size:9.5px;font-weight:700;text-transform:uppercase;letter-spacing:0.08em;color:var(--orange);margin-bottom:8px">O que o SIIGA garante</div>
-              <div style="font-size:10px;color:rgba(255,255,255,0.7);font-style:italic;line-height:1.4;margin-bottom:8px">"Planejamento não é o problema. O problema é fazer o planejamento sobreviver à execução."</div>
-              <ul style="list-style:none;padding:0;margin:0 0 10px 0">
-                <li style="font-size:10px;color:#fff;font-weight:600;line-height:1.5;margin-bottom:3px">→ O plano chega ao CPF do operário, não para na sala técnica</li>
-                <li style="font-size:10px;color:#fff;font-weight:600;line-height:1.5;margin-bottom:3px">→ O desvio é visto no mesmo dia, não no fechamento do mês</li>
-                <li style="font-size:10px;color:#fff;font-weight:600;line-height:1.5;margin-bottom:3px">→ Qualidade é trava para pagamento — nenhum centavo sem lastro</li>
-                <li style="font-size:10px;color:#fff;font-weight:600;line-height:1.5;margin-bottom:3px">→ Engenheiro estratégico — não operacional</li>
-                <li style="font-size:10px;color:#fff;font-weight:600;line-height:1.5">→ IA que potencializa quem tem método</li>
-              </ul>
-              <div style="display:grid;grid-template-columns:1fr 1fr;gap:6px">
-                <div style="background:var(--orange);color:#fff;font-size:9px;font-weight:700;text-align:center;padding:5px 6px;border-radius:5px">+25% PRODUTIVIDADE</div>
-                <div style="background:var(--orange);color:#fff;font-size:9px;font-weight:700;text-align:center;padding:5px 6px;border-radius:5px">OBRA NO PRAZO</div>
-                <div style="background:var(--orange);color:#fff;font-size:9px;font-weight:700;text-align:center;padding:5px 6px;border-radius:5px">MARGEM PROTEGIDA</div>
-                <div style="background:var(--orange);color:#fff;font-size:9px;font-weight:700;text-align:center;padding:5px 6px;border-radius:5px">PAGAMENTO VINC. À PRODUÇÃO</div>
+            <div style="display:flex;align-items:center;gap:12px;border-top:1px solid rgba(255,255,255,0.12);padding-top:12px">
+              <div style="width:36px;height:36px;border-radius:50%;background:var(--orange);display:flex;align-items:center;justify-content:center;font-size:12px;font-weight:700;color:#fff;flex-shrink:0">NV</div>
+              <div>
+                <div style="font-size:12px;font-weight:700;color:#fff">Natalia V. de Dios</div>
+                <div style="font-size:10px;color:rgba(255,255,255,0.55)">Ger. de Processos e Qualidade · Dimas Construções</div>
               </div>
             </div>
           </div>
-        </div>
 
-        <!-- Depoimentos de clientes reais -->
-        <div style="margin-top:14px;padding-top:14px;border-top:1px solid #eee">
-          <div style="font-family:'Bai Jamjuree';font-size:12px;font-weight:700;color:#14141b;margin-bottom:10px">O que dizem nossos clientes</div>
-          <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:10px">
-            <div style="padding:12px 14px;border-radius:8px;background:#14141b">
-              <div style="font-size:10.5px;color:rgba(255,255,255,0.85);line-height:1.5;font-style:italic;margin-bottom:10px">"O Agilean nos trouxe praticidade e soluções reais para acompanhar a mão de obra em grandes construções, nossas obras tem entre 150 e 200 pessoas e era um desafio gerenciar e integrar todos os recursos e suas atividades. Agora tenho tempo para analisar, criar estratégias e focar nas atividades que de fato agregam valor."</div>
-              <div style="display:flex;align-items:center;gap:8px">
-                <div style="width:26px;height:26px;border-radius:50%;background:var(--orange);display:flex;align-items:center;justify-content:center;font-size:10px;font-weight:700;color:#fff;flex-shrink:0">NV</div>
-                <div>
-                  <div style="font-size:10.5px;font-weight:700;color:#fff">Natalia V. de Dios</div>
-                  <div style="font-size:9.5px;color:rgba(255,255,255,0.55)">Ger. de Processos e Qualidade · Dimas Construções</div>
-                </div>
+          <!-- Depoimento 2: CONX -->
+          <div style="padding:20px 22px;border-radius:10px;background:#14141b;display:flex;flex-direction:column;justify-content:space-between;min-height:240px">
+            <div>
+              <div style="display:inline-block;padding:4px 8px;background:rgba(255,95,31,0.2);color:var(--orange);border-radius:4px;font-size:9.5px;font-weight:700;margin-bottom:10px">✦ Decisão em Tempo Real</div>
+              <div style="font-size:12px;color:rgba(255,255,255,0.92);line-height:1.7;font-style:italic;margin-bottom:14px">
+                "Uma das maiores vantagens que o Agilean nos trouxe foi a capacidade de rastrear e monitorar o progresso das nossas obras em tempo real, permitindo que a gente consiga tomar decisões mais rápido com o que está realmente acontecendo nos canteiros. Aumentamos consideravelmente o cumprimento dos prazos."
               </div>
             </div>
-            <div style="padding:12px 14px;border-radius:8px;background:#14141b">
-              <div style="font-size:10.5px;color:rgba(255,255,255,0.85);line-height:1.5;font-style:italic;margin-bottom:10px">"Uma das maiores vantagens que o Agilean nos trouxe foi a capacidade de rastrear e monitorar o progresso das nossas obras em tempo real, permitindo que a gente consiga tomar decisões mais rápido, olhando para o que está realmente acontecendo nos canteiros. Aumentamos consideravelmente o cumprimento dos prazos."</div>
-              <div style="display:flex;align-items:center;gap:8px">
-                <div style="width:26px;height:26px;border-radius:50%;background:var(--orange);display:flex;align-items:center;justify-content:center;font-size:10px;font-weight:700;color:#fff;flex-shrink:0">AS</div>
-                <div>
-                  <div style="font-size:10.5px;font-weight:700;color:#fff">Alessandra Silva</div>
-                  <div style="font-size:9.5px;color:rgba(255,255,255,0.55)">Coord. de Plan. e Controle · CONX</div>
-                </div>
+            <div style="display:flex;align-items:center;gap:12px;border-top:1px solid rgba(255,255,255,0.12);padding-top:12px">
+              <div style="width:36px;height:36px;border-radius:50%;background:var(--orange);display:flex;align-items:center;justify-content:center;font-size:12px;font-weight:700;color:#fff;flex-shrink:0">AS</div>
+              <div>
+                <div style="font-size:12px;font-weight:700;color:#fff">Alessandra Silva</div>
+                <div style="font-size:10px;color:rgba(255,255,255,0.55)">Coord. de Planejamento e Controle · CONX</div>
               </div>
             </div>
-            <div style="padding:12px 14px;border-radius:8px;background:#14141b">
-              <div style="font-size:10.5px;color:rgba(255,255,255,0.85);line-height:1.5;font-style:italic;margin-bottom:10px">"Saímos de um modelo bem operacional e trabalhoso para planejar, replanejar e elaborar nossa linha de balanço, nossos engenheiros passavam facilmente meses nesse processo. E agora com o Agilean, fazemos tudo em questão de horas, e o ganho de eficiência nos permitiu elaborar múltiplos cenários e planos de ataques diferentes."</div>
-              <div style="display:flex;align-items:center;gap:8px">
-                <div style="width:26px;height:26px;border-radius:50%;background:var(--orange);display:flex;align-items:center;justify-content:center;font-size:10px;font-weight:700;color:#fff;flex-shrink:0">CB</div>
-                <div>
-                  <div style="font-size:10.5px;font-weight:700;color:#fff">Claudio Barreira</div>
-                  <div style="font-size:9.5px;color:rgba(255,255,255,0.55)">Diretor · Dasart</div>
-                </div>
+          </div>
+
+          <!-- Depoimento 3: Dasart -->
+          <div style="padding:20px 22px;border-radius:10px;background:#14141b;display:flex;flex-direction:column;justify-content:space-between;min-height:240px">
+            <div>
+              <div style="display:inline-block;padding:4px 8px;background:rgba(255,95,31,0.2);color:var(--orange);border-radius:4px;font-size:9.5px;font-weight:700;margin-bottom:10px">✦ Linha de Balanço Ágil</div>
+              <div style="font-size:12px;color:rgba(255,255,255,0.92);line-height:1.7;font-style:italic;margin-bottom:14px">
+                "Saímos de um modelo bem operacional e trabalhoso para planejar, replanejar e elaborar nossa linha de balanço; nossos engenheiros passavam meses nesse processo. Agora com o Agilean fazemos tudo em questão de horas, simulando múltiplos cenários e planos de ataque."
               </div>
+            </div>
+            <div style="display:flex;align-items:center;gap:12px;border-top:1px solid rgba(255,255,255,0.12);padding-top:12px">
+              <div style="width:36px;height:36px;border-radius:50%;background:var(--orange);display:flex;align-items:center;justify-content:center;font-size:12px;font-weight:700;color:#fff;flex-shrink:0">CB</div>
+              <div>
+                <div style="font-size:12px;font-weight:700;color:#fff">Claudio Barreira</div>
+                <div style="font-size:10px;color:rgba(255,255,255,0.55)">Diretor · Dasart</div>
+              </div>
+            </div>
+          </div>
+
+        </div>
+      </div>
+    </div>
+
+    <!-- 5. SEÇÃO DE ROADMAP DE IMPLEMENTAÇÃO (Logo após Ganhos) -->
+    <div class="card card-wide rep-mb">
+      <div class="rep-sec-title" id="rep-title-roadmap">Roadmap de Implementação SIIGA</div>
+      <p style="font-size:12px;color:#666;margin-bottom:18px">A sequência do SIIGA é inegociável: cada fase depende da anterior. O plano prioriza os gaps de maior impacto do diagnóstico.</p>
+      <div class="roadmap-tl" id="roadmap-el"></div>
+
+      <!-- Bloco SIIGA — Origem do Método & Garantias -->
+      <div style="margin-top:20px;padding-top:16px;border-top:1px solid #eee">
+        <div style="font-family:'Bai Jamjuree';font-size:13px;font-weight:700;color:#14141b;margin-bottom:12px">SIIGA — Sistema Integrado e Inteligente de Gestão Agilean</div>
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:14px">
+          <div style="padding:12px 14px;background:#f8f8f8;border-radius:8px;border:1px solid #e8e8e8">
+            <div style="font-size:9.5px;font-weight:700;text-transform:uppercase;letter-spacing:0.08em;color:var(--orange);margin-bottom:8px">Origem do Método</div>
+            <div style="margin-bottom:7px"><div style="font-size:11px;font-weight:700;color:#14141b">Last Planner System</div><div style="font-size:10px;color:#666;line-height:1.4">Embutido nos algoritmos — sequenciamento, balanceamento de fluxo e causa raiz.</div></div>
+            <div style="margin-bottom:7px"><div style="font-size:11px;font-weight:700;color:#14141b">+25 anos de experiência em campo</div><div style="font-size:10px;color:#666;line-height:1.4">De MCMV a alto padrão, carteiras de centenas de obras simultâneas.</div></div>
+            <div style="margin-bottom:7px"><div style="font-size:11px;font-weight:700;color:#14141b">+10 anos de dados estruturados</div><div style="font-size:10px;color:#666;line-height:1.4">Sequências, durações e padrões de produtividade. Nenhuma big tech tem esses dados.</div></div>
+            <div><div style="font-size:11px;font-weight:700;color:#14141b">Boas práticas das obras de maior sucesso</div><div style="font-size:10px;color:#666;line-height:1.4">O que as melhores construtoras brasileiras fazem diferente — sistematizado em método.</div></div>
+          </div>
+          <div style="padding:12px 14px;background:#14141b;border-radius:8px">
+            <div style="font-size:9.5px;font-weight:700;text-transform:uppercase;letter-spacing:0.08em;color:var(--orange);margin-bottom:8px">O que o SIIGA garante</div>
+            <div style="font-size:10px;color:rgba(255,255,255,0.7);font-style:italic;line-height:1.4;margin-bottom:8px">"Planejamento não é o problema. O problema é fazer o planejamento sobreviver à execução."</div>
+            <ul style="list-style:none;padding:0;margin:0 0 10px 0">
+              <li style="font-size:10px;color:#fff;font-weight:600;line-height:1.5;margin-bottom:3px">→ O plano chega ao CPF do operário, não para na sala técnica</li>
+              <li style="font-size:10px;color:#fff;font-weight:600;line-height:1.5;margin-bottom:3px">→ O desvio é visto no mesmo dia, não no fechamento do mês</li>
+              <li style="font-size:10px;color:#fff;font-weight:600;line-height:1.5;margin-bottom:3px">→ Qualidade é trava para pagamento — nenhum centavo sem lastro</li>
+              <li style="font-size:10px;color:#fff;font-weight:600;line-height:1.5;margin-bottom:3px">→ Engenheiro estratégico — não operacional</li>
+              <li style="font-size:10px;color:#fff;font-weight:600;line-height:1.5">→ IA que potencializa quem tem método</li>
+            </ul>
+            <div style="display:grid;grid-template-columns:1fr 1fr;gap:6px">
+              <div style="background:var(--orange);color:#fff;font-size:9px;font-weight:700;text-align:center;padding:5px 6px;border-radius:5px">+25% PRODUTIVIDADE</div>
+              <div style="background:var(--orange);color:#fff;font-size:9px;font-weight:700;text-align:center;padding:5px 6px;border-radius:5px">OBRA NO PRAZO</div>
+              <div style="background:var(--orange);color:#fff;font-size:9px;font-weight:700;text-align:center;padding:5px 6px;border-radius:5px">MARGEM PROTEGIDA</div>
+              <div style="background:var(--orange);color:#fff;font-size:9px;font-weight:700;text-align:center;padding:5px 6px;border-radius:5px">PAGAMENTO VINC. À PRODUÇÃO</div>
             </div>
           </div>
         </div>
@@ -492,45 +535,177 @@ function maskPhone(input){var d=input.value.replace(/\D/g,'');if(d.length>11)d=d
       <div id="roi2-config" class="no-print" style="display:grid;grid-template-columns:repeat(2,1fr);gap:14px;margin-bottom:10px;max-width:520px"></div>
       <div id="roi2-summary" style="font-size:11px;color:#888;margin-bottom:16px"></div>
 
-      <div style="display:grid;grid-template-columns:1fr 1fr;gap:24px">
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:20px;margin-bottom:16px">
         <div>
-          <div style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:0.08em;color:#999;margin-bottom:8px">Visão Estratégica</div>
+          <div style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:0.08em;color:#999;margin-bottom:6px">Visão Estratégica</div>
           <div id="roi2-estrategica"></div>
         </div>
         <div>
-          <div style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:0.08em;color:#999;margin-bottom:8px">Visão Operacional</div>
+          <div style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:0.08em;color:#999;margin-bottom:6px">Visão Operacional</div>
           <div id="roi2-operacional"></div>
         </div>
       </div>
-    </div>
 
-    <div class="card card-wide rep-mb">
-      <div style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:0.08em;color:#999;margin-bottom:8px">Faixa de retorno por cenário</div>
-      <table class="roi-table" id="roi2-cenarios-table"></table>
-      <div style="margin-top:10px;font-size:11px;color:#888;font-style:italic">Cálculo baseado nas planilhas de ROI Agilean. Estimativa a partir dos dados informados pelo cliente — não representa garantia contratual.</div>
-    </div>
-
-    <div class="card card-wide rep-mb">
-      <div style="font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:0.08em;color:#999;margin-bottom:8px">Pressupostos do cálculo · dados informados nesta operação</div>
-      <div id="roi2-params-box" style="padding:14px 16px;background:#f8f8f8;border-radius:var(--r3);border:1px solid #e8e8e8"></div>
-    </div>
-
-    <div class="card card-wide rep-mb">
-      <div style="margin-bottom:6px">
-        <div style="font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:0.08em;color:#999">De onde vêm as horas</div>
-        <p style="font-size:11px;color:#888;margin-top:2px">Cada rotina hoje manual, com a % de economia esperada com o SIIGA. O total desta tabela é a base de "Economia nos fluxos de gestão" e "Capacidade de gestão liberada" acima.</p>
+      <!-- Faixa de retorno por cenário -->
+      <div style="margin-bottom:14px">
+        <div style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:0.08em;color:#999;margin-bottom:6px">Faixa de retorno por cenário</div>
+        <table class="roi-table" id="roi2-cenarios-table" style="margin-bottom:6px"></table>
+        <div style="font-size:10px;color:#888;font-style:italic">Cálculo baseado nas planilhas de ROI Agilean. Estimativa a partir dos dados informados pelo cliente — não representa garantia contratual.</div>
       </div>
-      <table class="roi-table" id="roi2-fluxos-table"></table>
+
+      <!-- Pressupostos acoplados ao mesmo card -->
+      <div style="border-top:1px solid #eee;padding-top:12px;margin-top:10px">
+        <div style="font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:0.08em;color:#999;margin-bottom:6px">Pressupostos do cálculo · dados informados nesta operação</div>
+        <div id="roi2-params-box" style="padding:10px 14px;background:#f8f8f8;border-radius:var(--r3);border:1px solid #e8e8e8;font-size:11px"></div>
+      </div>
     </div>
 
-    <div class="card card-wide rep-mb">
-      <div class="rep-sec-title">3. Road Map Executivo — 90 dias</div>
-      <p style="font-size:12px;color:#666;margin-bottom:18px">A sequência do SIIGA é inegociável: cada fase depende da anterior. O plano prioriza os gaps de maior impacto do diagnóstico.</p>
-      <div class="roadmap-tl" id="roadmap-el"></div>
-    </div>
+    <!-- 7. PÁGINA PRÓPRIA: PRÓXIMOS PASSOS & FLUXO CONSTRUTIVO AGILEAN -->
+    <div class="card card-wide rep-mb" id="next-steps-page" style="background:#fff">
 
-    <div class="card card-wide rep-mb" style="background:#fff8f5;border:1.5px solid rgba(255,95,31,0.25)" id="next-steps-container">
-      <!-- Preenchido dinamicamente por renderNextSteps() em script.js -->
+      <!-- Seção Próximos Passos (Ato 1, 2, 3) -->
+      <div id="next-steps-container" style="background:#fff8f5;border:1.5px solid rgba(255,95,31,0.25);border-radius:10px;padding:16px 20px;margin-bottom:20px">
+        <!-- Preenchido dinamicamente por renderNextSteps() em script.js -->
+      </div>
+
+      <!-- Infográfico: Gestão do Fluxo Construtivo com o Agilean -->
+      <div style="border-top:1px solid #e2e8f0;padding-top:16px">
+        <div style="background:#14141b;color:#ffffff;padding:12px 18px;border-radius:8px;font-family:'Bai Jamjuree';font-size:14px;font-weight:700;display:flex;align-items:center;gap:10px;margin-bottom:14px">
+          <span style="color:var(--orange);font-size:18px">▲</span>
+          <span style="color:#ffffff">Fluxo de Gestão Integrado Agilean</span>
+        </div>
+
+        <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:12px;margin-bottom:18px">
+
+          <div style="background:#f8f9fa;border:1px solid #e9ecef;border-radius:8px;padding:12px;position:relative">
+            <div style="display:flex;align-items:center;gap:8px;margin-bottom:6px">
+              <span style="font-family:'Bai Jamjuree';font-size:20px;font-weight:800;color:var(--orange)">1</span>
+              <strong style="font-size:11.5px;color:#14141b">Planejamento Lean</strong>
+            </div>
+            <div style="font-size:10.5px;color:#555;line-height:1.45">Dinâmico, prático, intuitivo e em linha de balanço vinculado ao orçamento.</div>
+          </div>
+
+          <div style="background:#f8f9fa;border:1px solid #e9ecef;border-radius:8px;padding:12px;position:relative">
+            <div style="display:flex;align-items:center;gap:8px;margin-bottom:6px">
+              <span style="font-family:'Bai Jamjuree';font-size:20px;font-weight:800;color:var(--orange)">2</span>
+              <strong style="font-size:11.5px;color:#14141b">Gestão de Mão de Obra</strong>
+            </div>
+            <div style="font-size:10.5px;color:#555;line-height:1.45">Alocações para execução dos pacotes e controle de produtividade das equipes.</div>
+          </div>
+
+          <div style="background:#f8f9fa;border:1px solid #e9ecef;border-radius:8px;padding:12px;position:relative">
+            <div style="display:flex;align-items:center;gap:8px;margin-bottom:6px">
+              <span style="font-family:'Bai Jamjuree';font-size:20px;font-weight:800;color:var(--orange)">3</span>
+              <strong style="font-size:11.5px;color:#14141b">Medições + Planejamento</strong>
+            </div>
+            <div style="font-size:10.5px;color:#555;line-height:1.45">Feitas por aplicativo, atualizando em tempo real dashboards e planejamento.</div>
+          </div>
+
+          <div style="background:#f8f9fa;border:1px solid #e9ecef;border-radius:8px;padding:12px;position:relative">
+            <div style="display:flex;align-items:center;gap:8px;margin-bottom:6px">
+              <span style="font-family:'Bai Jamjuree';font-size:20px;font-weight:800;color:var(--orange)">4</span>
+              <strong style="font-size:11.5px;color:#14141b">Qualidade integrada e Digital</strong>
+            </div>
+            <div style="font-size:10.5px;color:#555;line-height:1.45">FVS integradas ao planejamento com geração automática no ato da medição.</div>
+          </div>
+
+          <div style="background:#f8f9fa;border:1px solid #e9ecef;border-radius:8px;padding:12px;position:relative">
+            <div style="display:flex;align-items:center;gap:8px;margin-bottom:6px">
+              <span style="font-family:'Bai Jamjuree';font-size:20px;font-weight:800;color:var(--orange)">5</span>
+              <strong style="font-size:11.5px;color:#14141b">Planejamento + Qualidade</strong>
+            </div>
+            <div style="font-size:10.5px;color:#555;line-height:1.45">Indicadores de qualidade integrados à evolução do planejamento da obra.</div>
+          </div>
+
+          <div style="background:#f8f9fa;border:1px solid #e9ecef;border-radius:8px;padding:12px;position:relative">
+            <div style="display:flex;align-items:center;gap:8px;margin-bottom:6px">
+              <span style="font-family:'Bai Jamjuree';font-size:20px;font-weight:800;color:var(--orange)">6</span>
+              <strong style="font-size:11.5px;color:#14141b">Desempenho da obra</strong>
+            </div>
+            <div style="font-size:10.5px;color:#555;line-height:1.45">Comparativo entre obras, valor agregado, produtividade, longo, médio e curto prazo.</div>
+          </div>
+
+        </div>
+
+        <!-- Sistemas com Integração Nativa (logos reais) -->
+        <div style="background:#f8fafc;border:1px solid #e2e8f0;border-radius:10px;padding:18px 20px;margin-top:14px">
+          <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:16px">
+            <div>
+              <div style="font-family:'Bai Jamjuree';font-size:13.5px;font-weight:700;color:#0f172a">🔌 Sistemas com Integração Nativa</div>
+              <div style="font-size:11px;color:#64748b">Conexão bidirecional sem redigitação de dados ou planilhas</div>
+            </div>
+            <div style="background:rgba(37,99,235,0.08);color:#2563eb;font-size:10.5px;font-weight:700;padding:5px 10px;border-radius:6px;border:1px solid rgba(37,99,235,0.2)">
+              API REST Bidirecional
+            </div>
+          </div>
+
+          <div style="display:grid;grid-template-columns:repeat(7,1fr);gap:10px">
+
+            <!-- MS Project -->
+            <div style="background:#fff;border:1px solid #cbd5e1;border-radius:8px;padding:12px 6px;text-align:center;display:flex;flex-direction:column;align-items:center;justify-content:center;min-height:95px">
+              <div style="height:36px;display:flex;align-items:center;justify-content:center;margin-bottom:6px">
+                <svg width="32" height="32" viewBox="0 0 32 32" fill="none"><rect width="32" height="32" rx="6" fill="#31752F"/><path d="M10 9h7a4 4 0 010 8h-4v6h-3V9zm3 3v2h4a1 1 0 000-2h-4z" fill="#fff"/></svg>
+              </div>
+              <div style="font-size:11px;font-weight:700;color:#0f172a">MS Project</div>
+              <div style="font-size:9px;color:#64748b">Planejamento</div>
+            </div>
+
+            <!-- Excel -->
+            <div style="background:#fff;border:1px solid #cbd5e1;border-radius:8px;padding:12px 6px;text-align:center;display:flex;flex-direction:column;align-items:center;justify-content:center;min-height:95px">
+              <div style="height:36px;display:flex;align-items:center;justify-content:center;margin-bottom:6px">
+                <svg width="32" height="32" viewBox="0 0 32 32" fill="none"><rect width="32" height="32" rx="6" fill="#107C41"/><path d="M9 10l5 6-5 6h3.5l3.25-4.25L20 22h3.5l-5-6 5-6H20l-3.25 4.25L13.5 10H9z" fill="#fff"/></svg>
+              </div>
+              <div style="font-size:11px;font-weight:700;color:#0f172a">Excel</div>
+              <div style="font-size:9px;color:#64748b">Planilhas</div>
+            </div>
+
+            <!-- Sienge -->
+            <div style="background:#fff;border:1px solid #cbd5e1;border-radius:8px;padding:12px 6px;text-align:center;display:flex;flex-direction:column;align-items:center;justify-content:center;min-height:95px">
+              <div style="height:36px;display:flex;align-items:center;justify-content:center;margin-bottom:6px">
+                <img src="logos/SIENGE.png" alt="Sienge" style="max-height:28px;max-width:70px;object-fit:contain">
+              </div>
+              <div style="font-size:11px;font-weight:700;color:#0f172a">Sienge</div>
+              <div style="font-size:9px;color:#64748b">Softplan</div>
+            </div>
+
+            <!-- TOTVS -->
+            <div style="background:#fff;border:1px solid #cbd5e1;border-radius:8px;padding:12px 6px;text-align:center;display:flex;flex-direction:column;align-items:center;justify-content:center;min-height:95px">
+              <div style="height:36px;display:flex;align-items:center;justify-content:center;margin-bottom:6px">
+                <img src="logos/TOTVs.jpeg" alt="TOTVS" style="max-height:28px;max-width:70px;object-fit:contain">
+              </div>
+              <div style="font-size:11px;font-weight:700;color:#0f172a">TOTVS</div>
+              <div style="font-size:9px;color:#64748b">RM / Protheus</div>
+            </div>
+
+            <!-- Informakon: sem logo real disponível ainda — mantido como ícone -->
+            <div style="background:#fff;border:1px solid #cbd5e1;border-radius:8px;padding:12px 6px;text-align:center;display:flex;flex-direction:column;align-items:center;justify-content:center;min-height:95px">
+              <div style="height:36px;display:flex;align-items:center;justify-content:center;margin-bottom:6px;font-size:22px">🏗️</div>
+              <div style="font-size:11px;font-weight:700;color:#0f172a">Informakon</div>
+              <div style="font-size:9px;color:#64748b">ERP Construtora</div>
+            </div>
+
+            <!-- Mega -->
+            <div style="background:#fff;border:1px solid #cbd5e1;border-radius:8px;padding:12px 6px;text-align:center;display:flex;flex-direction:column;align-items:center;justify-content:center;min-height:95px">
+              <div style="height:36px;display:flex;align-items:center;justify-content:center;margin-bottom:6px">
+                <img src="logos/MEGA.jpeg" alt="Senior Mega" style="max-height:28px;max-width:70px;object-fit:contain">
+              </div>
+              <div style="font-size:11px;font-weight:700;color:#0f172a">Senior Mega</div>
+              <div style="font-size:9px;color:#64748b">ERP Construção</div>
+            </div>
+
+            <!-- UAU -->
+            <div style="background:#fff;border:1px solid #cbd5e1;border-radius:8px;padding:12px 6px;text-align:center;display:flex;flex-direction:column;align-items:center;justify-content:center;min-height:95px">
+              <div style="height:36px;display:flex;align-items:center;justify-content:center;margin-bottom:6px">
+                <img src="logos/UAU.jpeg" alt="UAU" style="max-height:28px;max-width:70px;object-fit:contain">
+              </div>
+              <div style="font-size:11px;font-weight:700;color:#0f172a">UAU</div>
+              <div style="font-size:9px;color:#64748b">Globaltec</div>
+            </div>
+
+          </div>
+        </div>
+
+      </div>
     </div>
 
     <div class="btn-row no-print" style="max-width:920px;justify-content:space-between">
