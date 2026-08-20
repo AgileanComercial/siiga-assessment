@@ -19,6 +19,7 @@ var S = {
   empresa:'', consultor:'', contato:'', cargo:'', email:'', telefone:'', data:'',
   numObras:5, orcamentoMedio:8000000, prazoMedio:18, numObrasRange:'', orcamentoRange:'',
   tipologia:'', modeloMO:'', momento:'',
+  ferramentas:{ planejamento:'', medicao:'', qualidade:'', contratos:'', folha:'' },
   scores:{ b03:0, b06:0, f1:[0,0,0,0,0,0,0,0], f2:[0,0,0,0,0], f3:[0,0,0,0,0,0,0], mo:{}, f4:[0,0,0,0,0] },
   showMO: false,
   // Dados para o cálculo de ROI real (calculadora-roi-agilean) — coletados dentro das fases relacionadas
@@ -128,6 +129,18 @@ var B0Q = [
       {v:'1', l:'Quantitativos e preços, sem composição',          s:'Lista de serviços com preços, sem detalhamento de MO', score:1},
       {v:'2', l:'Composições com MO segregada, desalinhado da EAP',s:'Detalhado, mas cronograma e orçamento não conversam', score:2},
       {v:'3', l:'Composições, MO segregada, alinhado à EAP',       s:'Orçamento e planejamento integrados desde a concepção', score:3}
+    ]
+  },
+  // TELA 07: Ferramentas utilizadas hoje (não pontua — alimenta o quadro comparativo do relatório)
+  { id:'b07', code:'B0.7', key:'ferramentas', badge:'bb0', blabel:'Bloco 0 · Contexto Estratégico', scored:false, type:'ferramentas',
+    text:'Quais ferramentas vocês usam hoje para cada uma dessas rotinas? (pode ser Excel, papel, sistema próprio ou "nenhuma")',
+    reveals:'',
+    fields:[
+      {key:'planejamento', label:'Ferramenta de Planejamento', placeholder:'Ex: MS Project, Excel, papel...'},
+      {key:'medicao', label:'Ferramenta de Medição', placeholder:'Ex: Excel, planilha própria...'},
+      {key:'qualidade', label:'Ferramenta de Qualidade (FVS)', placeholder:'Ex: Checklist em papel, Excel...'},
+      {key:'contratos', label:'Ferramenta de Controle de Contratos', placeholder:'Ex: ERP, Excel...'},
+      {key:'folha', label:'Ferramenta de Elaboração da Folha de Produção', placeholder:'Ex: Excel, sistema de RH...'}
     ]
   }
 ];
@@ -505,6 +518,19 @@ function renderB0() {
     return;
   }
 
+  if(q.type === 'ferramentas') {
+    var ferrFieldsHtml = q.fields.map(function(f) {
+      var savedVal = S.ferramentas[f.key];
+      return '<div class="input-group"><label>'+f.label+'</label>' +
+        '<input class="text-input" id="ferr-'+f.key+'" type="text" placeholder="'+f.placeholder+'" value="'+(savedVal||'')+'"></div>';
+    }).join('');
+    card.innerHTML = '<div class="phase-badge '+q.badge+'">'+q.blabel+'</div>' +
+      '<div class="q-code">'+q.code+'</div>' +
+      '<div class="q-text">'+q.text+'</div>' +
+      '<div style="display:grid;grid-template-columns:1fr 1fr;gap:14px;margin-top:8px">' + ferrFieldsHtml + '</div>';
+    return;
+  }
+
   var revealsHtml = q.reveals ? '<div class="q-reveals">'+q.reveals+'</div>' : '';
   var html = '<div class="phase-badge '+q.badge+'">'+q.blabel+'</div>' +
     '<div class="q-code">'+q.code+'</div>' +
@@ -660,6 +686,12 @@ function nextQ() {
       if(orc && orc.value) S.orcamentoMedio = orc.dataset.raw ? parseInt(orc.dataset.raw) : parseBRL(orc.value);
       var prazo = document.getElementById('roi-prazo');
       if(prazo && prazo.value) S.prazoMedio = parseFloat(prazo.value);
+    }
+    if(q.type === 'ferramentas') {
+      q.fields.forEach(function(f) {
+        var el = document.getElementById('ferr-'+f.key);
+        if(el) S.ferramentas[f.key] = el.value.trim();
+      });
     }
     if(currentQIdx < B0Q.length - 1) {
       currentQIdx++;
@@ -1366,9 +1398,61 @@ function renderNextSteps() {
     '</div>';
 }
 
+function renderRotinaComparativa() {
+  var tbody = document.getElementById('rotina-comparativa-body');
+  if (!tbody) return;
+
+  var f = S.ferramentas || {};
+  var naoInformado = 'Não informado no diagnóstico';
+
+  var rows = [
+    {
+      rotina: 'Planejamento & Reprogramação',
+      ferramenta: f.planejamento,
+      gargalo: 'Alimentação manual, desconectada do orçamento e da EAP',
+      siiga: 'Linha de Balanço dinâmica com Copilotos de IA ajustando prazos e orçamento em minutos.'
+    },
+    {
+      rotina: 'Medição de Avanço Físico',
+      ferramenta: f.medicao,
+      gargalo: 'Sistemas desconectados — avanço apurado manualmente, sem rastreio diário',
+      siiga: 'Apontamento diário via app; lookahead de 4 semanas com IRR zerando restrições antes do atraso.'
+    },
+    {
+      rotina: 'Qualidade (FVS)',
+      ferramenta: f.qualidade,
+      gargalo: 'Retrabalhos identificados tarde; qualidade tratada como auditoria separada do pagamento',
+      siiga: 'FVS de qualidade vinculada à liberação de medição — nenhum retrabalho pago sem evidência.'
+    },
+    {
+      rotina: 'Controle de Contratos / Empreiteiros',
+      ferramenta: f.contratos,
+      gargalo: 'Negociação de medição desgastante; sem evidência objetiva para liberar pagamento',
+      siiga: 'Medição por evidência auditável; fim da negociação subjetiva com empreiteiros.'
+    },
+    {
+      rotina: 'Folha de Produção / Fechamento de MO',
+      ferramenta: f.folha,
+      gargalo: 'Fechamento manual e lento; produtividade por equipe sem rastreabilidade',
+      siiga: 'Fechamento de folha e produtividade por HH em horas, com integração nativa ao ERP.'
+    }
+  ];
+
+  tbody.innerHTML = rows.map(function(r) {
+    var ferramentaLabel = (r.ferramenta && r.ferramenta.trim()) ? r.ferramenta.trim() : naoInformado;
+    return '<tr>' +
+      '<td><strong>' + r.rotina + '</strong></td>' +
+      '<td style="color:#555">' + ferramentaLabel + '</td>' +
+      '<td style="color:#b45309;background:rgba(251,146,60,0.06)">' + r.gargalo + '</td>' +
+      '<td style="color:#14141b;font-weight:600;background:rgba(255,95,31,0.03)">' + r.siiga + '</td>' +
+    '</tr>';
+  }).join('');
+}
+
 function buildReport() {
   renderQualitativeGains();
   renderNextSteps();
+  renderRotinaComparativa();
 
   var maxes = {f1:21,f2:12,f3:18,f4:12};
   var colors = {f1:'#1B4F8A',f2:'#0D7C8C',f3:'#0D6B45',f4:'#4a4558'};
@@ -2164,7 +2248,9 @@ function buildRoadmap() {
 // ═══════════════════════════════════════════
 function restartAssessment() {
   clearDraft();
-  S = {empresa:'',consultor:'',contato:'',cargo:'',email:'',telefone:'',data:'',numObras:5,orcamentoMedio:8000000,prazoMedio:18,numObrasRange:'',orcamentoRange:'',tipologia:'',modeloMO:'',momento:'',scores:{b03:0,b06:0,f1:[0,0,0,0,0,0,0,0],f2:[0,0,0,0,0],f3:[0,0,0,0,0,0,0],mo:{},f4:[0,0,0,0,0]},showMO:false,
+  S = {empresa:'',consultor:'',contato:'',cargo:'',email:'',telefone:'',data:'',numObras:5,orcamentoMedio:8000000,prazoMedio:18,numObrasRange:'',orcamentoRange:'',tipologia:'',modeloMO:'',momento:'',
+    ferramentas:{planejamento:'',medicao:'',qualidade:'',contratos:'',folha:''},
+    scores:{b03:0,b06:0,f1:[0,0,0,0,0,0,0,0],f2:[0,0,0,0,0],f3:[0,0,0,0,0,0,0],mo:{},f4:[0,0,0,0,0]},showMO:false,
     roi2:{folha:0,hDiaAtual:0,hSemQualidade:0,fluxoPlanejar:0,fluxoCurto:0,fluxoMedio:0,fluxoReprogramar:0,fluxoMedir:0,fluxoConferir:0,fluxoERP:0,fluxoCruzar:0},
     mensalidade:2000, captura:0.50};
   currentBlock='b0'; currentQIdx=0; currentPhaseIdx=0; phaseOrder=['f1','f2','f3','f4'];
@@ -2489,6 +2575,7 @@ function generatePDFFromAdmin(id) {
   var rec = list.find(function(r){ return r.id === id; });
   if(!rec) return;
   S = rec.state;
+  if(!S.ferramentas) S.ferramentas = {planejamento:'',medicao:'',qualidade:'',contratos:'',folha:''};
   generatePDF(true);
 }
 
@@ -2837,6 +2924,7 @@ function loadAndAnalyze(id) {
   var rec = list.find(function(r){ return r.id === id; });
   if(!rec) return;
   S = rec.state;
+  if(!S.ferramentas) S.ferramentas = {planejamento:'',medicao:'',qualidade:'',contratos:'',folha:''};
   buildAndShowRadar();
   setTimeout(function(){ runAiAnalysis(); }, 200);
 }
@@ -3081,6 +3169,7 @@ function resumeDraft() {
 
   // Restore full state
   S = draft.state;
+  if(!S.ferramentas) S.ferramentas = {planejamento:'',medicao:'',qualidade:'',contratos:'',folha:''};
   currentBlock    = draft.currentBlock    || 'b0';
   currentPhaseIdx = draft.currentPhaseIdx || 0;
   currentQIdx     = draft.currentQIdx     || 0;
@@ -3286,6 +3375,7 @@ function loadDiagnostico(id) {
   if(!rec) return;
   // Restore full state
   S = rec.state;
+  if(!S.ferramentas) S.ferramentas = {planejamento:'',medicao:'',qualidade:'',contratos:'',folha:''};
   // Rebuild radar and show report
   buildAndShowRadar();
   setTimeout(function(){ showReport(); }, 100);
