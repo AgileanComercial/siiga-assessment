@@ -1264,7 +1264,112 @@ function showReport() {
   showScreen('screen-report');
 }
 
+function renderQualitativeGains() {
+  var grid = document.getElementById('qualitative-grid');
+  if (!grid) return;
+
+  var f1p = getAvgPct('f1');
+  var f2p = getAvgPct('f2');
+  var mo = S.modeloMO || 'terceirizada';
+  var obras = S.numObras || 1;
+
+  // Card 1: Gargalo Raiz
+  var card1 = { icon: '🎯', title: '', desc: '' };
+  if (f1p < 0.60 || f2p < 0.60) {
+    card1.title = 'Linha de Balanço e Antecipação de Restrições';
+    card1.desc = 'A obra sai do modo "apagar incêndio". Com a Linha de Balanço digital e o lookahead de 4 semanas, os desvios de prazo e gargalos de suprimentos são identificados antes de virarem custo no canteiro.';
+  } else {
+    card1.title = 'Previsibilidade de Produção e Ritmo Contínuo';
+    card1.desc = 'O canteiro ganha fluxo contínuo. As metas semanais claras e o acompanhamento diário garantem que o planejado chegue até a ponta, evitando paradas de equipe e oscilações de ritmo.';
+  }
+
+  // Card 2: Copilotos de IA (Produtividade da Engenharia)
+  var card2 = {
+    icon: '🤖',
+    title: 'Engenharia 10x com Copilotos de IA',
+    desc: 'Nossos Copilotos de IA (Planejamento, Associação com Orçamento e Operacional) assumem os fluxos mais pesados da engenharia — como cruzar EAP com orçamento e ajustar programações. A equipe economiza dezenas de horas de trabalho braçal e foca no canteiro.'
+  };
+
+  // Card 3: Governança de Mão de Obra e Qualidade
+  var card3 = { icon: '', title: '', desc: '' };
+  if (mo === 'propria') {
+    card3.icon = '👷';
+    card3.title = 'Rastreabilidade de Folha e Produtividade HH';
+    card3.desc = 'Fim do apagão de produtividade. Os apontamentos diários mostram exatamente o rendimento de cada equipe e colaborador, reduzindo horas extras desnecessárias e pagamentos indevidos.';
+  } else {
+    card3.icon = '🤝';
+    card3.title = 'Medição por Evidência e Fim do Conflito com Empreiteiros';
+    card3.desc = 'Fim das negociações exaustivas no fechamento. A medição é feita sobre o que foi conferido no canteiro com FVS aprovada. Menos atrito, pagamento justo e qualidade garantida antes da liberação financeira.';
+  }
+
+  // Card 4: Escalabilidade & Integrações ERP
+  var card4 = {
+    icon: '📈',
+    title: 'Escalabilidade com Integração Nativa aos ERPs',
+    desc: 'Conexão direta com os principais ERPs do mercado (Sienge, TOTVS, Informakon, Mega e UAU). Os dados de avanço e medição fluem automaticamente, permitindo gerenciar ' + obras + ' obra(s) mantendo a equipe enxuta.'
+  };
+
+  var cards = [card1, card2, card3, card4];
+  grid.innerHTML = cards.map(function(c) {
+    return '<div style="padding:12px 14px;border-radius:8px;border:1px solid #e8e8e8;background:#fff;display:flex;gap:12px;align-items:flex-start">' +
+      '<div style="font-size:20px;flex-shrink:0">' + c.icon + '</div>' +
+      '<div>' +
+        '<div style="font-family:\'Bai Jamjuree\';font-size:12px;font-weight:700;color:#14141b;margin-bottom:3px">' + c.title + '</div>' +
+        '<div style="font-size:11px;color:#555;line-height:1.5">' + c.desc + '</div>' +
+      '</div>' +
+    '</div>';
+  }).join('');
+}
+
+function renderNextSteps() {
+  var container = document.getElementById('next-steps-container');
+  if (!container) return;
+
+  var empresa = S.empresa || 'sua empresa';
+  var obras = S.numObras || 1;
+  var tipologiaMap = {
+    vert: 'Residencial vertical',
+    horiz: 'Residencial horizontal',
+    mcmv: 'MCMV / Habitação popular',
+    com: 'Comercial / industrial',
+    div: 'Portfólio diversificado'
+  };
+  var tipologiaLabel = tipologiaMap[S.tipologia] || 'Construção Civil';
+  var moLabel = S.modeloMO === 'propria' ? 'mão de obra própria' : (S.modeloMO === 'mista' ? 'mão de obra mista' : 'mão de obra terceirizada');
+
+  container.innerHTML =
+    '<div style="display:flex;align-items:flex-start;gap:20px">' +
+      '<div style="font-size:36px;flex-shrink:0">🎯</div>' +
+      '<div>' +
+        '<div style="font-family:\'Bai Jamjuree\';font-size:16px;font-weight:700;color:#14141b;margin-bottom:8px">O próximo passo: Apresentação da Solução Agilean</div>' +
+        '<p style="font-size:13px;color:#444;line-height:1.7;margin-bottom:12px">' +
+          'Com base no diagnóstico da <strong>' + empresa + '</strong> (' + obras + ' obra(s) no perfil <em>' + tipologiaLabel + '</em> com <em>' + moLabel + '</em>), preparamos uma demonstração personalizada focada em destravar os principais gargalos identificados hoje:' +
+        '</p>' +
+        '<div style="display:flex;flex-direction:column;gap:10px;margin-bottom:16px">' +
+          '<div style="display:flex;align-items:flex-start;gap:10px;font-size:13px;color:#333">' +
+            '<span style="color:var(--orange);font-weight:700;font-size:16px;line-height:1.2">→</span>' +
+            '<span><strong>Ato 1: Metodologia & Copilotos de Planejamento/Orçamento</strong> — Demonstração da Linha de Balanço e de como os Copilotos de IA automatizam o cronograma e o cruzamento com o orçamento do seu ERP em minutos.</span>' +
+          '</div>' +
+          '<div style="display:flex;align-items:flex-start;gap:10px;font-size:13px;color:#333">' +
+            '<span style="color:var(--orange);font-weight:700;font-size:16px;line-height:1.2">→</span>' +
+            '<span><strong>Ato 2: Canteiro Ágil & Copiloto Operacional</strong> — Como a equipe de campo realiza apontamentos diários pelo celular/WhatsApp, eliminando restrições 4 semanas antes e vinculando FVS de qualidade à medição.</span>' +
+          '</div>' +
+          '<div style="display:flex;align-items:flex-start;gap:10px;font-size:13px;color:#333">' +
+            '<span style="color:var(--orange);font-weight:700;font-size:16px;line-height:1.2">→</span>' +
+            '<span><strong>Ato 3: Fechamento Blindado & Inteligência da Diretoria</strong> — Performance HUB executivo em tempo real e integração nativa com seu ERP (Sienge, TOTVS, Informakon, Mega, UAU) para fechar medições e folhas em horas.</span>' +
+          '</div>' +
+        '</div>' +
+        '<div style="padding:12px 16px;background:rgba(255,95,31,0.07);border-radius:8px;border-left:3px solid var(--orange)">' +
+          '<span style="font-size:13px;color:#333;font-style:italic">"Identificamos oportunidades claras de ganho de eficiência e estancamento de perdas na sua operação. Na próxima reunião, demonstraremos na prática como a metodologia SIIGA e a tecnologia Agilean capturam esses resultados desde o primeiro ciclo."</span>' +
+        '</div>' +
+      '</div>' +
+    '</div>';
+}
+
 function buildReport() {
+  renderQualitativeGains();
+  renderNextSteps();
+
   var maxes = {f1:21,f2:12,f3:18,f4:12};
   var colors = {f1:'#1B4F8A',f2:'#0D7C8C',f3:'#0D6B45',f4:'#4a4558'};
   var lnames = {f1:'Fase 1 · Planejamento Estratégico',f2:'Fase 2 · Proteção da Execução',f3:'Fase 3 · Gestão da Produção',f4:'Fase 4 · Controle e Performance'};
@@ -2513,7 +2618,8 @@ PRODUTOS AGILEAN:
 - Planejamento e Controle: Linha de Balanco digital, reprogramacoes automatizadas, Curva S fisico-financeira, IDP, gestao de restricoes com IRR, assistente Angelina via WhatsApp. Porta de entrada natural.
 - Qualidade: FVS automatica pos-medicao, PPCQ, controle de NCs, vinculo producao x qualidade x pagamento. Pre-requisito: P&C ativo.
 - Mao de Obra: folha de producao digital, medicao de empreiteiros integrada, produtividade por funcionario, improdutividade visivel. Pre-requisito: medicoes rodando.
-- Integracao ERP: API nativa com Sienge, Mega, UAU.
+- Copilotos de IA Agilean: Copiloto de Planejamento (estruturacao agil de prazos e Linha de Balanco), Copiloto de Associacao de Planejamento com Orcamento (mapeamento automatizado EAP x orcamento) e Copiloto Operacional (apoio a rotina de campo, lookahead e insights diarios de canteiro).
+- Integracao ERP: API nativa com Sienge, TOTVS, Informakon, Mega e UAU.
 
 BENCHMARKS REAIS (use com precisao):
 - Media de 10% de reducao de custos operacionais
