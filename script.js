@@ -20,7 +20,7 @@ var S = {
   numObras:5, orcamentoMedio:8000000, prazoMedio:18, numObrasRange:'', orcamentoRange:'',
   tipologia:'', modeloMO:'', momento:'',
   ferramentas:{ planejamento:'', medicao:'', qualidade:'', contratos:'', folha:'' },
-  scores:{ b03:0, b06:0, f1:[0,0,0,0,0,0,0,0], f2:[0,0,0,0,0], f3:[0,0,0,0,0,0,0], mo:{}, f4:[0,0,0,0,0] },
+  scores:{ b03:0, f1:[0,0,0,0,0,0,0,0], f2:[0,0,0,0], f3:[0,0,0,0,0,0], mo:{}, f4:[0,0,0,0,0] },
   showMO: false,
   // Dados para o cálculo de ROI real (calculadora-roi-agilean) — coletados dentro das fases relacionadas
   // custoHora: fixo (ROI_REAL_K.CUSTO_HORA_TECNICA) — não é mais perguntado ao cliente
@@ -96,7 +96,7 @@ var B0Q = [
     opts:[
       {v:'0', l:'A obra acumula tudo',                         s:'Engenheiro gerencia canteiro, plano e controle ao mesmo tempo', score:0},
       {v:'1', l:'Engenheiro com algum suporte',                s:'Apoio esporádico de escritório ou estagiário', score:1},
-      {v:'2', l:'Sala técnica parcial',                        s:'Time dedicado mas sem método estruturado', score:2},
+      {v:'2', l:'Sala técnica parcial',                        s:'Time dedicado mas sem método estruturado', score:1.5},
       {v:'3', l:'Sala técnica dedicada ou consultoria estruturada', s:'Especialista em planejamento e controle de obras', score:3}
     ]
   },
@@ -120,19 +120,10 @@ var B0Q = [
       {v:'estavel',      l:'Operação estável',        s:'Volume constante, foco em eficiência operacional', score:0}
     ]
   },
-  // TELA 06: Estrutura do orçamento (scored)
-  { id:'b06', code:'B0.6', key:'b06', badge:'bb0', blabel:'Bloco 0 · Contexto Estratégico', scored:true,
-    text:'Como o orçamento das obras é estruturado?',
-    reveals:'',
-    opts:[
-      {v:'0', l:'Verbalizado ou global por m²',                    s:'Sem separação por serviço ou composição de custos', score:0},
-      {v:'1', l:'Quantitativos e preços, sem composição',          s:'Lista de serviços com preços, sem detalhamento de MO', score:1},
-      {v:'2', l:'Composições com MO segregada, desalinhado da EAP',s:'Detalhado, mas cronograma e orçamento não conversam', score:2},
-      {v:'3', l:'Composições, MO segregada, alinhado à EAP',       s:'Orçamento e planejamento integrados desde a concepção', score:3}
-    ]
-  },
-  // TELA 07: Ferramentas utilizadas hoje (não pontua — alimenta o quadro comparativo do relatório)
-  { id:'b07', code:'B0.7', key:'ferramentas', badge:'bb0', blabel:'Bloco 0 · Contexto Estratégico', scored:false, type:'ferramentas',
+  // TELA 06: Ferramentas utilizadas hoje (não pontua — alimenta o quadro comparativo do relatório)
+  // B0.6 (Estrutura do orçamento) foi removida: era duplicata de F1.4, que já avalia
+  // se orçamento e planejamento estão integrados — F1.4 é a autoridade técnica sobre o tema.
+  { id:'b07', code:'B0.6', key:'ferramentas', badge:'bb0', blabel:'Bloco 0 · Contexto Estratégico', scored:false, type:'ferramentas',
     text:'Quais ferramentas vocês usam hoje para cada uma dessas rotinas? (pode ser Excel, papel, sistema próprio ou "nenhuma")',
     reveals:'',
     fields:[
@@ -157,29 +148,29 @@ var PQ = {
     },
     qs:[
       { code:'F1.1', text:'Antes de iniciar a obra, existe um planejamento formal aprovado — ou o cronograma vai sendo construído durante a execução?', reveals:'Avalia a cultura de planejamento: se o plano existe antes da obra começar e se passa por aprovação formal da gestão.',
-        opts:[{l:'Sem planejamento formal',s:'A obra começa sem cronograma definido',score:0},{l:'Cronograma genérico',s:'Existe, mas só com atividades macro e datas gerais',score:1},{l:'Cronograma detalhado por atividades',s:'Atividades detalhadas, mas sem validação formal antes do início',score:2},{l:'Planejamento formal aprovado antes do início',s:'Cronograma detalhado, validado e aprovado pela gestão antes de mobilizar',score:3}]
+        opts:[{l:'Sem planejamento formal',s:'A obra começa sem cronograma definido',score:0},{l:'Cronograma genérico',s:'Existe, mas só com atividades macro e datas gerais',score:1},{l:'Cronograma detalhado por atividades',s:'Atividades detalhadas, mas sem validação formal antes do início',score:1.5},{l:'Planejamento formal aprovado antes do início',s:'Cronograma detalhado, validado e aprovado pela gestão antes de mobilizar',score:3}]
       },
       { code:'F1.2', text:'Qual técnica de planejamento vocês utilizam nas obras?', reveals:'Avalia a maturidade técnica do planejamento: desde o cronograma empírico até a Linha de Balanço com lotes formalizados — que é a base do método SIIGA.',
-        opts:[{l:'Sem técnica estruturada',s:'Planejamento empírico ou planilha livre sem método definido',score:0},{l:'Gantt com atividades sequenciais',s:'Cronograma tradicional, sem lógica de fluxo por lote',score:1},{l:'Linha de Balanço com lotes macros (ex: pavimento)',s:'Estrutura existe mas sem subdivisão por atividade e sem critérios de terminalidade definidos',score:2},{l:'Linha de Balanço com lotes definidos e critério de terminalidade',s:'Lotes formalizados com dicionário de pacotes e critério claro de conclusão',score:3}]
+        opts:[{l:'Sem técnica estruturada',s:'Planejamento empírico ou planilha livre sem método definido',score:0},{l:'Gantt com atividades sequenciais',s:'Cronograma tradicional, sem lógica de fluxo por lote',score:1},{l:'Linha de Balanço com lotes macros (ex: pavimento)',s:'Estrutura existe mas sem subdivisão por atividade e sem critérios de terminalidade definidos',score:1.5},{l:'Linha de Balanço com lotes definidos e critério de terminalidade',s:'Lotes formalizados com dicionário de pacotes e critério claro de conclusão',score:3}]
       },
       { code:'F1.3', text:'A duração de cada pacote é definida por quantidade de serviço e produtividade, ou é mais baseada em experiência anterior e estimativa?', reveals:'Base técnica do dimensionamento — pré-requisito direto do Ensaio de Recursos.',
-        opts:[{l:'Estimativa empírica',s:'Baseado no feeling de quem faz',score:0},{l:'Dados históricos informais',s:'Lembramos de obras parecidas',score:1},{l:'Referências de obras similares',s:'Consultamos registros de projetos anteriores',score:2},{l:'Cálculo por quantidades × produtividade',s:'Dimensionamento técnico com base em dados reais de produção',score:3}]
+        opts:[{l:'Estimativa empírica',s:'Baseado no feeling de quem faz',score:0},{l:'Dados históricos informais',s:'Lembramos de obras parecidas',score:1},{l:'Referências de obras similares',s:'Consultamos registros de projetos anteriores',score:1.5},{l:'Cálculo por quantidades × produtividade',s:'Dimensionamento técnico com base em dados reais de produção',score:3}]
       },
       { code:'F1.4', text:'O orçamento e o planejamento da obra estão integrados — ou são documentos que vivem separados?', reveals:'Avalia se o físico e o financeiro conversam: base para que a Curva S reflita a realidade e não apenas a intenção inicial.',
         anchor:'E quando o orçamento é atualizado — isso reflete automaticamente na sua Curva S, ou ainda tem um passo manual para reprocessar?',
-        opts:[{l:'Separados — nunca se encontram',s:'Orçamento e planejamento são documentos independentes',score:0},{l:'Integração inicial congelada',s:'A associação foi feita no início da obra mas não acompanha mudanças — estão descolados',score:1},{l:'Integração manual ativa',s:'Quando o orçamento ou o plano muda, alguém atualiza manualmente — funciona mas gera retrabalho',score:2},{l:'Integração via sistema, sem planilhas',s:'O orçamento vem direto do ERP para a plataforma de planejamento, sem intermediários',score:3}]
+        opts:[{l:'Separados — nunca se encontram',s:'Orçamento e planejamento são documentos independentes',score:0},{l:'Integração inicial congelada',s:'A associação foi feita no início da obra mas não acompanha mudanças — estão descolados',score:1},{l:'Integração manual ativa',s:'Quando o orçamento ou o plano muda, alguém atualiza manualmente — funciona mas gera retrabalho',score:1.5},{l:'Integração via sistema, sem planilhas',s:'O orçamento vem direto do ERP para a plataforma de planejamento, sem intermediários',score:3}]
       },
       { code:'F1.6', text:'Quando analisam o desempenho da obra, existe uma rotina de comparar o avanço realizado contra o planejado na Curva S — calculando média de avanço e fazendo projeção de término?', reveals:'Leitura estratégica da Curva S: a diferença entre ter o gráfico e usar o gráfico para decidir.',
         anchor:'E quando identificam que o avanço realizado está abaixo do planejado — existe processo para calcular o ritmo necessário de recuperação e validar se ele é viável com as equipes que têm hoje?',
-        opts:[{l:'Sem análise',s:'Não olhamos para a Curva S regularmente',score:0},{l:'Análise esporádica e qualitativa',s:'Olhamos quando tem reunião com cliente',score:1},{l:'Análise periódica sem projeção',s:'Sabemos onde estamos mas não onde vamos terminar',score:2},{l:'Análise com % real vs. planejado, média e projeção de término',s:'Leitura completa dos indicadores com decisão baseada em dado',score:3}]
+        opts:[{l:'Sem análise',s:'Não olhamos para a Curva S regularmente',score:0},{l:'Análise esporádica e qualitativa',s:'Olhamos quando tem reunião com cliente',score:1},{l:'Análise periódica sem projeção',s:'Sabemos onde estamos mas não onde vamos terminar',score:1.5},{l:'Análise com % real vs. planejado, média e projeção de término',s:'Leitura completa dos indicadores com decisão baseada em dado',score:3}]
       },
       { code:'F1.7', text:'Além do físico-financeiro de gestão, existe um cronograma bancário estruturado — com as medições previstas alinhadas ao ritmo real de execução da obra?', reveals:'Gap mais custoso e menos visível: retrabalho duplo em toda reprogramação, falta de visão de exposição de caixa e risco de glosa.',
         anchor:'O cronograma que vai para o banco e o que a obra usa para se planejar são dois documentos diferentes, mantidos por pessoas diferentes, que nunca conversam. Você consegue dizer hoje qual é a exposição de caixa da obra?',
-        opts:[{l:'Sem cronograma bancário',s:'Medições são feitas sem referência de planejamento',score:0},{l:'Existe, completamente desconectado do planejamento',s:'O financeiro tem uma planilha separada',score:1},{l:'Atualizado manualmente de forma eventual',s:'Atualizamos quando vence medição',score:2},{l:'Integrado na mesma plataforma, atualizado dinamicamente',s:'A medição de avanço de obra alimenta automaticamente o cronograma bancário',score:3}]
+        opts:[{l:'Sem cronograma bancário',s:'Medições são feitas sem referência de planejamento',score:0},{l:'Existe, completamente desconectado do planejamento',s:'O financeiro tem uma planilha separada',score:1},{l:'Atualizado manualmente de forma eventual',s:'Atualizamos quando vence medição',score:1.5},{l:'Integrado na mesma plataforma, atualizado dinamicamente',s:'A medição de avanço de obra alimenta automaticamente o cronograma bancário',score:3}]
       },
       { code:'F1.5', text:'Existe integração entre o planejamento da obra e o processo de suprimentos — o cronograma de compras é definido com base nas datas de início de cada pacote planejado?', reveals:'ROI direto em compras (menos urgência, melhor negociação). A ausência explica grande parte das paradas por material faltante.',
         anchor:'A integração planejamento × suprimentos é um dos ganhos mais rápidos e visíveis quando o SIIGA é implantado. Cada compra emergencial tem custo oculto que nunca aparece no relatório.',
-        opts:[{l:'Suprimentos totalmente reativo',s:'Compra quando percebe que vai faltar',score:0},{l:'Alinhamento informal eventual',s:'Avisamos compras quando lembramos',score:1},{l:'Cronograma de compras existe, desconectado do planejamento',s:'Temos um cronograma mas não bate com o plano de obra',score:2},{l:'Cronograma gerado a partir do planejamento',s:'Compras alinhadas com o planejamento e reprogramações de forma automática',score:3}]
+        opts:[{l:'Suprimentos totalmente reativo',s:'Compra quando percebe que vai faltar',score:0},{l:'Alinhamento informal eventual',s:'Avisamos compras quando lembramos',score:1},{l:'Cronograma de compras existe, desconectado do planejamento',s:'Temos um cronograma mas não bate com o plano de obra',score:1.5},{l:'Cronograma gerado a partir do planejamento',s:'Compras alinhadas com o planejamento e reprogramações de forma automática',score:3}]
       },
       { code:'F1.ROI', type:'numgrid', text:'Para dimensionar o potencial de ganho da sua operação, informe:', reveals:'Esses dados alimentam o cálculo de ROI real do diagnóstico — tempo hoje gasto em rotinas manuais de gestão.',
         fields:[
@@ -191,25 +182,22 @@ var PQ = {
   f2:{
     phase:2, badgeClass:'bf2', color:'#2dd4bf', colorHex:'#0D7C8C',
     label:'Fase 2 · Proteção e Garantia da Execução do Plano',
-    maxScore:12,
+    maxScore:9,
     insight: function(p){
       if(p<0.4) return 'Restrições aparecem quando já estão atrasando. Você está respondendo a problemas que poderia ter antecipado — esse tempo de resposta tem custo direto de produção parada.';
       if(p<0.7) return 'Alguma proteção existe, mas é informal. O lookahead não está funcionando como blindagem real — ainda há surpresas que poderiam ter sido antecipadas.';
       return 'Bom nível de proteção da execução. A maturidade aqui permite colher os frutos de uma Fase 3 mais estruturada.';
     },
     qs:[
-      { code:'F2.1', text:'Existe alguma rotina — semanal ou quinzenal — onde a equipe olha para as próximas 4 a 6 semanas e mapeia o que pode travar a execução antes de acontecer?', reveals:'Existência de lookahead estruturado e gestão de restrições. O critério não é o nome da reunião — é se ela realmente antecipa problemas com consistência.',
-        opts:[{l:'Sem rotina de médio prazo',s:'Problemas aparecem quando já travaram a produção',score:0},{l:'Discussões baseadas na experiência dos gestores',s:'Sem agenda ou frequência definida — o conhecimento está nas pessoas, não no processo',score:1},{l:'Reuniões com agenda e frequência definidas',s:'Pauta existe e há regularidade, mas os registros são informais e não há processo de cobrança e análise',score:2},{l:'Lookahead estruturado com restrições categorizadas e responsáveis',s:'Processo formal com registro, cobrança e análise de cada restrição por categoria',score:3}]
-      },
-      { code:'F2.2', text:'Com que antecedência vocês conseguem visualizar riscos de parada — por falta de material, projeto não liberado ou frente bloqueada?', reveals:'Mede a efetividade real da antecipação — independente de existir ou não uma rotina formal. Nota de condução: se F2.1 foi score 0 ou 1, reformule como confirmação: "Dado que ainda não há uma rotina estruturada de médio prazo, é natural que restrições apareçam quando já estão travando — me confirme: isso costuma acontecer dias antes ou só quando já parou?"',
+      { code:'F2.1', text:'Como funciona a antecipação de restrições e o planejamento de médio prazo (lookahead) — com que antecedência vocês conseguem visualizar riscos de parada por falta de material, projeto não liberado ou frente bloqueada?', reveals:'Existência e efetividade real do lookahead estruturado e da gestão de restrições. O critério não é o nome da reunião nem a antecedência isolada — é se o processo realmente antecipa problemas antes que travem a produção, com consistência.',
         anchor:'Quanto custa, por mês, cada semana perdida por uma restrição que poderia ter sido antecipada?',
-        opts:[{l:'Identificado quando a produção já parou',s:'Descobrimos na hora — sem tempo de agir',score:0},{l:'Dias antes',s:'Percebemos com poucos dias, pouco tempo para resolver',score:1},{l:'1–2 semanas antes',s:'Alguma antecipação mas insuficiente para compras longas',score:2},{l:'4+ semanas antes, com plano de remoção estruturado',s:'Antecipação real com ação planejada',score:3}]
+        opts:[{l:'Identificado quando a produção já parou',s:'Sem rotina de médio prazo — problemas aparecem quando já travaram a produção',score:0},{l:'Dias antes, sem processo formal',s:'Discussões baseadas na experiência dos gestores, sem agenda ou frequência definida',score:1},{l:'1–2 semanas antes, com reuniões e registro informal',s:'Pauta e regularidade existem, mas sem processo estruturado de cobrança e análise',score:1.5},{l:'4+ semanas antes, com plano de remoção estruturado',s:'Lookahead estruturado com restrições categorizadas, responsáveis e análise por categoria',score:3}]
       },
-      { code:'F2.3', text:'Os empreiteiros ou equipes próprias que vão entrar nas próximas 2 semanas já estão contratados e confirmados — ou isso ainda está em definição?', reveals:'Planejamento de MO no médio prazo. Equipe não confirmada para as próximas 2 semanas é risco imediato de parada.',
-        opts:[{l:'Definido no momento de entrada',s:'Contratamos quando o serviço já vai começar',score:0},{l:'Definido com poucos dias de antecedência',s:'Resolvemos na última hora',score:1},{l:'Planejado com 1–2 semanas',s:'Alguma antecipação na contratação',score:2},{l:'Confirmado com 4+ semanas, alinhado ao lookahead',s:'Contratação integrada ao planejamento de médio prazo',score:3}]
+      { code:'F2.2', text:'Os empreiteiros ou equipes próprias que vão entrar nas próximas 2 semanas já estão contratados e confirmados — ou isso ainda está em definição?', reveals:'Planejamento de MO no médio prazo. Equipe não confirmada para as próximas 2 semanas é risco imediato de parada.',
+        opts:[{l:'Definido no momento de entrada',s:'Contratamos quando o serviço já vai começar',score:0},{l:'Definido com poucos dias de antecedência',s:'Resolvemos na última hora',score:1},{l:'Planejado com 1–2 semanas',s:'Alguma antecipação na contratação',score:1.5},{l:'Confirmado com 4+ semanas, alinhado ao lookahead',s:'Contratação integrada ao planejamento de médio prazo',score:3}]
       },
-      { code:'F2.4', text:'Ao final de cada ciclo de execução — mensal, bimestral ou conforme o ritmo da obra — existe uma reprogramação formal, revisando o que foi feito e construindo novo plano?', reveals:'Cultura de reprogramação. Não fixamos a frequência — o que importa é se o ciclo existe, seja qual for o intervalo.',
-        opts:[{l:'Planejamento original até o fim',s:'Não reprogramamos — seguimos o plano inicial',score:0},{l:'Ajustes informais ocasionais',s:'Quando o desvio é muito grande, conversamos',score:1},{l:'Reprogramação periódica sem dados formais',s:'Fazemos mas é mais no feeling',score:2},{l:'Ciclo formal de reprogramação com PPC e análise de causas',s:'Dados reais alimentam o novo plano',score:3}]
+      { code:'F2.3', text:'Ao final de cada ciclo de execução — mensal, bimestral ou conforme o ritmo da obra — existe uma reprogramação formal, revisando o que foi feito e construindo novo plano?', reveals:'Cultura de reprogramação. Não fixamos a frequência — o que importa é se o ciclo existe, seja qual for o intervalo.',
+        opts:[{l:'Planejamento original até o fim',s:'Não reprogramamos — seguimos o plano inicial',score:0},{l:'Ajustes informais ocasionais',s:'Quando o desvio é muito grande, conversamos',score:1},{l:'Reprogramação periódica sem dados formais',s:'Fazemos mas é mais no feeling',score:1.5},{l:'Ciclo formal de reprogramação com PPC e análise de causas',s:'Dados reais alimentam o novo plano',score:3}]
       },
       { code:'F2.ROI', type:'numgrid', text:'Quanto tempo sua equipe gasta hoje nas rotinas de curto e médio prazo?', reveals:'Tempo gasto nessas rotinas manuais é diretamente recuperável com o SIIGA.',
         fields:[
@@ -223,7 +211,7 @@ var PQ = {
   f3:{
     phase:3, badgeClass:'bf3', color:'#34d399', colorHex:'#0D6B45',
     label:'Fase 3 · Gestão Integrada da Produção',
-    maxScore:18,
+    maxScore:15,
     insight: function(p){
       if(p<0.4) return 'O canteiro está produzindo sem feedback real. O plano existe mas não governa a execução. A gestão descobre o problema 2 semanas depois que ele aconteceu.';
       if(p<0.7) return 'Alguma gestão da produção existe, mas sem integração completa. O dado do canteiro chega com atraso e não conecta ao pagamento de forma sistemática.';
@@ -231,23 +219,20 @@ var PQ = {
     },
     qs:[
       { code:'F3.1', text:'Existe uma programação semanal estruturada — com metas por equipe, responsáveis definidos e vínculo com o planejamento de médio prazo (lookahead)?', reveals:'Avalia se o plano semanal é um desdobramento real do lookahead ou apenas uma lista de tarefas improvisada. O vínculo com o médio prazo é o que garante que a semana não comece do zero.',
-        opts:[{l:'Sem programação semanal',s:'O encarregado decide o que fazer no dia, sem plano definido',score:0},{l:'Programação a cargo do encarregado, desconectada do planejamento global',s:'Existe mas é informal e não consulta o lookahead — o conhecimento está nas pessoas, não no processo',score:1},{l:'Programação semanal estruturada por equipe, sem vínculo formal com o lookahead',s:'O engenheiro monta a semana mas sem consultar o plano de médio prazo',score:2},{l:'Plano de comprometimento semanal gerado a partir do lookahead, com metas por equipe e coleta de causas de não cumprimento e cálculo do PPC',s:'Desdobramento formal do médio prazo com accountability semanal',score:3}]
+        opts:[{l:'Sem programação semanal',s:'O encarregado decide o que fazer no dia, sem plano definido',score:0},{l:'Programação a cargo do encarregado, desconectada do planejamento global',s:'Existe mas é informal e não consulta o lookahead — o conhecimento está nas pessoas, não no processo',score:1},{l:'Programação semanal estruturada por equipe, sem vínculo formal com o lookahead',s:'O engenheiro monta a semana mas sem consultar o plano de médio prazo',score:1.5},{l:'Plano de comprometimento semanal gerado a partir do lookahead, com metas por equipe e coleta de causas de não cumprimento e cálculo do PPC',s:'Desdobramento formal do médio prazo com accountability semanal',score:3}]
       },
-      { code:'F3.2', text:'Existe uma rotina diária de check-out e check-in — onde a equipe registra o que não foi feito ontem, a causa e a ação imediata, e o que pode impedir a execução hoje?', reveals:'Avalia se o fluxo de informação do canteiro para a gestão acontece diariamente ou só no fechamento. Quando esse ritual não existe, o engenheiro descobre os problemas de forma descoordenada ao longo do dia — o que reduz drasticamente sua capacidade de agir.',
+      { code:'F3.2', text:'Existe uma rotina diária de check-out e check-in — onde a equipe registra o que não foi feito ontem, a causa dessa meta não atingida e a ação imediata para tratá-la, e o que pode impedir a execução hoje?', reveals:'Avalia se o fluxo de informação do canteiro para a gestão acontece diariamente ou só no fechamento — incluindo o registro formal da causa e o tratamento para que ela não se repita. Quando esse ritual não existe, o engenheiro descobre os problemas de forma descoordenada ao longo do dia, e os mesmos desvios se repetem sem rastreabilidade.',
         anchor:'O ciclo de check-out e check-in deve acontecer até que todos os líderes de frente ou equipe cumpram o rito sugerido. Com isso, o tratamento de desvios e restrições passa a ser mais rápido e efetivo.',
-        opts:[{l:'Sem rotina diária',s:'O que acontece no canteiro fica no canteiro — engenheiro descobre quando o problema já impactou',score:0},{l:'Conversa informal do encarregado com a equipe no início do turno',s:'Sem método, sem registro, sem causa padrão — depende de quem está presente',score:1},{l:'Reunião diária com participação da engenharia, mas sem formulário padrão nem causa padrão',s:'Existe regularidade mas fica longa, desorganizada ou inconsistente',score:2},{l:'Check-out e check-in estruturados: pauta fixa, até 30 min, formulário de causa padrão, ação imediata com responsável e quadro de gestão à vista atualizado',s:'Ritual completo que garante visibilidade diária do PPC por equipe',score:3}]
+        opts:[{l:'Sem rotina diária',s:'O que acontece no canteiro fica no canteiro — engenheiro descobre quando o problema já impactou, sem registro de causa',score:0},{l:'Conversa informal do encarregado com a equipe no início do turno',s:'Sem método, sem registro, sem causa padrão — depende de quem está presente',score:1},{l:'Reunião diária com participação da engenharia, mas sem formulário padrão nem causa padrão',s:'Existe regularidade mas fica longa, desorganizada ou inconsistente — sabemos o que não foi feito mas não por quê',score:1.5},{l:'Check-out e check-in estruturados: pauta fixa, até 30 min, formulário de causa padrão, ação imediata com responsável e quadro de gestão à vista atualizado',s:'Ritual completo com registro de causa, ação corretiva e responsável — garante visibilidade diária do PPC por equipe',score:3}]
       },
-      { code:'F3.3', text:'Quando uma meta não é atingida, existe um registro formal da causa — e alguém que trate essa causa para ela não se repetir?', reveals:'Rastreabilidade de desvios e melhoria contínua. Sem isso, os mesmos problemas se repetem indefinidamente.',
-        opts:[{l:'Sem registro',s:'Desvios ficam no verbal',score:0},{l:'Registro informal eventual',s:'Às vezes anotamos em planilha',score:1},{l:'Registro sem análise de causa',s:'Sabemos o que não foi feito mas não por quê',score:2},{l:'Registro + análise de causa + ação corretiva com responsável',s:'Ciclo completo de não conformidade',score:3}]
+      { code:'F3.3', text:'Com que frequência é feita a coleta do avanço físico — o que foi executado de fato nas obras?', reveals:'A frequência da coleta define a velocidade com que a gestão consegue agir sobre desvios. Coleta mensal significa que um desvio pode se acumular por 4 semanas antes de ser visto.',
+        opts:[{l:'Estimativa — sem coleta formal',s:'Ninguém mede de fato, o número vem do feeling do engenheiro',score:0},{l:'Coleta mensal manual',s:'O engenheiro mede o avanço de todas as atividades uma vez por mês',score:1},{l:'Coleta quinzenal',s:'Frequência maior mas ainda manual, com gap de até 15 dias',score:1.5},{l:'Coleta semanal com autoapontamento',s:'Equipe registra o avanço, encarregado valida — gestão recebe dado em tempo próximo ao real',score:3}]
       },
-      { code:'F3.4', text:'Com que frequência é feita a coleta do avanço físico — o que foi executado de fato nas obras?', reveals:'A frequência da coleta define a velocidade com que a gestão consegue agir sobre desvios. Coleta mensal significa que um desvio pode se acumular por 4 semanas antes de ser visto.',
-        opts:[{l:'Estimativa — sem coleta formal',s:'Ninguém mede de fato, o número vem do feeling do engenheiro',score:0},{l:'Coleta mensal manual',s:'O engenheiro mede o avanço de todas as atividades uma vez por mês',score:1},{l:'Coleta quinzenal',s:'Frequência maior mas ainda manual, com gap de até 15 dias',score:2},{l:'Coleta semanal com autoapontamento',s:'Equipe registra o avanço, encarregado valida — gestão recebe dado em tempo próximo ao real',score:3}]
+      { code:'F3.4', text:'No canteiro, existe algum vínculo entre a inspeção técnica de qualidade aprovada de um serviço e a liberação do avanço físico daquele serviço?', reveals:'Integração de campo do ciclo Produção → Qualidade → Avanço. Sem esse vínculo técnico, o avanço físico registrado pode incluir serviço que ainda precisa de retrabalho.',
+        opts:[{l:'Sem vínculo',s:'Avanço físico e inspeção de qualidade são registros separados no canteiro',score:0},{l:'Verificação amostral',s:'Inspecionamos antes de liberar o avanço, mas apenas em parte dos serviços — não em todos',score:1},{l:'Qualidade verificada, mas não trava o avanço',s:'Inspecionamos mas o avanço físico é lançado mesmo com pendência',score:1.5},{l:'FVS aprovada é pré-requisito para liberação do avanço físico',s:'Qualidade técnica trava o lançamento de avanço automaticamente',score:3}]
       },
-      { code:'F3.5', text:'Existe algum vínculo entre a qualidade aprovada de um serviço e a liberação do pagamento daquele serviço para a equipe?', reveals:'Integração do ciclo Plano → Produção → Qualidade → Pagamento. Sem esse vínculo, paga-se por produção que pode precisar de retrabalho.',
-        opts:[{l:'Sem vínculo',s:'Pagamento e qualidade são processos separados',score:0},{l:'Verificação amostral',s:'Conferimos antes de pagar, mas apenas em parte dos serviços — não em todos',score:1},{l:'Qualidade verificada, mas não trava pagamento',s:'Inspecionamos mas pagamos mesmo com pendência',score:2},{l:'FVS aprovada é pré-requisito para liberação de pagamento',s:'Qualidade trava o pagamento automaticamente',score:3}]
-      },
-      { code:'F3.6', text:'No meio do período — quinzenal ou semanalmente — existe análise de resultado intermediário: funcionários ou equipes com produção abaixo do esperado, empreiteiros com mais não conformidades?', reveals:'Análise intermediária de MO improdutiva e qualidade de empreiteiros — separa gestão que age antes do fechamento da que descobre o problema depois.',
-        opts:[{l:'Sem análise intermediária',s:'Só sabemos no fechamento do mês',score:0},{l:'Análise verbal eventual na reunião',s:'Comentamos quando alguém percebe',score:1},{l:'Análise periódica sem dado formal',s:'Temos percepção mas sem número',score:2},{l:'Relatório quinzenal com ranking de produtividade e NCs por empreiteiro',s:'Dado formal guia decisão de realocação',score:3}]
+      { code:'F3.5', text:'No meio do período — quinzenal ou semanalmente — existe análise de resultado intermediário do cumprimento de metas de prazo: PPC por equipe, causas de não cumprimento e tendência de atraso antes do fechamento do ciclo?', reveals:'Análise intermediária de ritmo e cumprimento de prazo (PPC) — separa gestão que age antes do fechamento da que descobre o desvio de prazo depois.',
+        opts:[{l:'Sem análise intermediária',s:'Só sabemos o PPC e as causas de atraso no fechamento do mês',score:0},{l:'Análise verbal eventual na reunião',s:'Comentamos quando alguém percebe que o ritmo caiu',score:1},{l:'Análise periódica sem dado formal',s:'Temos percepção do ritmo mas sem número consolidado',score:1.5},{l:'Relatório quinzenal de PPC por equipe com causas de não cumprimento e tendência de prazo',s:'Dado formal guia decisão de recuperação de ritmo antes do fechamento',score:3}]
       },
       { code:'F3.ROI', type:'numgrid', text:'Para dimensionar o ganho operacional, informe os dados abaixo sobre o fechamento e a rotina de produção:', reveals:'Base para o cálculo de horas recuperadas por mês e por obra. Os dias de fechamento já foram capturados no Bloco MO.',
         fields:[
@@ -267,25 +252,25 @@ var PQ = {
     insight: function(p){ return 'As respostas sobre gestão de MO alimentam diretamente o Mapa de Oportunidades e dimensionam o potencial de captura nos módulos de MO da plataforma.'; },
     qs:[
       { code:'MO.1', moType:'propria', text:'As equipes sabem quanto vão ganhar em cada tarefa antes de começar — o valor está claro antes do início da atividade?', reveals:'Transparência de metas de ganho. Quando o operário não sabe o que vai ganhar, não tem como se comprometer com uma meta.',
-        opts:[{l:'Definido só no fechamento',s:'A equipe descobre no pagamento',score:0},{l:'Comunicado informalmente pelo mestre',s:'O mestre fala o valor de boca',score:1},{l:'Valor definido antes, mas sem formalização',s:'Alinhamos verbalmente antes de começar',score:2},{l:'Estudo de pacote entregue à equipe antes do início',s:'Documento formal com valor e meta clara',score:3}]
+        opts:[{l:'Definido só no fechamento',s:'A equipe descobre no pagamento',score:0},{l:'Comunicado informalmente pelo mestre',s:'O mestre fala o valor de boca',score:1},{l:'Valor definido antes, mas sem formalização',s:'Alinhamos verbalmente antes de começar',score:1.5},{l:'Estudo de pacote entregue à equipe antes do início',s:'Documento formal com valor e meta clara',score:3}]
       },
       { code:'MO.2', moType:'propria', text:'Você consegue identificar hoje quais funcionários estão com produção abaixo do esperado — cujo custo de carteira não está sendo coberto pela produção gerada?', reveals:'Visibilidade de improdutividade individual. Funcionário improdutivo é custo sem dono.',
-        opts:[{l:'Sem visibilidade',s:'Não temos como saber individualmente',score:0},{l:'Percepção subjetiva do mestre',s:'O mestre sabe quem rende menos',score:1},{l:'Algum controle manual eventual',s:'Fazemos uma estimativa de vez em quando',score:2},{l:'Relatório quinzenal: valor produzido vs. custo de carteira por funcionário',s:'Dado objetivo por colaborador',score:3}]
+        opts:[{l:'Sem visibilidade',s:'Não temos como saber individualmente',score:0},{l:'Percepção subjetiva do mestre',s:'O mestre sabe quem rende menos',score:1},{l:'Algum controle manual eventual',s:'Fazemos uma estimativa de vez em quando',score:1.5},{l:'Relatório quinzenal: valor produzido vs. custo de carteira por funcionário',s:'Dado objetivo por colaborador',score:3}]
       },
       { code:'MO.3', moType:'propria', text:'Quando surge necessidade de pagar por atividade fora do planejado — retrabalho, mobilização emergencial — existe processo formal de solicitação e aprovação de verba antes de executar?', reveals:'Gestão de aditivos e verbas extras. "Puxar de outra atividade" distorce o custo real de cada serviço e cria passivo de ajuste.',
-        opts:[{l:'Sem processo formal',s:'Engenheiro ajusta valores entre atividades',score:0},{l:'Aprovação verbal eventual',s:'Ligamos ou mandamos mensagem',score:1},{l:'Solicitação existe, mas posterior à execução',s:'Formalizamos depois que já foi feito',score:2},{l:'Processo formalizado de solicitação, aprovação e registro de motivo da verba, antes da execução',s:'Zero aditivo sem aprovação prévia e motivo documentado — retroalimenta o planejamento futuro',score:3}]
+        opts:[{l:'Sem processo formal',s:'Engenheiro ajusta valores entre atividades',score:0},{l:'Aprovação verbal eventual',s:'Ligamos ou mandamos mensagem',score:1},{l:'Solicitação existe, mas posterior à execução',s:'Formalizamos depois que já foi feito',score:1.5},{l:'Processo formalizado de solicitação, aprovação e registro de motivo da verba, antes da execução',s:'Zero aditivo sem aprovação prévia e motivo documentado — retroalimenta o planejamento futuro',score:3}]
       },
       { code:'MO.4', moType:'propria', text:'O fechamento da folha de produção mensal consome quanto tempo do seu time?', reveals:'Eficiência do processo de fechamento. Cada dia de engenharia nessa rotina tem custo direto — e indica ausência de dados estruturados.',
-        opts:[{l:'5 dias ou mais',s:'Uma semana inteira ou mais',score:0},{l:'3–4 dias',s:'Boa parte da semana',score:1},{l:'2 dias',s:'Dois dias de trabalho intenso',score:2},{l:'1 dia ou menos',s:'Processo fluido com dados já estruturados',score:3}]
+        opts:[{l:'5 dias ou mais',s:'Uma semana inteira ou mais',score:0},{l:'3–4 dias',s:'Boa parte da semana',score:1},{l:'2 dias',s:'Dois dias de trabalho intenso',score:1.5},{l:'1 dia ou menos',s:'Processo fluido com dados já estruturados',score:3}]
       },
       { code:'MO.5', moType:'terc', text:'Os empreiteiros têm suas metas de atividades claras e alinhadas ao planejamento da obra — eles sabem o que precisam entregar, em qual prazo e em qual lote?', reveals:'Alinhamento de metas com empreiteiros. Empreiteiro sem meta clara trabalha no ritmo dele — não no ritmo da obra.',
-        opts:[{l:'Sem meta formal',s:'Empreiteiro recebe orientação geral',score:0},{l:'Orientação verbal pelo engenheiro',s:'Falamos o que queremos mas não formalizamos',score:1},{l:'Meta definida, sem acompanhamento formal',s:'Definimos mas não acompanhamos sistematicamente',score:2},{l:'Meta alinhada ao planejamento, comunicada e acompanhada formalmente',s:'Contrato de meta integrado ao plano de obra',score:3}]
+        opts:[{l:'Sem meta formal',s:'Empreiteiro recebe orientação geral',score:0},{l:'Orientação verbal pelo engenheiro',s:'Falamos o que queremos mas não formalizamos',score:1},{l:'Meta definida, sem acompanhamento formal',s:'Definimos mas não acompanhamos sistematicamente',score:1.5},{l:'Meta alinhada ao planejamento, comunicada e acompanhada formalmente',s:'Contrato de meta integrado ao plano de obra',score:3}]
       },
       { code:'MO.6', moType:'terc', text:'Existe comunicação clara e antecipada informando ao empreiteiro quais atividades têm bloqueio para pagamento — como pendência de qualidade ou FVS não aprovada?', reveals:'Transparência de bloqueios de pagamento. Empreiteiro que descobre no fechamento entra em conflito.',
-        opts:[{l:'Empreiteiro descobre no fechamento',s:'Conflito mensal garantido',score:0},{l:'Comunicado verbalmente quando solicitado',s:'Só quando ele pergunta',score:1},{l:'Lista de pendências entregue antes do fechamento',s:'Avisamos alguns dias antes',score:2},{l:'Comunicação automática antecipada vinculada ao sistema de qualidade',s:'Empreiteiro sabe em tempo real',score:3}]
+        opts:[{l:'Empreiteiro descobre no fechamento',s:'Conflito mensal garantido',score:0},{l:'Comunicado verbalmente quando solicitado',s:'Só quando ele pergunta',score:1},{l:'Lista de pendências entregue antes do fechamento',s:'Avisamos alguns dias antes',score:1.5},{l:'Comunicação automática antecipada vinculada ao sistema de qualidade',s:'Empreiteiro sabe em tempo real',score:3}]
       },
       { code:'MO.7', moType:'terc', text:'O fechamento da medição dos empreiteiros consome quanto tempo do seu time por mês?', reveals:'Eficiência do fechamento de medição. Medição que leva uma semana é feita na base da negociação — não do registro.',
-        opts:[{l:'5 dias ou mais',s:'Uma semana inteira ou mais',score:0},{l:'3–4 dias',s:'Boa parte da semana',score:1},{l:'2 dias',s:'Dois dias de trabalho intenso',score:2},{l:'1 dia ou menos',s:'Processo fluido com dados já estruturados',score:3}]
+        opts:[{l:'5 dias ou mais',s:'Uma semana inteira ou mais',score:0},{l:'3–4 dias',s:'Boa parte da semana',score:1},{l:'2 dias',s:'Dois dias de trabalho intenso',score:1.5},{l:'1 dia ou menos',s:'Processo fluido com dados já estruturados',score:3}]
       },
       { code:'MO.ROI1', moType:'propria', type:'numgrid', text:'Para o cálculo financeiro do ROI, informe a folha de mão de obra própria:', reveals:'Alimenta o cálculo de recuperação financeira por retrabalho e pagamentos indevidos.',
         fields:[
@@ -305,16 +290,16 @@ var PQ = {
     },
     qs:[
       { code:'F4.1', text:'Ao final de cada ciclo de execução, a gerência da obra ou sala técnica reúne com a engenharia para analisar os indicadores do período — prazo, ritmo de produção, restrições abertas, qualidade e custo do projeto — e definir as entradas para a próxima reprogramação? Ou o fechamento é mais informal e não gera decisões estruturadas?', reveals:'Avalia se existe o ciclo técnico de análise que alimenta a Fase 2 — o coração do método SIIGA. Sem esse fechamento, os dados gerados nos Pilares 1, 2 e 3 morrem na semana.',
-        opts:[{l:'Sem reunião de fechamento',s:'Cada obra segue sem análise formal do período',score:0},{l:'Reunião existe mas informal',s:'Sem pauta definida, sem saídas estruturadas — depende de quem está presente',score:1},{l:'Reunião periódica com análise parcial dos indicadores',s:'Alguns dados analisados mas sem visão completa e sem registro das decisões',score:2},{l:'Fechamento de período estruturado com análise de prazo, ritmo, restrições, qualidade e custo',s:'Saídas documentadas que alimentam diretamente a próxima Fase 2',score:3}]
+        opts:[{l:'Sem reunião de fechamento',s:'Cada obra segue sem análise formal do período',score:0},{l:'Reunião existe mas informal',s:'Sem pauta definida, sem saídas estruturadas — depende de quem está presente',score:1},{l:'Reunião periódica com análise parcial dos indicadores',s:'Alguns dados analisados mas sem visão completa e sem registro das decisões',score:1.5},{l:'Fechamento de período estruturado com análise de prazo, ritmo, restrições, qualidade e custo',s:'Saídas documentadas que alimentam diretamente a próxima Fase 2',score:3}]
       },
       { code:'F4.2', text:'A diretoria recebe mensalmente um relatório consolidado da obra — com status, avanço físico, qualidade e custo do projeto — e valida o plano reprogramado? Ou a visão executiva é baseada em relatos do engenheiro sem dados estruturados?', reveals:'Avalia se o ciclo executivo existe e se a diretoria toma decisão com dado — não com narrativa. A distinção crítica: reunião com dados vs. reunião com relato.',
-        opts:[{l:'Sem reunião executiva estruturada',s:'Diretoria só sabe quando o problema já é grave',score:0},{l:'Reunião existe mas baseada em relatos',s:'Cada um chega com um número diferente — sem dado unificado',score:1},{l:'Reunião periódica com alguns indicadores de prazo e custo',s:'Sem visão consolidada de qualidade e análise de tendência',score:2},{l:'Reunião mensal garantida com relatório executivo: semáforo, avanço, qualidade, custo e plano de ação já validado',s:'Diretoria valida o plano reprogramado — não apenas recebe resultado',score:3}]
+        opts:[{l:'Sem reunião executiva estruturada',s:'Diretoria só sabe quando o problema já é grave',score:0},{l:'Reunião existe mas baseada em relatos',s:'Cada um chega com um número diferente — sem dado unificado',score:1},{l:'Reunião periódica com alguns indicadores de prazo e custo',s:'Sem visão consolidada de qualidade e análise de tendência',score:1.5},{l:'Reunião mensal garantida com relatório executivo: semáforo, avanço, qualidade, custo e plano de ação já validado',s:'Diretoria valida o plano reprogramado — não apenas recebe resultado',score:3}]
       },
       { code:'F4.3', text:'Quando analisam o período, vocês conseguem ter simultaneamente a visão de prazo, ritmo de produção, restrições abertas, qualidade e custo do projeto em um único painel — ou cada informação está em uma fonte diferente e alguém precisa compilar manualmente?', reveals:'Integração dos dados e maturidade analítica. O que separa análise real de análise parcial é ter os cinco blocos disponíveis ao mesmo tempo para tomada de decisão.',
-        opts:[{l:'Cada informação em um lugar diferente',s:'Ninguém tem a visão completa simultaneamente',score:0},{l:'Alguns indicadores compilados manualmente em planilha antes de cada reunião',s:'Processo manual e demorado, sujeito a erro',score:1},{l:'Painel parcial com prazo e custo, mas qualidade e ritmo de produção ainda fora',s:'Visão incompleta — decisões sem base total',score:2},{l:'Painel integrado com prazo, ritmo, restrições, qualidade e custo atualizado automaticamente',s:'Gerência chega à reunião com diagnóstico pronto — tempo dedicado à decisão, não à montagem do dado',score:3}]
+        opts:[{l:'Cada informação em um lugar diferente',s:'Ninguém tem a visão completa simultaneamente',score:0},{l:'Alguns indicadores compilados manualmente em planilha antes de cada reunião',s:'Processo manual e demorado, sujeito a erro',score:1},{l:'Painel parcial com prazo e custo, mas qualidade e ritmo de produção ainda fora',s:'Visão incompleta — decisões sem base total',score:1.5},{l:'Painel integrado com prazo, ritmo, restrições, qualidade e custo atualizado automaticamente',s:'Gerência chega à reunião com diagnóstico pronto — tempo dedicado à decisão, não à montagem do dado',score:3}]
       },
-      { code:'F4.4', text:'O fechamento mensal de folha e medição de empreiteiros é baseado nas evidências de produção geradas ao longo do mês — com aprovação hierárquica e registro de exceções — ou é mais um fechamento sem base objetiva de produção?', reveals:'Maturidade do ciclo financeiro mensal. Aplica-se a MO própria (folha) e terceirizada (medição). O que diferencia não é o tipo de MO — é o nível de rastreabilidade e evidência por trás do pagamento.',
-        opts:[{l:'Fechamento sem base objetiva',s:'Por estimativa ou negociação — sem dado de produção como referência',score:0},{l:'Critério informal baseado em observação',s:'Engenheiro ou gestor decide pelo que viu — sem registro auditável',score:1},{l:'Critério definido, sem rastreabilidade digital e sem fluxo hierárquico',s:'Temos regra, mas sem aprovação formal e sem registro de exceções',score:2},{l:'Sugestão automática baseada em produção real + FVS aprovada, com aprovação por instâncias e exceções registradas com justificativa',s:'Ciclo financeiro rastreável e auditável — paga pelo que foi produzido com qualidade comprovada',score:3}]
+      { code:'F4.4', text:'O fechamento mensal de folha e medição de empreiteiros passa por um fluxo de aprovação hierárquica integrado ao ERP — com registro auditável de exceções — ou é mais um fechamento sem governança formal sobre o que foi liberado para pagamento?', reveals:'Maturidade da governança financeira do ciclo mensal. Aplica-se a MO própria (folha) e terceirizada (medição). O que diferencia não é o tipo de MO — é o nível de auditoria, aprovação por instâncias e integração com o ERP por trás do pagamento.',
+        opts:[{l:'Fechamento sem governança formal',s:'Aprovado por estimativa ou negociação — sem fluxo de aprovação nem registro auditável',score:0},{l:'Aprovação informal baseada em observação',s:'Engenheiro ou gestor aprova pelo que viu — sem instância hierárquica nem registro',score:1},{l:'Fluxo de aprovação definido, mas manual e fora do ERP',s:'Existe hierarquia de aprovação, mas roda em planilha, sem integração e sem registro de exceções',score:1.5},{l:'Fluxo de aprovação hierárquica integrado ao ERP, com exceções registradas e justificadas',s:'Ciclo financeiro auditável de ponta a ponta — cada exceção tem instância aprovadora e justificativa registrada',score:3}]
       },
       { code:'F4.ROI', type:'numgrid', text:'Quanto tempo sua equipe gasta hoje cruzando dados de diferentes fontes para montar a visão executiva?', reveals:'Tempo gasto compilando planilhas manualmente antes das reuniões de resultado.',
         fields:[
@@ -336,7 +321,7 @@ function showScreen(id) {
 }
 
 function updateProgress() {
-  var totalQ = B0Q.length + 7 + 4 + 5 + 7 + 3 + 6; // +6 = novas perguntas numgrid de ROI (F1,F2,F3,F4,MO×2)
+  var totalQ = B0Q.length + PQ.f1.qs.length + PQ.f2.qs.length + PQ.f3.qs.length + PQ.f4.qs.length + PQ.mo.qs.length;
   var done = (currentBlock!=='b0') ? B0Q.length : currentQIdx;
   if(currentBlock==='phase') {
     done += B0Q.length;
@@ -354,23 +339,25 @@ function getScore(key) {
 }
 
 function getAvgPct(key) {
-  var maxes = {f1:21,f2:12,f3:18,f4:12};
+  var maxes = {f1:21,f2:9,f3:15,f4:12};
   var sum = getScore(key);
   return sum / (maxes[key]||1);
 }
 
 function levelFromPct(p) {
-  if(p<0.35) return 'Reativo';
-  if(p<0.6) return 'Em Construção';
-  if(p<0.85) return 'Estruturado';
-  return 'Referência SIIGA';
+  if(p<0.40) return 'Crítico / Vulnerável';
+  if(p<0.60) return 'Operação Artesanal / Risco de Desvio';
+  if(p<0.75) return 'Parcialmente Estruturado (Gargalos de Escala)';
+  if(p<0.90) return 'Estruturado com Perdas Ocultas';
+  return 'Referência SIIGA / Alta Performance';
 }
 
 function colorFromPct(p) {
-  if(p<0.35) return '#f87171';
-  if(p<0.6) return '#fb923c';
-  if(p<0.85) return '#60a5fa';
-  return '#34d399';
+  if(p<0.40) return '#ef4444';
+  if(p<0.60) return '#f97316';
+  if(p<0.75) return '#eab308';
+  if(p<0.90) return '#3b82f6';
+  return '#10b981';
 }
 
 function fmtNum(n) {
@@ -774,11 +761,11 @@ function showPhaseResult(bk) {
     'F1.3':'Dimensionamento de equipes','F1.4':'Integração orçamento × planejamento',
     'F1.5':'Acompanhamento da Curva S','F1.6':'Cronograma bancário',
     'F1.7':'Integração planejamento × suprimentos',
-    'F2.1':'Lookahead / gestão de restrições','F2.2':'Antecipação de riscos de parada',
-    'F2.3':'Planejamento de MO no médio prazo','F2.4':'Ciclo de reprogramação',
+    'F2.1':'Lookahead / antecipação de restrições','F2.2':'Planejamento de MO no médio prazo',
+    'F2.3':'Ciclo de reprogramação',
     'F3.1':'Programação semanal','F3.2':'Check-out e check-in diário',
-    'F3.3':'Rastreabilidade de desvios','F3.4':'Frequência de coleta do avanço',
-    'F3.5':'Qualidade vinculada ao pagamento','F3.6':'Análise intermediária de MO',
+    'F3.3':'Frequência de coleta do avanço','F3.4':'Qualidade vinculada ao avanço físico',
+    'F3.5':'Análise intermediária de PPC e prazo',
     'F4.1':'Fechamento técnico de período','F4.2':'Reunião executiva com diretoria',
     'F4.3':'Performance HUB — visão integrada','F4.4':'Pagamento por Evidência',
     'MO.1':'Transparência de metas para equipes','MO.2':'Visibilidade de improdutividade',
@@ -1133,11 +1120,11 @@ function showFocusedResult() {
     'F1.3':'Dimensionamento de equipes','F1.4':'Integração orçamento × planejamento',
     'F1.5':'Acompanhamento da Curva S','F1.6':'Cronograma bancário',
     'F1.7':'Integração planejamento × suprimentos',
-    'F2.1':'Lookahead / gestão de restrições','F2.2':'Antecipação de riscos',
-    'F2.3':'Planejamento de MO no médio prazo','F2.4':'Ciclo de reprogramação',
+    'F2.1':'Lookahead / antecipação de restrições','F2.2':'Planejamento de MO no médio prazo',
+    'F2.3':'Ciclo de reprogramação',
     'F3.1':'Programação semanal','F3.2':'Check-out e check-in',
-    'F3.3':'Rastreabilidade de desvios','F3.4':'Frequência de coleta do avanço',
-    'F3.5':'Qualidade vinculada ao pagamento','F3.6':'Análise intermediária de MO',
+    'F3.3':'Frequência de coleta do avanço','F3.4':'Qualidade vinculada ao avanço físico',
+    'F3.5':'Análise intermediária de PPC e prazo',
     'F4.1':'Fechamento técnico de período','F4.2':'Reunião executiva',
     'F4.3':'Performance HUB','F4.4':'Pagamento por Evidência'
   };
@@ -1223,9 +1210,9 @@ function startFullFromFocused() {
 // ═══════════════════════════════════════════
 function buildAndShowRadar() {
   var phases = ['f1','f2','f3','f4'];
-  var maxes = {f1:21,f2:12,f3:18,f4:12};
-  var benchmark = [0.45,0.38,0.35,0.30];
-  var reference = [0.90,0.85,0.88,0.82];
+  var maxes = {f1:21,f2:9,f3:15,f4:12};
+  var benchmark = [0.70,0.62,0.55,0.58];
+  var reference = [0.92,0.88,0.90,0.85];
   var labels = ['Fase 1','Fase 2','Fase 3','Fase 4'];
 
   var clientPct = phases.map(function(k) {
@@ -1235,12 +1222,12 @@ function buildAndShowRadar() {
     return sum/(maxes[k]||1);
   });
 
-  var totalMax = 21+12+18+12+3+3;
+  var totalMax = 21+9+15+12+3;
   var totalScore = ['f1','f2','f3','f4'].reduce(function(acc,k) {
     var arr = S.scores[k];
     if(!Array.isArray(arr)) return acc;
     return acc + arr.reduce(function(a,b){return a+(b||0);},0);
-  },0) + (S.scores.b03||0) + (S.scores.b06||0);
+  },0) + (S.scores.b03||0);
 
   var totalPct = totalScore / totalMax;
   var totalLevel = levelFromPct(totalPct);
@@ -1526,7 +1513,7 @@ function buildReport() {
     tRoadmap.textContent = 'Roadmap de Implementação SIIGA para a ' + nomeEmpresa;
   }
 
-  var maxes = {f1:21,f2:12,f3:18,f4:12};
+  var maxes = {f1:21,f2:9,f3:15,f4:12};
   var colors = {f1:'#1B4F8A',f2:'#0D7C8C',f3:'#0D6B45',f4:'#4a4558'};
   var lnames = {f1:'Fase 1 · Planejamento Estratégico',f2:'Fase 2 · Proteção da Execução',f3:'Fase 3 · Gestão da Produção',f4:'Fase 4 · Controle e Performance'};
 
@@ -1791,20 +1778,18 @@ var GAP_INFO = {
   'F1.5':{title:'Acompanhamento da Curva S', impact:'Desvios de prazo são identificados semanas depois. Sem projeção de término, não há decisão estruturada de recuperação.'},
   'F1.6':{title:'Cronograma bancário', impact:'Retrabalho duplo em toda reprogramação. Exposição de caixa invisível gera risco financeiro não mapeado.'},
   'F1.7':{title:'Integração planejamento × suprimentos', impact:'Compras emergenciais têm custo 15–25% maior. Paradas por material faltante são evitáveis.'},
-  'F2.1':{title:'Lookahead / gestão de restrições', impact:'Restrições aparecem quando já atrasaram. Antecipação reduz paradas não planejadas em até 40%.'},
-  'F2.2':{title:'Antecipação de riscos de parada', impact:'Sem visibilidade de risco com semanas de antecedência, cada parada vira surpresa — e surpresa tem custo de produção parada.'},
-  'F2.3':{title:'Planejamento de MO no médio prazo', impact:'Equipe não confirmada para as próximas semanas é risco imediato de parada por falta de mão de obra.'},
-  'F2.4':{title:'Ciclo de reprogramação', impact:'Sem ciclo formal de reprogramação, os mesmos desvios se acumulam de mês em mês sem correção estrutural.'},
+  'F2.1':{title:'Lookahead / antecipação de restrições', impact:'Restrições aparecem quando já atrasaram. Antecipação reduz paradas não planejadas em até 40%.'},
+  'F2.2':{title:'Planejamento de MO no médio prazo', impact:'Equipe não confirmada para as próximas semanas é risco imediato de parada por falta de mão de obra.'},
+  'F2.3':{title:'Ciclo de reprogramação', impact:'Sem ciclo formal de reprogramação, os mesmos desvios se acumulam de mês em mês sem correção estrutural.'},
   'F3.1':{title:'Programação semanal', impact:'Obra opera sem feedback real. Uma semana de decisão perdida a cada ciclo.'},
-  'F3.2':{title:'Check-out e check-in diário', impact:'Sem ritual diário, o engenheiro descobre os problemas do canteiro de forma descoordenada — depois que já impactaram o dia.'},
-  'F3.3':{title:'Rastreabilidade de desvios', impact:'Sem registro e causa raiz, os mesmos problemas se repetem indefinidamente — sem nenhuma curva de aprendizado.'},
-  'F3.4':{title:'Frequência de coleta do avanço', impact:'Avanço físico coletado por estimativa mensal. Dado chega semanas atrasado — improdutividade de MO fica invisível até o fechamento.'},
-  'F3.5':{title:'Qualidade vinculada ao pagamento', impact:'Sem vínculo entre qualidade aprovada e pagamento, paga-se por produção que pode precisar de retrabalho.'},
-  'F3.6':{title:'Análise intermediária de MO', impact:'Sem análise quinzenal, funcionários e empreiteiros improdutivos só são identificados no fechamento — quando o custo já foi gerado.'},
+  'F3.2':{title:'Check-out, check-in e causa raiz diária', impact:'Sem ritual diário, o engenheiro descobre os problemas do canteiro de forma descoordenada — e os mesmos desvios se repetem sem tratamento de causa.'},
+  'F3.3':{title:'Frequência de coleta do avanço', impact:'Avanço físico coletado por estimativa mensal. Dado chega semanas atrasado — improdutividade de MO fica invisível até o fechamento.'},
+  'F3.4':{title:'Qualidade vinculada ao avanço físico', impact:'Sem vínculo técnico entre inspeção e avanço no canteiro, o avanço registrado pode incluir serviço que ainda precisa de retrabalho.'},
+  'F3.5':{title:'Análise intermediária de PPC e prazo', impact:'Sem análise quinzenal de PPC e causas de atraso, o desvio de prazo só é identificado no fechamento — quando já não há tempo de recuperação.'},
   'F4.1':{title:'Fechamento técnico de período', impact:'Sem fechamento técnico estruturado, os dados gerados nas Fases 1, 2 e 3 morrem na semana — a próxima reprogramação recomeça do zero.'},
   'F4.2':{title:'Reunião executiva com diretoria', impact:'Reunião executiva sem dados estruturados. Decisões tomadas no feeling — cada reunião termina com narrativa, não com plano.'},
   'F4.3':{title:'Performance HUB — visão integrada', impact:'Sem painel único, alguém precisa compilar manualmente prazo, custo e qualidade antes de cada reunião — tempo gasto montando o dado, não decidindo.'},
-  'F4.4':{title:'Pagamento por Evidência', impact:'Fechamento sem base objetiva de produção paga por estimativa ou negociação — sem rastreabilidade e sem auditoria possível.'},
+  'F4.4':{title:'Governança financeira do fechamento (ERP)', impact:'Fechamento sem fluxo de aprovação hierárquica integrado ao ERP paga por estimativa ou negociação — sem rastreabilidade e sem auditoria possível.'},
   'MO.1':{title:'Transparência de metas para equipes', impact:'Quando o operário não sabe o que vai ganhar, não tem como se comprometer com uma meta — a produtividade fica ao acaso.'},
   'MO.2':{title:'Visibilidade de improdutividade', impact:'Funcionário improdutivo é custo sem dono. Em múltiplas obras simultâneas, esse gap se multiplica — não é problema de uma obra, é padrão de operação.'},
   'MO.3':{title:'Gestão de aditivos de verba', impact:'Verba extra aprovada só depois de executada distorce o custo real de cada serviço e cria passivo de ajuste.'},
@@ -2323,7 +2308,7 @@ function restartAssessment() {
   clearDraft();
   S = {empresa:'',consultor:'',contato:'',cargo:'',email:'',telefone:'',data:'',numObras:5,orcamentoMedio:8000000,prazoMedio:18,numObrasRange:'',orcamentoRange:'',tipologia:'',modeloMO:'',momento:'',
     ferramentas:{planejamento:'',medicao:'',qualidade:'',contratos:'',folha:''},
-    scores:{b03:0,b06:0,f1:[0,0,0,0,0,0,0,0],f2:[0,0,0,0,0],f3:[0,0,0,0,0,0,0],mo:{},f4:[0,0,0,0,0]},showMO:false,
+    scores:{b03:0,f1:[0,0,0,0,0,0,0,0],f2:[0,0,0,0],f3:[0,0,0,0,0,0],mo:{},f4:[0,0,0,0,0]},showMO:false,
     roi2:{folha:0,hDiaAtual:0,hSemQualidade:0,fluxoPlanejar:0,fluxoCurto:0,fluxoMedio:0,fluxoReprogramar:0,fluxoMedir:0,fluxoConferir:0,fluxoERP:0,fluxoCruzar:0},
     mensalidade:2000, captura:0.50};
   currentBlock='b0'; currentQIdx=0; currentPhaseIdx=0; phaseOrder=['f1','f2','f3','f4'];
@@ -2553,11 +2538,10 @@ function generatePDF(fromAdmin) {
       alert('Erro ao gerar PDF. Tente usar o botão Imprimir como alternativa.');
     }
 
-    // Adiciona uma página ao PDF a partir de um canvas já capturado (radar ou seção do relatório).
-    function addImagePage(canvas) {
-      var imgW = canvas.width, imgH = canvas.height;
+    // Desenha uma única página do PDF a partir de um canvas que já cabe inteiro
+    // na altura útil da página (ver addImagePage para quem garante isso).
+    function drawPageFromCanvas(canvas, hMm) {
       var wMm = contentWMm;
-      var hMm = (imgH / imgW) * wMm;
       var imgData = canvas.toDataURL('image/png');
 
       if(globalPageNum > 0) pdf.addPage();
@@ -2573,6 +2557,39 @@ function generatePDF(fromAdmin) {
       pdf.text('Página ' + (globalPageNum + 1), pageW - margin - 15, pageH - 4);
 
       globalPageNum++;
+    }
+
+    // Adiciona uma página ao PDF a partir de um canvas já capturado (radar ou seção do relatório).
+    // Uma seção do relatório é uma unidade indivisível para o bin-packing (buildPageGroups não
+    // a corta entre páginas) — mas seu conteúdo é dinâmico (ex: roadmap com um item por gap do
+    // diagnóstico) e pode crescer além da altura de uma página A4. Sem este corte, o addImage do
+    // jsPDF desenha a imagem inteira mesmo assim, e o excedente vaza por baixo do rodapé fixo,
+    // sobrepondo texto (bug relatado: seção "SIIGA — Sistema Integrado" sobreposta no PDF).
+    // Por isso: qualquer canvas mais alto que a área útil da página é fatiado em pedaços que
+    // cabem, cada um virando sua própria página — nunca deixa conteúdo vazar sobre o rodapé.
+    function addImagePage(canvas) {
+      var imgW = canvas.width, imgH = canvas.height;
+      var wMm = contentWMm;
+      var hMm = (imgH / imgW) * wMm;
+      var maxHmm = pageH - margin * 2 - 6; // reserva espaço pro rodapé fixo (texto em pageH-4)
+
+      if(hMm <= maxHmm) {
+        drawPageFromCanvas(canvas, hMm);
+        return;
+      }
+
+      var pxPerMm = imgH / hMm; // escala vertical do canvas (preserva proporção com a largura)
+      var sliceHpx = Math.max(1, Math.floor(maxHmm * pxPerMm));
+      var y = 0;
+      while(y < imgH) {
+        var thisHpx = Math.min(sliceHpx, imgH - y);
+        var sliceCanvas = document.createElement('canvas');
+        sliceCanvas.width = imgW;
+        sliceCanvas.height = thisHpx;
+        sliceCanvas.getContext('2d').drawImage(canvas, 0, y, imgW, thisHpx, 0, 0, imgW, thisHpx);
+        drawPageFromCanvas(sliceCanvas, thisHpx / pxPerMm);
+        y += thisHpx;
+      }
     }
 
     function renderPage() {
@@ -2720,7 +2737,7 @@ function toggleConsultorBlock() {
 }
 
 function buildDiagnosticoJSON() {
-  var maxes = {f1:21, f2:12, f3:18, f4:12};
+  var maxes = {f1:21, f2:9, f3:15, f4:12};
 
   function pct(arr, max) {
     if(!Array.isArray(arr)) return 0;
@@ -2729,10 +2746,11 @@ function buildDiagnosticoJSON() {
   }
 
   function nivel(p) {
-    if(p < 35) return 'Critico';
-    if(p < 60) return 'Em Construcao';
-    if(p < 85) return 'Estruturado';
-    return 'Avancado';
+    if(p < 40) return 'Critico / Vulneravel';
+    if(p < 60) return 'Operacao Artesanal / Risco de Desvio';
+    if(p < 75) return 'Parcialmente Estruturado (Gargalos de Escala)';
+    if(p < 90) return 'Estruturado com Perdas Ocultas';
+    return 'Referencia SIIGA / Alta Performance';
   }
 
   var f1pct = pct(S.scores.f1, maxes.f1);
@@ -2750,8 +2768,8 @@ function buildDiagnosticoJSON() {
     (S.scores.f2||[]).reduce(function(a,b){return a+(b||0);},0) +
     (S.scores.f3||[]).reduce(function(a,b){return a+(b||0);},0) +
     (S.scores.f4||[]).reduce(function(a,b){return a+(b||0);},0) +
-    (S.scores.b03||0) + (S.scores.b06||0);
-  var totalMax = 66;
+    (S.scores.b03||0);
+  var totalMax = 60;
 
   return {
     cliente: {
@@ -2766,7 +2784,6 @@ function buildDiagnosticoJSON() {
       pilarPriority: S.pilarPriority || [],
       portfolioTotal: (S.numObras||0) * (S.orcamentoMedio||0),
       estruturaTime: { score: S.scores.b03||0, nivel: nivel((S.scores.b03||0)/3*100) },
-      nivelOrcamento: { score: S.scores.b06||0, nivel: nivel((S.scores.b06||0)/3*100) },
       roiReal: { dados: S.roi2 || {}, mensalidade: S.mensalidade||0, captura: S.captura||0.5 }
     },
     fases: {
@@ -2780,8 +2797,8 @@ function buildDiagnosticoJSON() {
     referencia: {
       perguntas: {
         f1: ['Formalidade do planejamento','Tecnica de planejamento (LB)','Dimensionamento tecnico','Integracao orcamento x planejamento','Acompanhamento da Curva S','Cronograma bancario','Integracao planejamento x suprimentos'],
-        f2: ['Lookahead e gestao de restricoes','Antecipacao de riscos de parada','Planejamento de MO no medio prazo','Ciclo de reprogramacao'],
-        f3: ['Programacao semanal','Check-out e check-in diario','Rastreabilidade de desvios','Frequencia de coleta do avanco','Qualidade vinculada ao pagamento','Analise intermediaria de MO'],
+        f2: ['Lookahead e antecipacao de restricoes','Planejamento de MO no medio prazo','Ciclo de reprogramacao'],
+        f3: ['Programacao semanal','Check-out, check-in e causa raiz diaria','Frequencia de coleta do avanco','Qualidade vinculada ao avanco fisico','Analise intermediaria de PPC e prazo'],
         f4: ['Reuniao executiva com dados','Maturidade dos indicadores','Pagamento por evidencia']
       }
     }
@@ -3332,13 +3349,13 @@ function closeSaveModal() {
 async function confirmSave() {
   var nome = document.getElementById('save-nome').value.trim() || 'Diagnóstico sem nome';
   var list = getAllDiagnosticos();
-  var maxes = {f1:21,f2:12,f3:18,f4:12};
-  var totalMax = 21+12+18+12+3+3;
+  var maxes = {f1:21,f2:9,f3:15,f4:12};
+  var totalMax = 21+9+15+12+3;
   var totalScore = ['f1','f2','f3','f4'].reduce(function(acc,k) {
     var arr = S.scores[k];
     if(!Array.isArray(arr)) return acc;
     return acc + arr.reduce(function(a,b){return a+(b||0);},0);
-  },0) + (S.scores.b03||0) + (S.scores.b06||0);
+  },0) + (S.scores.b03||0);
 
   var record = {
     id: Date.now(),
@@ -3505,8 +3522,8 @@ function exportDiagnostico(id) {
     // Phase levels only — no raw scores or internal weights
     fases: {
       fase1: { nivel: rec.scores && rec.scores.f1 ? levelFromPct(rec.scores.f1.reduce(function(a,b){return a+(b||0);},0)/21) : '—' },
-      fase2: { nivel: rec.scores && rec.scores.f2 ? levelFromPct(rec.scores.f2.reduce(function(a,b){return a+(b||0);},0)/12) : '—' },
-      fase3: { nivel: rec.scores && rec.scores.f3 ? levelFromPct(rec.scores.f3.reduce(function(a,b){return a+(b||0);},0)/18) : '—' },
+      fase2: { nivel: rec.scores && rec.scores.f2 ? levelFromPct(rec.scores.f2.reduce(function(a,b){return a+(b||0);},0)/9) : '—' },
+      fase3: { nivel: rec.scores && rec.scores.f3 ? levelFromPct(rec.scores.f3.reduce(function(a,b){return a+(b||0);},0)/15) : '—' },
       fase4: { nivel: rec.scores && rec.scores.f4 ? levelFromPct(rec.scores.f4.reduce(function(a,b){return a+(b||0);},0)/12) : '—' }
     }
   };
