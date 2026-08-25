@@ -9,6 +9,7 @@ const supabaseClient = window.supabase ? window.supabase.createClient(SUPABASE_U
 let allData = [];
 let filteredData = [];
 let selectedIds = [];
+let currentDetailRow = null;
 
 // ═══════════════════════════════════════════
 //  LOGIN
@@ -459,9 +460,79 @@ function generateLeadOpportunities(row) {
   return opps.slice(0, 5);
 }
 
+// ═══════════════════════════════════════════
+//  CSV DE PERGUNTAS DO LEAD (exportação individual)
+// ═══════════════════════════════════════════
+var MO_QUESTION_LABELS = {
+  'MO.1': 'Transparência de metas de ganho',
+  'MO.2': 'Visibilidade de improdutividade',
+  'MO.3': 'Processo de verba extra',
+  'MO.4': 'Tempo de fechamento de folha',
+  'MO.5': 'Metas de empreiteiros',
+  'MO.6': 'Comunicação de bloqueios',
+  'MO.7': 'Tempo de medição'
+};
+
+function csvField(v) {
+  return '"' + String(v == null ? '' : v).replace(/"/g, '""') + '"';
+}
+
+function exportLeadQuestionsCSV() {
+  var row = currentDetailRow;
+  if (!row) { alert('Abra os Detalhes de um diagnóstico antes de exportar.'); return; }
+
+  var state = getState(row);
+  var scores = getPhaseScores(row);
+  var empresa = getField(row, 'empresa', 'empresa') || 'Diagnóstico';
+  var contato = getField(row, 'contato', 'contato') || '—';
+  var cargo = getField(row, 'cargo', 'cargo') || '—';
+  var consultor = getField(row, 'consultor', 'consultor') || '—';
+  var rawDate = row.created_at || new Date().toISOString();
+  var d = new Date(rawDate);
+  var dateStr = d.getDate().toString().padStart(2,'0') + '/' + (d.getMonth()+1).toString().padStart(2,'0') + '/' + d.getFullYear();
+
+  var lines = [];
+  lines.push([csvField('Empresa'), csvField(empresa)].join(';'));
+  lines.push([csvField('Contato'), csvField(contato + (cargo && cargo !== '—' ? ' (' + cargo + ')' : ''))].join(';'));
+  lines.push([csvField('Consultor'), csvField(consultor)].join(';'));
+  lines.push([csvField('Data do diagnóstico'), csvField(dateStr)].join(';'));
+  lines.push('');
+  lines.push([csvField('Fase'), csvField('Pergunta'), csvField('Score'), csvField('Score Máximo')].join(';'));
+
+  ['f1', 'f2', 'f3', 'f4'].forEach(function(key) {
+    var phase = PHASES[key];
+    var phaseScores = scores[key];
+    if (!Array.isArray(phaseScores)) return;
+    phaseScores.forEach(function(qScore, qi) {
+      var qLabel = phase.questions[qi] || ('Pergunta ' + (qi + 1));
+      lines.push([csvField(phase.label), csvField(qLabel), csvField(qScore != null ? qScore : ''), csvField(3)].join(';'));
+    });
+  });
+
+  if (scores.mo && typeof scores.mo === 'object') {
+    Object.keys(scores.mo).forEach(function(k) {
+      var qLabel = MO_QUESTION_LABELS[k] || k;
+      lines.push([csvField('Bloco MO · Gestão de Mão de Obra'), csvField(qLabel), csvField(scores.mo[k] != null ? scores.mo[k] : ''), csvField(3)].join(';'));
+    });
+  }
+
+  var csvContent = '﻿' + lines.join('\n');
+  var blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+  var url = URL.createObjectURL(blob);
+
+  var link = document.createElement('a');
+  link.setAttribute('href', url);
+  link.setAttribute('download', 'diagnostico_' + empresa.replace(/[^a-z0-9]+/gi, '_') + '.csv');
+  link.style.visibility = 'hidden';
+  document.body.appendChild(link);
+  link.click();
+  document.body.removeChild(link);
+}
+
 function openDetails(index) {
   var row = filteredData[index];
   if (!row) return;
+  currentDetailRow = row;
 
   var state = getState(row);
   var scores = getPhaseScores(row);
