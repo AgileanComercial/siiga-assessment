@@ -42,27 +42,34 @@ var radarChartInst = null;
 var RADAR_STATE = null; // último dado usado no radar — reaproveitado para desenhar a versão clara do PDF
 
 // Desenha o radar SIIGA num <canvas>. light=true usa cores para fundo branco
-// (usado na exportação do PDF); light=false (padrão) usa o tema escuro do app.
-function drawRadarChart(canvasEl, state, light) {
-  var gridColor   = light ? 'rgba(0,0,0,0.10)'  : 'rgba(255,255,255,0.07)';
-  var tickColor   = light ? 'rgba(0,0,0,0.35)'  : 'rgba(255,255,255,0.25)';
-  var labelColor  = light ? 'rgba(0,0,0,0.65)'  : 'rgba(255,255,255,0.65)';
-  var marketColor = light ? 'rgba(0,0,0,0.28)'  : 'rgba(255,255,255,0.25)';
-  var marketFill  = light ? 'rgba(0,0,0,0.03)'  : 'rgba(255,255,255,0.03)';
+// (usado na exportação do PDF claro); light='darkPdf' usa cores vibrantes para o PDF escuro;
+// light=false (padrão) usa o tema escuro do app.
+function drawRadarChart(canvasEl, state, mode) {
+  var isLight = (mode === true || mode === 'light');
+  var isDarkPdf = (mode === 'darkPdf');
+
+  var gridColor   = isLight ? 'rgba(0,0,0,0.10)'  : (isDarkPdf ? 'rgba(255,255,255,0.10)' : 'rgba(255,255,255,0.07)');
+  var tickColor   = isLight ? 'rgba(0,0,0,0.35)'  : (isDarkPdf ? 'rgba(255,255,255,0.35)' : 'rgba(255,255,255,0.25)');
+  var labelColor  = isLight ? 'rgba(0,0,0,0.65)'  : (isDarkPdf ? '#f1f5f9' : 'rgba(255,255,255,0.65)');
+  var marketColor = isLight ? 'rgba(0,0,0,0.28)'  : (isDarkPdf ? 'rgba(148,163,184,0.40)' : 'rgba(255,255,255,0.25)');
+  var marketFill  = isLight ? 'rgba(0,0,0,0.03)'  : (isDarkPdf ? 'rgba(255,255,255,0.03)' : 'rgba(255,255,255,0.03)');
+  var clientFill  = isDarkPdf ? 'rgba(234,88,12,0.20)' : 'rgba(255,95,31,0.12)';
+  var refFill     = isDarkPdf ? 'rgba(16,185,129,0.16)' : 'rgba(52,211,153,0.14)';
+
   return new Chart(canvasEl.getContext('2d'), {
     type:'radar',
     data:{
       labels: state.labels,
       datasets:[
-        {label:'Sua empresa',data:state.clientPct.map(function(p){return Math.round(p*100);}),borderColor:'#ff5f1f',backgroundColor:'rgba(255,95,31,0.12)',borderWidth:2.5,pointRadius:4,pointBackgroundColor:'#ff5f1f'},
-        {label:'Média de mercado',data:state.benchmark.map(function(p){return Math.round(p*100);}),borderColor:marketColor,backgroundColor:marketFill,borderWidth:1.5,pointRadius:3,borderDash:[5,3]},
-        {label:'Referência SIIGA',data:state.reference.map(function(p){return Math.round(p*100);}),borderColor:'#34d399',backgroundColor:'rgba(52,211,153,0.14)',borderWidth:1.5,pointRadius:3,borderDash:[3,3]}
+        {label:'Sua empresa',data:state.clientPct.map(function(p){return Math.round(p*100);}),borderColor:'#ea580c',backgroundColor:clientFill,borderWidth:2.4,pointRadius:isDarkPdf?4.5:4,pointBackgroundColor:'#ea580c',pointBorderColor:isDarkPdf?'#fff':'#ea580c'},
+        {label:'Média de mercado',data:state.benchmark.map(function(p){return Math.round(p*100);}),borderColor:marketColor,backgroundColor:marketFill,borderWidth:1.4,pointRadius:3,borderDash:[4,3]},
+        {label:'Referência SIIGA',data:state.reference.map(function(p){return Math.round(p*100);}),borderColor:'#10b981',backgroundColor:refFill,borderWidth:1.6,pointRadius:isDarkPdf?3.5:3,borderDash:[3,3],pointBackgroundColor:'#10b981',pointBorderColor:isDarkPdf?'#fff':'#10b981'}
       ]
     },
     options:{
-      responsive: !light,
-      animation: light ? false : undefined,
-      scales:{r:{min:0,max:100,ticks:{stepSize:25,color:tickColor,backdropColor:'transparent',font:{size:9}},grid:{color:gridColor},angleLines:{color:gridColor},pointLabels:{color:function(ctx){ return ctx.index === state.worstIdx ? '#dc2626' : labelColor; },font:function(ctx){ return {family:'Bai Jamjuree',size:12,weight: ctx.index === state.worstIdx ? '700' : '600'}; }}}},
+      responsive: !(isLight || isDarkPdf),
+      animation: (isLight || isDarkPdf) ? false : undefined,
+      scales:{r:{min:0,max:100,ticks:{stepSize:25,color:tickColor,backdropColor:'transparent',font:{size:10}},grid:{color:gridColor},angleLines:{color:gridColor},pointLabels:{color:function(ctx){ return ctx.index === state.worstIdx ? (isDarkPdf ? '#ef4444' : '#dc2626') : labelColor; },font:function(ctx){ return {family:'Bai Jamjuree',size:13,weight: ctx.index === state.worstIdx ? '700' : '600'}; }}}},
       plugins:{legend:{display:false}}
     }
   });
@@ -321,11 +328,20 @@ function showScreen(id) {
 }
 
 function updateProgress() {
-  var totalQ = B0Q.length + PQ.f1.qs.length + PQ.f2.qs.length + PQ.f3.qs.length + PQ.f4.qs.length + PQ.mo.qs.length;
+  // Rodada 2 · SMART DIAGNOSTIC: usamos getNavQs (telas realmente exibidas no
+  // fluxo principal) em vez do total bruto de perguntas — as fusões reduzem o
+  // número de TELAS sem reduzir o número de SCORES coletados.
+  var totalQ = B0Q.length;
+  var order = ['f1','f2','f3','mo','f4'];
+  for(var t=0;t<order.length;t++) {
+    var bk0 = order[t];
+    if(bk0==='mo' && phaseOrder.indexOf('mo')<0) continue; // MO fora do fluxo
+    totalQ += getNavQs(PQ[bk0], bk0).length;
+  }
   var done = (currentBlock!=='b0') ? B0Q.length : currentQIdx;
   if(currentBlock==='phase') {
-    done += B0Q.length;
-    for(var i=0;i<currentPhaseIdx;i++) done += PQ[phaseOrder[i]].qs.length;
+    done = B0Q.length;
+    for(var i=0;i<currentPhaseIdx;i++) done += getNavQs(PQ[phaseOrder[i]], phaseOrder[i]).length;
     done += currentQIdx;
   }
   var pct = Math.min((done/totalQ)*100, 100);
@@ -576,10 +592,68 @@ function getFilteredQs(bd) {
   });
 }
 
+// ═══════════════════════════════════════════
+//  RODADA 2 · SMART DIAGNOSTIC — fusão de telas
+//  (o dado por trás — S.scores por código — NUNCA é fundido, só a tela)
+// ═══════════════════════════════════════════
+
+// Lê/grava score por código, e não por posição em array — assim uma pergunta
+// pode ser respondida numa combo-tela de outra fase sem quebrar a indexação
+// posicional usada pelo restante do relatório (gaps, oportunidades, radar).
+function setScoreByCode(bk, code, score) {
+  if(bk === 'mo') {
+    if(!S.scores.mo || typeof S.scores.mo !== 'object' || Array.isArray(S.scores.mo)) S.scores.mo = {};
+    S.scores.mo[code] = score;
+    return;
+  }
+  if(!Array.isArray(S.scores[bk])) S.scores[bk] = [];
+  var idx = -1;
+  for(var i=0;i<PQ[bk].qs.length;i++) { if(PQ[bk].qs[i].code === code) { idx = i; break; } }
+  if(idx >= 0) S.scores[bk][idx] = score;
+}
+
+function getScoreByCode(bk, code) {
+  if(bk === 'mo') return (S.scores.mo || {})[code];
+  var arr = S.scores[bk];
+  if(!Array.isArray(arr)) return undefined;
+  var idx = -1;
+  for(var i=0;i<PQ[bk].qs.length;i++) { if(PQ[bk].qs[i].code === code) { idx = i; break; } }
+  return (idx >= 0) ? arr[idx] : undefined;
+}
+
+function findQ(bk, code) {
+  var qs = PQ[bk].qs;
+  for(var i=0;i<qs.length;i++) { if(qs[i].code === code) return qs[i]; }
+  return null;
+}
+
+// Lista de telas realmente exibidas no fluxo PRINCIPAL (Diagnóstico Completo).
+// F3.4 / MO.6 / F4.4 são coletadas juntas na combo "Trava de Qualidade" (disparada
+// na posição de F3.4, dentro da Fase 3). F2.3 / F4.1 são coletadas juntas na combo
+// "Rito de Reprogramação" (disparada na posição de F2.3, dentro da Fase 2).
+// MO.ROI1 + F4.ROI são coletados juntos numa única tela "Financeiro & Visão
+// Executiva" (disparada na posição de MO.ROI1, quando o bloco MO existe no fluxo).
+// O Diagnóstico Focado (renderFocusedQ) NÃO usa esta função — continua pergunta a
+// pergunta, sem fusões, para manter aquele fluxo simples e sem esta complexidade.
+function getNavQs(bd, bk) {
+  var list = getFilteredQs(bd);
+  if(bk === 'mo') {
+    list = list.filter(function(q){ return q.code !== 'MO.6'; });
+  }
+  if(bk === 'f4') {
+    list = list.filter(function(q){
+      if(q.code === 'F4.1' || q.code === 'F4.4') return false;
+      if(q.code === 'F4.ROI' && phaseOrder.indexOf('mo') >= 0) return false;
+      return true;
+    });
+  }
+  return list;
+}
+
 function renderPhaseQ() {
   var bk = phaseOrder[currentPhaseIdx];
   var bd = PQ[bk];
-  var filteredQs = getFilteredQs(bd);
+  var filteredQs = getNavQs(bd, bk);
   var q = filteredQs[currentQIdx];
   var card = document.getElementById('phase-card');
   var total = filteredQs.length;
@@ -594,8 +668,28 @@ function renderPhaseQ() {
     moNotice = '<div class="cond-notice">🎯 ' + moLabel + '</div>';
   }
 
+  // ── Combo "Trava de Qualidade" (F3.4 + MO.6 + F4.4) ──
+  if(bk === 'f3' && q.code === 'F3.4') {
+    renderComboQualidade(bd, currentQIdx, total, moNotice);
+    return;
+  }
+  // ── Combo "Rito de Reprogramação" (F2.3 + F4.1) ──
+  if(bk === 'f2' && q.code === 'F2.3') {
+    renderComboReprogramacao(bd, currentQIdx, total, moNotice);
+    return;
+  }
+
   if(q.type === 'numgrid') {
-    var fieldsHtml = q.fields.map(function(f) {
+    var qFields = q.fields;
+    var qText = q.text;
+    // Combo de ROI "Financeiro & Visão Executiva" (MO.ROI1 + F4.ROI), só quando
+    // o bloco MO existe no fluxo — senão F4.ROI segue sozinho na Fase 4.
+    if(bk === 'mo' && q.code === 'MO.ROI1' && phaseOrder.indexOf('f4') >= 0) {
+      var f4roiQ = findQ('f4', 'F4.ROI');
+      qFields = q.fields.concat(f4roiQ.fields);
+      qText = 'Financeiro & Visão Executiva — para dimensionar o ROI completo, informe:';
+    }
+    var fieldsHtml = qFields.map(function(f) {
       var savedVal = S.roi2[f.key];
       if(f.type === 'currency') {
         return '<div class="input-group"><label>'+f.label+'</label>' +
@@ -607,19 +701,18 @@ function renderPhaseQ() {
     card.innerHTML = moNotice +
       '<div class="phase-badge '+bd.badgeClass+'">'+bd.label+'</div>' +
       '<div class="q-code">'+q.code+' · Pergunta '+(currentQIdx+1)+' de '+total+'</div>' +
-      '<div class="q-text">'+q.text+'</div>' +
+      '<div class="q-text">'+qText+'</div>' +
       '<div class="q-reveals">'+q.reveals+'</div>' +
       '<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:14px;margin-top:8px">' + fieldsHtml + '</div>';
     return;
   }
 
-  var arrKey = (bk==='mo') ? 'mo' : bk;
   if(bk === 'mo') {
     if(!S.scores.mo || typeof S.scores.mo !== 'object' || Array.isArray(S.scores.mo)) S.scores.mo = {};
   } else {
-    if(!Array.isArray(S.scores[arrKey])) S.scores[arrKey] = [];
+    if(!Array.isArray(S.scores[bk])) S.scores[bk] = [];
   }
-  var savedScore = (bk === 'mo') ? S.scores.mo[q.code] : S.scores[arrKey][currentQIdx];
+  var savedScore = getScoreByCode(bk, q.code);
 
   var html = moNotice +
     '<div class="phase-badge '+bd.badgeClass+'">'+bd.label+'</div>' +
@@ -646,17 +739,62 @@ function renderPhaseQ() {
 function selectPhaseOpt(optIdx, score) {
   var bk = phaseOrder[currentPhaseIdx];
   var bd = PQ[bk];
-  var filteredQs = getFilteredQs(bd);
+  var filteredQs = getNavQs(bd, bk);
   var q = filteredQs[currentQIdx];
-  if(bk === 'mo') {
-    if(!S.scores.mo || typeof S.scores.mo !== 'object' || Array.isArray(S.scores.mo)) S.scores.mo = {};
-    S.scores.mo[q.code] = score;
-  } else {
-    var arrKey = bk;
-    if(!Array.isArray(S.scores[arrKey])) S.scores[arrKey] = [];
-    S.scores[arrKey][currentQIdx] = score;
-  }
+  setScoreByCode(bk, q.code, score);
   renderPhaseQ();
+}
+
+// Grava o score de um sub-item de uma combo-tela direto no pilar de origem
+// (bkTarget/code podem ser de uma fase diferente da tela atual) e reflete a
+// seleção sem avançar — cada sub-item é independente dos outros dois.
+function selectComboSub(bkTarget, code, score) {
+  setScoreByCode(bkTarget, code, score);
+  renderPhaseQ();
+}
+
+function renderComboSubHtml(bkTarget, code, label) {
+  var q = findQ(bkTarget, code);
+  var savedScore = getScoreByCode(bkTarget, code);
+  var optsHtml = q.opts.map(function(opt) {
+    var isSel = (savedScore !== undefined && savedScore === opt.score) ? ' sel' : '';
+    return '<div class="opt'+isSel+'" onclick="selectComboSub(\''+bkTarget+'\',\''+code+'\','+opt.score+')">' +
+      '<div class="opt-dot">'+opt.score+'</div>' +
+      '<div class="opt-body"><div class="opt-score">Score '+opt.score+'</div><div class="opt-label">'+opt.l+'</div></div>' +
+      '</div>';
+  }).join('');
+  return '<div class="combo-sub">' +
+    '<div class="combo-sub-label">' + label + ' <span class="combo-sub-code">' + code + '</span></div>' +
+    '<div class="combo-sub-text">' + q.text + '</div>' +
+    '<div class="options options-compact">' + optsHtml + '</div>' +
+    '</div>';
+}
+
+function renderComboQualidade(bd, currentQIdx, total, moNotice) {
+  var showMO6 = phaseOrder.indexOf('mo') >= 0 &&
+    (S.modeloMO === 'terceirizada' || S.modeloMO === 'mista');
+  var subs = renderComboSubHtml('f3','F3.4','No canteiro');
+  if(showMO6) subs += '<div class="combo-divider"></div>' + renderComboSubHtml('mo','MO.6','Com o empreiteiro');
+  subs += '<div class="combo-divider"></div>' + renderComboSubHtml('f4','F4.4','No fechamento / ERP');
+
+  document.getElementById('phase-card').innerHTML = moNotice +
+    '<div class="phase-badge '+bd.badgeClass+'">'+bd.label+'</div>' +
+    '<div class="q-code">Trava de Qualidade · Pergunta '+(currentQIdx+1)+' de '+total+'</div>' +
+    '<div class="q-text">A aprovação da qualidade no canteiro trava, de forma rastreável, a liberação de pagamento e avanço — ou ainda é possível pagar/avançar sem inspeção concluída?</div>' +
+    '<div class="q-reveals">Esta tela reúne 3 avaliações independentes — cada uma gera seu próprio score, no seu próprio pilar (Fase 3, MO e Fase 4) — sobre se a qualidade técnica realmente trava o fluxo físico e financeiro da obra.</div>' +
+    subs;
+}
+
+function renderComboReprogramacao(bd, currentQIdx, total, moNotice) {
+  var subs = renderComboSubHtml('f2','F2.3','Existência do rito') +
+    '<div class="combo-divider"></div>' + renderComboSubHtml('f4','F4.1','Profundidade do fechamento');
+
+  document.getElementById('phase-card').innerHTML = moNotice +
+    '<div class="phase-badge '+bd.badgeClass+'">'+bd.label+'</div>' +
+    '<div class="q-code">Rito de Reprogramação · Pergunta '+(currentQIdx+1)+' de '+total+'</div>' +
+    '<div class="q-text">Existe uma rotina formal de reprogramação a cada ciclo, com análise estruturada que alimenta o próximo plano?</div>' +
+    '<div class="q-reveals">Esta tela reúne 2 avaliações independentes — cada uma gera seu próprio score, no seu próprio pilar (Fase 2 e Fase 4) — sobre a existência do rito de reprogramação e a profundidade do fechamento que o alimenta.</div>' +
+    subs;
 }
 
 // ═══════════════════════════════════════════
@@ -689,10 +827,14 @@ function nextQ() {
   } else if(currentBlock === 'phase') {
     var bk = phaseOrder[currentPhaseIdx];
     var bd = PQ[bk];
-    var filteredQs = getFilteredQs(bd);
+    var filteredQs = getNavQs(bd, bk);
     var curQ = filteredQs[currentQIdx];
     if(curQ.type === 'numgrid') {
-      curQ.fields.forEach(function(f) {
+      var curFields = curQ.fields;
+      if(bk === 'mo' && curQ.code === 'MO.ROI1' && phaseOrder.indexOf('f4') >= 0) {
+        curFields = curQ.fields.concat(findQ('f4','F4.ROI').fields);
+      }
+      curFields.forEach(function(f) {
         var el = document.getElementById('rg-'+f.key);
         if(!el) return;
         if(f.type === 'currency') {
@@ -723,7 +865,7 @@ function prevQ() {
     } else if(currentPhaseIdx > 0) {
       currentPhaseIdx--;
       var prevBk = phaseOrder[currentPhaseIdx];
-      currentQIdx = getFilteredQs(PQ[prevBk]).length - 1;
+      currentQIdx = getNavQs(PQ[prevBk], prevBk).length - 1;
       renderPhaseQ();
     } else {
       showScreen('screen-transition');
@@ -1295,54 +1437,53 @@ function renderQualitativeGains() {
   // -------------------------------------------------------------
   // BALÕES FIXOS (2 Obrigatórios):
   // -------------------------------------------------------------
+  // -------------------------------------------------------------
+  // CARDS ESTRATÉGICOS (2 Fixos + 2 Dinâmicos):
+  // -------------------------------------------------------------
   // 1. Fixo: Gestão Integrada Ponta a Ponta
   var cardFixo1 = {
-    icon: '🔄',
+    num: '01',
     title: 'Gestão Integrada Ponta a Ponta',
-    desc: 'Conexão em tempo real entre planejamento executivo, canteiro e ERP. Todas as etapas operam em fluxo contínuo sem retrabalho de planilhas.'
+    desc: 'Conexão contínua entre planejamento executivo, canteiro e ERP. Elimina retrabalho de planilhas e assegura governança operacional.'
   };
 
-  // 2. Fixo: Engenharia 10x com Copilotos de IA
+  // 2. Fixo: Engenharia com Copilotos de IA
   var cardFixo2 = {
-    icon: '🤖',
-    title: 'Engenharia 10x com Copilotos de IA',
-    desc: 'Copilotos de IA (Planejamento, Associação com Orçamento e Operacional) assumem o trabalho braçal de cruzar dados e monitorar restrições.'
+    num: '02',
+    title: 'Engenharia com Copilotos de IA',
+    desc: 'Copilotos de IA (Planejamento, Orçamento e Operações) automatizam a análise cruzada de dados e o monitoramento proativo de restrições.'
   };
 
   // 3. Dinâmico: Gargalo de Planejamento OU Qualidade
-  var cardDinamico1 = { icon: '🎯', title: '', desc: '' };
+  var cardDinamico1 = { num: '03', title: '', desc: '' };
   if (f1p < 0.65 || f2p < 0.65) {
-    cardDinamico1.title = 'Linha de Balanço e Antecipação de Restrições';
+    cardDinamico1.title = 'Linha de Balanço & Antecipação de Restrições';
     cardDinamico1.desc = 'Lookahead de 4 semanas e indicador IRR identificam e removem restrições de suprimentos antes que virem atraso no canteiro.';
   } else {
-    cardDinamico1.icon = '✅';
     cardDinamico1.title = 'Qualidade como Trava de Pagamento (FVS)';
-    cardDinamico1.desc = 'FVS digital no fluxo diário do canteiro. A medição e a folha só são aprovadas com evidência de serviço e qualidade aprovada.';
+    cardDinamico1.desc = 'FVS digital no fluxo diário do canteiro. A medição e a folha só são aprovadas com evidência de serviço e qualidade auditada.';
   }
 
   // 4. Dinâmico: Modelo de MO OU Escalabilidade
-  var cardDinamico2 = { icon: '🤝', title: '', desc: '' };
+  var cardDinamico2 = { num: '04', title: '', desc: '' };
   if (mo === 'propria') {
-    cardDinamico2.icon = '👷';
     cardDinamico2.title = 'Rastreabilidade de Folha e Produtividade HH';
     cardDinamico2.desc = 'Apontamento diário no canteiro com rendimento por equipe em tempo real, reduzindo horas extras e pagamentos indevidos.';
   } else if (mo === 'terceirizada') {
-    cardDinamico2.icon = '🤝';
     cardDinamico2.title = 'Medição por Evidência sem Conflito com Empreiteiros';
     cardDinamico2.desc = 'Medição objetiva registrada no canteiro via app. O fechamento mensal vira uma validação rápida e auditável de dados reais.';
   } else {
-    cardDinamico2.icon = '📈';
     cardDinamico2.title = 'Escalabilidade com Integração Nativa aos ERPs';
     cardDinamico2.desc = 'Conexão nativa aos ERPs (Sienge, TOTVS, Informakon, Mega e UAU), gerenciando ' + obras + ' obra(s) com equipe enxuta.';
   }
 
   var cards = [cardFixo1, cardFixo2, cardDinamico1, cardDinamico2];
   grid.innerHTML = cards.map(function(c) {
-    return '<div style="padding:10px 12px;border-radius:8px;border:1px solid #e8e8e8;background:#fff;display:flex;gap:10px;align-items:flex-start">' +
-      '<div style="font-size:18px;flex-shrink:0">' + c.icon + '</div>' +
+    return '<div style="padding:12px 14px;border-radius:8px;border:1px solid rgba(255,255,255,0.07);background:#161822;display:flex;gap:12px;align-items:flex-start">' +
+      '<div style="font-family:\'Bai Jamjuree\';font-size:13px;font-weight:700;color:#ea580c;opacity:0.9;padding-top:1px;flex-shrink:0">' + c.num + '</div>' +
       '<div>' +
-        '<div style="font-family:\'Bai Jamjuree\';font-size:11.5px;font-weight:700;color:#14141b;margin-bottom:2px">' + c.title + '</div>' +
-        '<div style="font-size:10.5px;color:#555;line-height:1.45">' + c.desc + '</div>' +
+        '<div style="font-family:\'Bai Jamjuree\';font-size:12px;font-weight:700;color:#f8fafc;margin-bottom:3px">' + c.title + '</div>' +
+        '<div style="font-size:11px;color:#94a3b8;line-height:1.5">' + c.desc + '</div>' +
       '</div>' +
     '</div>';
   }).join('');
@@ -1365,30 +1506,28 @@ function renderNextSteps() {
   var moLabel = S.modeloMO === 'propria' ? 'mão de obra própria' : (S.modeloMO === 'mista' ? 'mão de obra mista' : 'mão de obra terceirizada');
 
   container.innerHTML =
-    '<div style="display:flex;align-items:flex-start;gap:20px">' +
-      '<div style="font-size:36px;flex-shrink:0">🎯</div>' +
-      '<div>' +
-        '<div style="font-family:\'Bai Jamjuree\';font-size:16px;font-weight:700;color:#14141b;margin-bottom:8px">O próximo passo: Apresentação da Solução Agilean</div>' +
-        '<p style="font-size:13px;color:#444;line-height:1.7;margin-bottom:12px">' +
-          'Com base no diagnóstico da <strong>' + empresa + '</strong> (' + obras + ' obra(s) no perfil <em>' + tipologiaLabel + '</em> com <em>' + moLabel + '</em>), preparamos uma demonstração personalizada focada em destravar os principais gargalos identificados hoje:' +
-        '</p>' +
-        '<div style="display:flex;flex-direction:column;gap:10px;margin-bottom:16px">' +
-          '<div style="display:flex;align-items:flex-start;gap:10px;font-size:13px;color:#333">' +
-            '<span style="color:var(--orange);font-weight:700;font-size:16px;line-height:1.2">→</span>' +
-            '<span><strong>Ato 1: Metodologia & Copilotos de Planejamento/Orçamento</strong> — Demonstração da Linha de Balanço e de como os Copilotos de IA automatizam o cronograma e o cruzamento com o orçamento do seu ERP em minutos.</span>' +
-          '</div>' +
-          '<div style="display:flex;align-items:flex-start;gap:10px;font-size:13px;color:#333">' +
-            '<span style="color:var(--orange);font-weight:700;font-size:16px;line-height:1.2">→</span>' +
-            '<span><strong>Ato 2: Canteiro Ágil & Copiloto Operacional</strong> — Como a equipe de campo realiza apontamentos diários pelo celular/WhatsApp, eliminando restrições 4 semanas antes e vinculando FVS de qualidade à medição.</span>' +
-          '</div>' +
-          '<div style="display:flex;align-items:flex-start;gap:10px;font-size:13px;color:#333">' +
-            '<span style="color:var(--orange);font-weight:700;font-size:16px;line-height:1.2">→</span>' +
-            '<span><strong>Ato 3: Fechamento Blindado & Inteligência da Diretoria</strong> — Performance HUB executivo em tempo real e integração nativa com seu ERP (Sienge, TOTVS, Informakon, Mega, UAU) para fechar medições e folhas em horas.</span>' +
-          '</div>' +
+    '<div>' +
+      '<div style="font-size:10.5px;font-weight:700;text-transform:uppercase;letter-spacing:0.12em;color:#ea580c;margin-bottom:8px">Plano de Ação Executivo</div>' +
+      '<div style="font-family:\'Bai Jamjuree\';font-size:17px;font-weight:700;color:#ffffff;margin-bottom:14px">Apresentação da Solução Agilean & Próximos Passos</div>' +
+      '<p style="font-size:13px;color:#cbd5e1;line-height:1.75;margin-bottom:20px">' +
+        'Com base no diagnóstico da <strong>' + empresa + '</strong> (' + obras + ' obra(s) no perfil <em>' + tipologiaLabel + '</em> com <em>' + moLabel + '</em>), estruturamos uma demonstração executiva focada nos 3 atos de transformação operacional:' +
+      '</p>' +
+      '<div style="display:flex;flex-direction:column;gap:16px;margin-bottom:22px">' +
+        '<div style="display:flex;align-items:flex-start;gap:14px;font-size:13px;color:#e2e8f0;line-height:1.55">' +
+          '<span style="font-family:\'Bai Jamjuree\';color:#ea580c;font-weight:700;font-size:13px;padding-top:2px">01</span>' +
+          '<span><strong style="color:#ffffff">Metodologia & Copilotos de Planejamento</strong> — Linha de Balanço e automação de cronograma com cruzamento orçamentário direto do ERP em minutos.</span>' +
         '</div>' +
-        '<div style="padding:12px 16px;background:rgba(255,95,31,0.07);border-radius:8px;border-left:3px solid var(--orange)">' +
-          '<span style="font-size:13px;color:#333;font-style:italic">"Identificamos oportunidades claras de ganho de eficiência e estancamento de perdas na sua operação. Na próxima reunião, demonstraremos na prática como a metodologia SIIGA e a tecnologia Agilean capturam esses resultados desde o primeiro ciclo."</span>' +
+        '<div style="display:flex;align-items:flex-start;gap:14px;font-size:13px;color:#e2e8f0;line-height:1.55">' +
+          '<span style="font-family:\'Bai Jamjuree\';color:#ea580c;font-weight:700;font-size:13px;padding-top:2px">02</span>' +
+          '<span><strong style="color:#ffffff">Canteiro Ágil & Gestão Operacional</strong> — Apontamentos diários em campo, remoção preventiva de restrições com 4 semanas de antecedência e FVS vinculada à medição.</span>' +
         '</div>' +
+        '<div style="display:flex;align-items:flex-start;gap:14px;font-size:13px;color:#e2e8f0;line-height:1.55">' +
+          '<span style="font-family:\'Bai Jamjuree\';color:#ea580c;font-weight:700;font-size:13px;padding-top:2px">03</span>' +
+          '<span><strong style="color:#ffffff">Fechamento Blindado & Performance HUB</strong> — Inteligência executiva em tempo real e integração bidirecional com ERP para fechar medições e folha em horas.</span>' +
+        '</div>' +
+      '</div>' +
+      '<div style="padding:16px 18px;background:rgba(234,88,12,0.06);border-radius:6px;border-left:2.5px solid #ea580c">' +
+        '<span style="font-size:13px;color:#cbd5e1;font-style:italic;line-height:1.6">"Identificamos oportunidades claras de ganho de eficiência e estancamento de perdas na sua operação. Na reunião executiva, demonstraremos a metodologia SIIGA capturando esses resultados desde o primeiro ciclo."</span>' +
       '</div>' +
     '</div>';
 }
@@ -1436,10 +1575,10 @@ function renderRotinaComparativa() {
   tbody.innerHTML = rows.map(function(r) {
     var ferramentaLabel = (r.ferramenta && r.ferramenta.trim()) ? r.ferramenta.trim() : naoInformado;
     return '<tr>' +
-      '<td><strong>' + r.rotina + '</strong></td>' +
-      '<td style="color:#555">' + ferramentaLabel + '</td>' +
-      '<td style="color:#b45309;background:rgba(251,146,60,0.06)">' + r.gargalo + '</td>' +
-      '<td style="color:#14141b;font-weight:600;background:rgba(255,95,31,0.03)">' + r.siiga + '</td>' +
+      '<td><strong style="color:#14141b">' + r.rotina + '</strong></td>' +
+      '<td style="color:#94a3b8">' + ferramentaLabel + '</td>' +
+      '<td style="color:#ea580c;background:rgba(234,88,12,0.06)">' + r.gargalo + '</td>' +
+      '<td style="color:#f1f5f9;font-weight:500;background:rgba(255,255,255,0.02)">' + r.siiga + '</td>' +
     '</tr>';
   }).join('');
 }
@@ -1456,11 +1595,11 @@ function renderPerdasComposicao(roi) {
   if (pctEl) pctEl.textContent = perdaPct + '% do portfólio estimado em risco';
 
   var catColors = {
-    mo: '#ff5f1f',
+    mo: '#ea580c',
     retrabalho: '#e11d48',
-    time: '#2563eb',
-    velocidade: '#0d9488',
-    erros: '#7c3aed'
+    time: '#3b82f6',
+    velocidade: '#10b981',
+    erros: '#8b5cf6'
   };
 
   var barraHtml = '';
@@ -1473,9 +1612,9 @@ function renderPerdasComposicao(roi) {
 
     barraHtml += '<div style="width:' + pct + '%;background:' + col + ';height:100%" title="' + item.label + ': ' + pct + '%"></div>';
 
-    gridHtml += '<div style="padding:8px 10px;background:#f8fafc;border-radius:6px;border-left:3px solid ' + col + '">' +
-      '<div style="font-size:10px;color:#64748b;font-weight:600">' + item.label + '</div>' +
-      '<div style="font-family:\'Bai Jamjuree\';font-size:12px;font-weight:700;color:#1e293b">' + fmtNum(val) + ' <span style="font-size:10px;font-weight:500;color:#64748b">(' + pct + '%)</span></div>' +
+    gridHtml += '<div style="padding:8px 10px;background:#181a24;border-radius:6px;border-left:2.5px solid ' + col + '">' +
+      '<div style="font-size:10px;color:#94a3b8;font-weight:600;margin-bottom:2px">' + item.label + '</div>' +
+      '<div style="font-family:\'Bai Jamjuree\';font-size:12px;font-weight:700;color:#ffffff">' + fmtNum(val) + ' <span style="font-size:10px;font-weight:500;color:#94a3b8">(' + pct + '%)</span></div>' +
     '</div>';
   });
 
@@ -1484,6 +1623,82 @@ function renderPerdasComposicao(roi) {
 
   var gridEl = document.getElementById('perdas-categorias-grid');
   if (gridEl) gridEl.innerHTML = gridHtml;
+}
+
+// Preenche o card "Ganho Esperado com o SIIGA" — contraponto em chave de ganho da
+// página de Perdas Financeiras. Reaproveita os MESMOS cálculos já usados nas páginas
+// de Perdas (calculateROI) e de ROI Real (calcROIReal) em vez de inventar um número
+// novo: mostra a mesma oportunidade capturável no portfólio (roi.totalPortfolio) ao
+// lado do ganho líquido mensal real do cenário conservador — dois ângulos
+// complementares, sem repetir o mesmo valor duas vezes.
+function renderGanhoEsperado(roi) {
+  var portfolioEl = document.getElementById('ganho-portfolio-valor');
+  var liquidoEl = document.getElementById('ganho-liquido-valor');
+  if (!portfolioEl || !liquidoEl || !roi) return;
+
+  portfolioEl.textContent = fmtNum(roi.totalPortfolio);
+
+  var rConservador = calcROIReal(0.5);
+  liquidoEl.textContent = fmtNum(rConservador.estrategica.ganhoLiquido);
+
+  // Memória de cálculo — demonstra, em linguagem analítica, de onde vêm os dois
+  // números de destaque acima. Não introduz valor novo: apenas decompõe
+  // roi.totalPortfolio (mitigação de perdas de obra) e o ganho líquido do cenário
+  // conservador (eficiência de engenharia & gestão) nas mesmas parcelas já
+  // usadas nas tabelas de Perdas Financeiras e ROI Real.
+  var memEl = document.getElementById('ganho-memoria-calculo');
+  if (memEl) {
+    var itemEstouro = (roi.items||[]).filter(function(it){ return /estouro|orçamento/i.test(it.label||''); })[0];
+    var itemRetrabalho = (roi.items||[]).filter(function(it){ return /retrabalho/i.test(it.label||''); })[0];
+    var mitigacaoObra = (itemEstouro ? itemEstouro.portfolio : 0) + (itemRetrabalho ? itemRetrabalho.portfolio : 0);
+    var eficienciaEngenharia = rConservador.estrategica.valorCapacidade + rConservador.estrategica.rec1;
+
+    memEl.innerHTML =
+      '<div style="font-size:9px;font-weight:700;text-transform:uppercase;letter-spacing:0.08em;color:#0d6b45;margin-bottom:6px">Memória de Cálculo — Composição do Ganho</div>' +
+      '<div style="display:grid;grid-template-columns:1fr 1fr;gap:12px">' +
+        '<div>' +
+          '<div style="font-size:10px;font-weight:700;color:#333;margin-bottom:2px">Mitigação de Perdas de Obra</div>' +
+          '<div style="font-size:9.5px;color:#666;line-height:1.35">Redução de estouro de orçamento de MO + estancamento de retrabalho de portfólio.</div>' +
+          '<div style="font-family:tabular-nums;font-variant-numeric:tabular-nums;text-align:right;font-size:12px;font-weight:700;color:#0d6b45;margin-top:3px">'+fmtNum(mitigacaoObra)+'</div>' +
+        '</div>' +
+        '<div>' +
+          '<div style="font-size:10px;font-weight:700;color:#333;margin-bottom:2px">Eficiência de Engenharia &amp; Gestão</div>' +
+          '<div style="font-size:9.5px;color:#666;line-height:1.35">Horas técnicas recuperadas em rotinas de planejamento, medição e integração com ERP (cenário conservador).</div>' +
+          '<div style="font-family:tabular-nums;font-variant-numeric:tabular-nums;text-align:right;font-size:12px;font-weight:700;color:#0d6b45;margin-top:3px">'+fmtNum(eficienciaEngenharia)+'/mês</div>' +
+        '</div>' +
+      '</div>';
+  }
+}
+
+// Executive Snapshot — síntese de diretoria no topo do relatório, com os 3 KPIs
+// vitais do diagnóstico. Reaproveita os MESMOS cálculos já usados no restante do
+// relatório (score de maturidade das 4 fases, roi.totalPortfolio e o payback do
+// cenário conservador de calcROIReal) — nenhum número novo é inventado aqui.
+function renderExecutiveSnapshot(totalScore, totalMax, roi, rEstrategica) {
+  var el = document.getElementById('exec-snapshot');
+  if (!el) return;
+  var pct = totalMax ? totalScore/totalMax : 0;
+  var nivel = levelFromPct(pct);
+  var paybackTxt = (rEstrategica && isFinite(rEstrategica.estrategica.payback))
+    ? '< ' + Math.ceil(rEstrategica.estrategica.payback) + ' meses'
+    : '—';
+
+  var kpi = function(label, value, sub) {
+    return '<div style="padding:16px 18px;background:#151720;border:1px solid rgba(255,255,255,0.06);border-radius:10px">' +
+      '<div style="font-size:9.5px;font-weight:700;text-transform:uppercase;letter-spacing:0.1em;color:#94a3b8;margin-bottom:8px">'+label+'</div>' +
+      '<div style="font-family:tabular-nums;font-variant-numeric:tabular-nums;font-family:Bai Jamjuree,sans-serif;font-size:24px;font-weight:700;color:#f8fafc">'+value+'</div>' +
+      (sub ? '<div style="font-size:10.5px;color:#cbd5e1;margin-top:4px">'+sub+'</div>' : '') +
+    '</div>';
+  };
+
+  el.innerHTML =
+    '<div style="font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:0.12em;color:#ea580c;margin-bottom:4px">Executive Snapshot</div>' +
+    '<div style="font-size:12px;color:#94a3b8;margin-bottom:14px">Síntese de diretoria — os três indicadores que definem a urgência e o retorno da decisão.</div>' +
+    '<div style="display:grid;grid-template-columns:repeat(3,1fr);gap:14px">' +
+      kpi('Score de Maturidade', totalScore+'/'+totalMax, nivel) +
+      kpi('Exposição em Risco', fmtNum(roi ? roi.totalPortfolio : 0), 'Perda estimada no portfólio, sem intervenção') +
+      kpi('Payback Estimado', paybackTxt, 'Cenário conservador de captura') +
+    '</div>';
 }
 
 function buildReport() {
@@ -1500,6 +1715,18 @@ function buildReport() {
   var tGaps = document.getElementById('rep-title-gaps');
   if (tGaps) tGaps.textContent = 'Gaps do Processo atual da ' + nomeEmpresa;
 
+  // Chamada bi-focal — Diagnóstico de Gaps (Seção 5 do plano de narrativa).
+  // Reaproveita o mesmo cálculo de roi.totalPortfolio usado na tabela de
+  // Perdas Financeiras logo abaixo — nenhum número novo é inventado aqui.
+  var bifocalGaps = document.getElementById('rep-bifocal-gaps');
+  if (bifocalGaps) {
+    var roiGapsPreview = calculateROI();
+    bifocalGaps.innerHTML =
+      '<strong style="color:#333">Visão Estratégica:</strong> "Exposição de ' + fmtNum(roiGapsPreview.totalPortfolio) + ' em risco no portfólio."' +
+      '<span style="color:#ccc;margin:0 6px">|</span>' +
+      '<strong style="color:#333">Visão Operacional:</strong> "Mapeamento dos gargalos que sobrecarregam sua equipe no dia a dia."';
+  }
+
   var tGanhos = document.getElementById('rep-title-ganhos');
   if (tGanhos) tGanhos.textContent = 'Ganhos para a ' + nomeEmpresa + ' — SIIGA com Agilean';
 
@@ -1512,6 +1739,15 @@ function buildReport() {
   if (tRoadmap) {
     tRoadmap.textContent = 'Roadmap de Implementação SIIGA para a ' + nomeEmpresa;
   }
+
+  var fechConsultor = document.getElementById('rep-fechamento-consultor');
+  if (fechConsultor) fechConsultor.textContent = S.consultor || 'Equipe Agilean';
+
+  var fechContato = document.getElementById('rep-fechamento-contato');
+  if (fechContato) fechContato.textContent = S.contato || S.empresa || '';
+
+  var fechCargo = document.getElementById('rep-fechamento-cargo');
+  if (fechCargo) fechCargo.textContent = S.cargo || '';
 
   var maxes = {f1:21,f2:9,f3:15,f4:12};
   var colors = {f1:'#1B4F8A',f2:'#0D7C8C',f3:'#0D6B45',f4:'#4a4558'};
@@ -1527,12 +1763,15 @@ function buildReport() {
 
   // Section 1
   var insHtml = '';
+  var snapTotalScore = 0, snapTotalMax = 0;
   ['f1','f2','f3','f4'].forEach(function(k) {
     var arr = S.scores[k];
     var sum = Array.isArray(arr) ? arr.reduce(function(a,b){return a+(b||0);},0) : 0;
     var p = sum/(maxes[k]||1);
     var lv = levelFromPct(p);
     var ins = PQ[k].insight(p);
+    snapTotalScore += sum;
+    snapTotalMax += (maxes[k]||0);
     insHtml += '<div class="rep-ins-card" style="border-left:3px solid '+colors[k]+'">' +
       '<div class="rn" style="color:'+colors[k]+'">'+lnames[k]+'</div>' +
       '<div class="rv" style="color:'+colors[k]+'">'+sum+'/'+maxes[k]+'</div>' +
@@ -1543,11 +1782,68 @@ function buildReport() {
 
   // Section 2: opportunities
   var opps = generateOpportunities();
-  var oppHtml = '';
-  opps.forEach(function(r) {
-    oppHtml += '<tr><td>'+r.gap+'</td><td><span class="gap-tag" style="background:'+r.color+'22;color:'+r.color+'">'+r.phase+'</span></td><td>'+r.impact+'</td></tr>';
-  });
-  document.getElementById('opp-body').innerHTML = oppHtml;
+  var SEVERITY_INFO = {
+    critico: { label: 'Crítico', bg: 'rgba(239,68,68,0.15)', fg: '#dc2626' },
+    oportunidade: { label: 'Oportunidade', bg: 'rgba(249,115,22,0.15)', fg: '#c2680d' }
+  };
+  var oppTableCard = document.getElementById('opp-table-card');
+  if(opps.length === 0) {
+    // Cliente de alta maturidade, sem gaps críticos nem oportunidades de melhoria
+    // identificadas: reservar o layout inteiro de uma tabela vazia (só cabeçalhos)
+    // deixava metade da página em branco no PDF. Colapsa para uma mensagem curta.
+    if(oppTableCard) {
+      oppTableCard.innerHTML = '<div style="padding:14px 16px;text-align:center;color:#888;font-size:12px">' +
+        'Nenhum gap crítico ou oportunidade de melhoria identificada nesta fase do diagnóstico.</div>';
+    }
+  } else {
+    var oppHtml = '';
+    opps.forEach(function(r) {
+      var sevInfo = SEVERITY_INFO[r.severity] || SEVERITY_INFO.oportunidade;
+      oppHtml += '<tr><td>'+r.gap+'</td>' +
+        '<td><span class="gap-tag" style="background:'+sevInfo.bg+';color:'+sevInfo.fg+'">'+sevInfo.label+'</span></td>' +
+        '<td><span class="gap-tag" style="background:'+r.color+'22;color:'+r.color+'">'+r.phase+'</span></td>' +
+        '<td>'+r.impact+'</td></tr>';
+    });
+    // Recria a tabela sempre (idempotente) — buildReport() pode rodar mais de
+    // uma vez na mesma sessão e um render anterior sem gaps pode ter
+    // substituído este card pela mensagem curta acima.
+    if(oppTableCard) {
+      oppTableCard.innerHTML = '<table class="opp-table" id="opp-table-el"><thead><tr><th>Gap Identificado</th><th>Severidade</th><th>Fase</th><th>Impacto</th></tr></thead><tbody id="opp-body">'+oppHtml+'</tbody></table>';
+    }
+  }
+
+  // Resumo executivo dos gaps — card próprio (ver nota no index.html sobre a
+  // quebra do card único de Gaps em Card A/B). Reaproveita os MESMOS dados já
+  // calculados para a tabela acima e para o radar (RADAR_STATE) — não introduz
+  // nenhuma métrica nova, apenas reenquadra o que já existe em 3 números
+  // rápidos para preencher o card de contexto que antecede a tabela.
+  var gapsSummaryEl = document.getElementById('gaps-summary-stats');
+  if(gapsSummaryEl) {
+    var fLabels = {F1:'Fase 1',F2:'Fase 2',F3:'Fase 3',F4:'Fase 4',MO:'Mão de Obra'};
+    // Prioriza um Gap Crítico real sobre uma Oportunidade de melhoria ao escolher
+    // o destaque — opps já vem ordenado por score (pior primeiro), mas se o
+    // primeiro item da lista for só uma "oportunidade" e existir algum crítico
+    // mais adiante (não deveria, dado o sort, mas resguarda contra ordenação
+    // futura diferente), o crítico é o que deve aparecer aqui.
+    var worstCritico = opps.filter(function(o){ return o.severity === 'critico'; })[0];
+    var worstOpp = worstCritico || opps[0];
+    var worstOppLabel = worstOpp ? (fLabels[worstOpp.phase] || worstOpp.phase) : '—';
+    var radarWorstLabel = (typeof RADAR_STATE !== 'undefined' && RADAR_STATE) ? RADAR_STATE.labels[RADAR_STATE.worstIdx] : '—';
+    var radarWorstPct = (typeof RADAR_STATE !== 'undefined' && RADAR_STATE) ? Math.round((RADAR_STATE.reference[RADAR_STATE.worstIdx] - RADAR_STATE.clientPct[RADAR_STATE.worstIdx]) * 100) + ' p.p.' : '—';
+    gapsSummaryEl.innerHTML =
+      '<div style="padding:12px 14px;background:#f8f8f8;border-radius:8px;border:1px solid #e8e8e8;text-align:center">' +
+        '<div style="font-family:\'Bai Jamjuree\';font-size:22px;font-weight:700;color:var(--orange)">' + opps.length + '</div>' +
+        '<div style="font-size:10px;color:#888;text-transform:uppercase;letter-spacing:0.06em;margin-top:2px">Gaps identificados</div>' +
+      '</div>' +
+      '<div style="padding:12px 14px;background:#f8f8f8;border-radius:8px;border:1px solid #e8e8e8;text-align:center">' +
+        '<div style="font-family:\'Bai Jamjuree\';font-size:16px;font-weight:700;color:#14141b">' + worstOppLabel + '</div>' +
+        '<div style="font-size:10px;color:#888;text-transform:uppercase;letter-spacing:0.06em;margin-top:2px">Gap mais crítico</div>' +
+      '</div>' +
+      '<div style="padding:12px 14px;background:#f8f8f8;border-radius:8px;border:1px solid #e8e8e8;text-align:center">' +
+        '<div style="font-family:\'Bai Jamjuree\';font-size:16px;font-weight:700;color:#14141b">' + radarWorstLabel + ' · ' + radarWorstPct + '</div>' +
+        '<div style="font-size:10px;color:#888;text-transform:uppercase;letter-spacing:0.06em;margin-top:2px">Maior distância vs. Referência SIIGA</div>' +
+      '</div>';
+  }
 
   // ROI inputs summary
   var portfolio = (S.numObras||5) * (S.orcamentoMedio||8000000);
@@ -1561,6 +1857,7 @@ function buildReport() {
   // ROI table
   var roi = calculateROI();
   renderPerdasComposicao(roi);
+  renderGanhoEsperado(roi);
   var roiHtml = '<thead><tr>' +
     '<th>Fonte de Ganho</th>' +
     '<th>Pressuposto</th>' +
@@ -1593,6 +1890,9 @@ function buildReport() {
   buildROIReal();
   // Road map
   buildRoadmap();
+  // Executive Snapshot — reaproveita o score já somado acima e o ROI real
+  // (calcROIReal) guardado em window._lastROIReal por buildROIReal().
+  renderExecutiveSnapshot(snapTotalScore, snapTotalMax, roi, window._lastROIReal);
 }
 
 function roiCapturaLabel(fator) {
@@ -1610,6 +1910,7 @@ function buildROIReal() {
   if(capInput && capInput.value !== '') S.captura = Math.max(0.30, Math.min(1, parseFloat(capInput.value)/100));
 
   var r = calcROIReal(S.captura);
+  window._lastROIReal = r; // usado por renderExecutiveSnapshot() no fim de buildReport()
   var fmtH = function(n){ return (n||0).toLocaleString('pt-BR',{maximumFractionDigits:1}) + ' h'; };
   // Código de cores usado na coluna "Como é calculado": distingue o que é dado
   // informado pelo cliente, o que é referência fixa de mercado, e o que é o
@@ -1618,19 +1919,19 @@ function buildROIReal() {
   var pF = function(t){ return '<span style="color:#888">'+t+'</span>'; };
   var pS = function(t){ return '<strong style="color:var(--orange)">'+t+'</strong>'; };
   var roiRow = function(label, formula, val) {
-    return '<tr><td style="color:#333;font-size:12px">'+label+'</td>' +
-      '<td style="font-size:11px;line-height:1.5">'+(formula||'')+'</td>' +
+    return '<tr><td style="color:#333;font-size:11.5px">'+label+'</td>' +
+      '<td style="font-size:10.5px;line-height:1.45">'+(formula||'')+'</td>' +
       '<td style="text-align:right;font-weight:600;white-space:nowrap" class="roi-val">'+val+'</td></tr>';
   };
-  var roiLegend = '<div style="display:flex;flex-wrap:wrap;gap:16px;font-size:10px;color:#888;margin-bottom:10px">' +
+  var roiLegend = '<div style="display:flex;flex-wrap:wrap;gap:14px;font-size:9.5px;color:#888;margin-bottom:10px">' +
     '<span>'+pC('■')+' dado informado nesta operação</span>' +
     '<span>'+pF('■')+' referência de mercado (Agilean/Lean Construction)</span>' +
     '<span>'+pS('■')+' fator do cenário escolhido</span>' +
   '</div>';
   var roiCard = function(label, val) {
-    return '<div style="padding:11px;background:var(--light);border-radius:var(--r3)">' +
+    return '<div style="padding:12px 14px;background:var(--light);border-radius:var(--r3)">' +
       '<div style="font-size:10px;color:#999;text-transform:uppercase;letter-spacing:0.06em">'+label+'</div>' +
-      '<div style="font-family:Bai Jamjuree;font-size:18px;font-weight:700">'+val+'</div></div>';
+      '<div style="font-family:Bai Jamjuree;font-size:18px;font-weight:700;margin-top:2px">'+val+'</div></div>';
   };
 
   var cfgEl = document.getElementById('roi2-config');
@@ -1651,13 +1952,13 @@ function buildROIReal() {
   var diasFechamento = getDiasFechamentoAtual();
   var paramItem = function(label, val, isMarket) {
     var color = isMarket ? '#888' : '#1B4F8A';
-    return '<div style="font-size:11px;color:#666">• '+label+': <strong style="color:'+color+'">'+val+'</strong></div>';
+    return '<div style="font-size:10.5px;color:#666">• '+label+': <strong style="color:'+color+'">'+val+'</strong></div>';
   };
   var paramsEl = document.getElementById('roi2-params-box');
   if(paramsEl) {
     paramsEl.innerHTML =
       '<div style="font-size:10px;color:#888;margin-bottom:8px">'+pC('■')+' dado informado nesta operação &nbsp; '+pF('■')+' referência de mercado</div>' +
-      '<div style="display:grid;grid-template-columns:1fr 1fr;gap:6px">' +
+      '<div style="display:grid;grid-template-columns:1fr 1fr;gap:8px">' +
         paramItem('Folha de MO própria/mês', fmtNum(S.roi2.folha||0)) +
         paramItem('Custo hora técnica', 'R$ '+ROI_REAL_K.CUSTO_HORA_TECNICA+'/h', true) +
         paramItem('Dias p/ fechar medição/folha hoje', fmtNumBare(diasFechamento)+' dias <span style="color:#999;font-weight:400">(resposta do Bloco MO)</span>') +
@@ -1689,7 +1990,7 @@ function buildROIReal() {
   var estEl = document.getElementById('roi2-estrategica');
   if(estEl) {
     estEl.innerHTML =
-      '<div style="display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin-bottom:12px">' +
+      '<div style="display:grid;grid-template-columns:repeat(3,1fr);gap:10px;margin-bottom:12px">' +
         roiCard('ROI Mensal', Math.round(r.estrategica.roi*100)+'%') +
         roiCard('Payback', isFinite(r.estrategica.payback) ? fmtNumBare(r.estrategica.payback)+' meses' : '—') +
         roiCard('Ganho Líquido/mês', fmtNum(r.estrategica.ganhoLiquido)) +
@@ -1716,7 +2017,7 @@ function buildROIReal() {
   var opEl = document.getElementById('roi2-operacional');
   if(opEl) {
     opEl.innerHTML =
-      '<div style="display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin-bottom:12px">' +
+      '<div style="display:grid;grid-template-columns:repeat(3,1fr);gap:10px;margin-bottom:12px">' +
         roiCard('Horas recuperadas/mês', fmtH(r.operacional.hMes)) +
         roiCard('Horas recuperadas/obra', fmtH(r.operacional.hObra)) +
         roiCard('% da jornada liberada', (Math.round(r.operacional.pctJornada*1000)/10)+'%') +
@@ -1802,14 +2103,27 @@ var GAP_INFO = {
 function generateOpportunities() {
   var opps = [];
 
+  // Severidade: a escala de resposta tem 4 níveis não-uniformes (0, 1, 1.5, 3).
+  // score<=1 = Gap Crítico (os dois piores níveis). score===1.5 ("fazemos, mas
+  // informal/sem dado formal") não é bom nem péssimo, mas também não é maturidade
+  // real — antes ficava fora da tabela de gaps inteiramente, o que permitia o caso
+  // incoerente de uma empresa com score geral baixo (muitos 1.5) e "0 gaps
+  // identificados" no relatório. Agora entra como categoria própria, mais branda.
+  function severityOf(score) {
+    if(score <= 1) return 'critico';
+    if(score === 1.5) return 'oportunidade';
+    return null;
+  }
+
   function pushGaps(bk, arr, qs) {
     arr = arr || [];
     qs.forEach(function(q, i) {
       if(q.type === 'numgrid') return;
       var score = arr[i] || 0;
-      if(score <= 1) {
+      var sev = severityOf(score);
+      if(sev) {
         var info = GAP_INFO[q.code] || { title: q.code, impact: q.reveals || '' };
-        opps.push({ gap: info.title, phase: bk.toUpperCase(), color: PQ[bk].colorHex, impact: info.impact, score: score });
+        opps.push({ gap: info.title, phase: bk.toUpperCase(), color: PQ[bk].colorHex, impact: info.impact, score: score, severity: sev });
       }
     });
   }
@@ -1823,14 +2137,15 @@ function generateOpportunities() {
   getFilteredQs(PQ.mo).forEach(function(q) {
     if(q.type === 'numgrid') return;
     var score = moScores[q.code] || 0;
-    if(score <= 1) {
+    var sev = severityOf(score);
+    if(sev) {
       var info = GAP_INFO[q.code] || { title: q.code, impact: q.reveals || '' };
-      opps.push({ gap: info.title, phase: 'MO', color: PQ.mo.colorHex, impact: info.impact, score: score });
+      opps.push({ gap: info.title, phase: 'MO', color: PQ.mo.colorHex, impact: info.impact, score: score, severity: sev });
     }
   });
 
-  opps.sort(function(a,b){ return a.score - b.score; }); // pior score primeiro
-  return opps.slice(0, 10);
+  opps.sort(function(a,b){ return a.score - b.score; }); // pior score primeiro (críticos antes de oportunidades)
+  return opps.slice(0, 14);
 }
 
 function calculateROI() {
@@ -2084,7 +2399,7 @@ function buildRoadmap() {
   // ── SPRINT LIBRARY — full item sets per phase ─────────────────────────────
   var SPRINTS = {
     f1_critical: {
-      lbl:'S1', color:'#1B4F8A',
+      color:'#1B4F8A',
       title:'Estruturar a base do planejamento',
       focus:'Os gaps de planejamento identificados impedem que os demais pilares funcionem. A prioridade é criar uma linha de base confiável antes de qualquer outra iniciativa.',
       items: [
@@ -2097,7 +2412,7 @@ function buildRoadmap() {
       prod:'Planejamento estratégico e linha de base'
     },
     f1_medium: {
-      lbl:'S1', color:'#1B4F8A',
+      color:'#1B4F8A',
       title:'Consolidar e integrar o planejamento',
       focus:'O planejamento existe mas precisa ser conectado ao orçamento e ao canteiro para gerar previsibilidade real.',
       items: [
@@ -2109,7 +2424,7 @@ function buildRoadmap() {
       prod:'Planejamento estratégico e linha de base'
     },
     f2_critical: {
-      lbl:'S2', color:'#0D7C8C',
+      color:'#0D7C8C',
       title:'Implantar proteção da execução',
       focus:'Sem lookahead e gestão de restrições, os problemas só aparecem quando já travaram a produção. A obra precisa sair do modo reativo antes de evoluir para o canteiro.',
       items: [
@@ -2122,7 +2437,7 @@ function buildRoadmap() {
       prod:'Proteção do plano e antecipação de riscos'
     },
     f2_medium: {
-      lbl:'S2', color:'#0D7C8C',
+      color:'#0D7C8C',
       title:'Fortalecer a proteção da execução',
       focus:'O lookahead existe mas não está gerando accountability. O foco é transformar a reunião de médio prazo em um ciclo real de decisão.',
       items: [
@@ -2134,7 +2449,7 @@ function buildRoadmap() {
       prod:'Proteção do plano e antecipação de riscos'
     },
     f3_critical: {
-      lbl:'S3', color:'#0D6B45',
+      color:'#0D6B45',
       title:'Fazer o planejamento chegar ao canteiro',
       focus:'O principal gap está entre o que é planejado e o que chega ao dia a dia da obra. O objetivo é criar o ciclo diário e semanal que conecta planejamento e execução.',
       items: [
@@ -2147,7 +2462,7 @@ function buildRoadmap() {
       prod:'Gestão integrada de produção e mão de obra'
     },
     f3_medium: {
-      lbl:'S3', color:'#0D6B45',
+      color:'#0D6B45',
       title:'Fortalecer o ciclo de produção',
       focus:'O canteiro já tem rotinas, mas o dado gerado ainda não alimenta a gestão com velocidade suficiente. O foco é qualidade do dado e integração com qualidade e MO.',
       items: [
@@ -2159,7 +2474,7 @@ function buildRoadmap() {
       prod:'Gestão integrada de produção e mão de obra'
     },
     f4_intro: {
-      lbl:'∞', color:'#4a4558',
+      color:'#4a4558',
       title:'Primeiros passos de controle executivo',
       focus:'Com os pilares anteriores estruturados, os dados já existem para alimentar o ciclo de performance. O foco é criar a reunião de inteligência e o fechamento baseado em evidência.',
       items: [
@@ -2170,7 +2485,7 @@ function buildRoadmap() {
       prod:'Controle, performance e inteligência de gestão'
     },
     f4_deferred: {
-      lbl:'M4+', color:'#4a4558',
+      deferred:true, color:'#4a4558',
       title:'Controle e Performance — Mês 4 em diante',
       focus:null,
       items: [
@@ -2254,13 +2569,34 @@ function buildRoadmap() {
     sprintDefs.push(SPRINTS.f4_intro);
   }
 
-  // Assign day labels
-  var dayIdx = 0;
+  // Assign sequential badges ("S1", "S2", "S3"...) and day labels.
+  //
+  // O badge de cada step NÃO é mais fixo por fase (F1 sempre "S1", F2 sempre
+  // "S2"...) — antes, quando as fases iniciais não geravam gaps (maturidade de
+  // referência) e eram puladas, o próximo step "herdava" o lbl fixo do seu
+  // template de origem: os templates F1-F3 usam 'S1'/'S2'/'S3', mas o template
+  // f4_intro usava o símbolo '∞' (pensado para o caso em que F4 é só uma
+  // referência distante) mesmo quando, na prática, ele estava ocupando um slot
+  // sequencial dentro dos 90 dias (por caber em sprintDefs.length < 3). O
+  // resultado: um badge quase ilegível (glifo '∞' minúsculo, lido como um
+  // simples "-") e nenhum "S4" nem "M4+" correto — porque a atribuição de
+  // dayIdx abaixo tratava qualquer sp com lbl '∞' como sempre-deferred,
+  // reforçando o rótulo errado.
+  //
+  // Agora o badge é calculado pela POSIÇÃO real do step dentro da timeline: só
+  // os steps genuinamente adiados (SPRINTS.f4_deferred, marcado com
+  // `deferred:true`) recebem "M4+" / "Mês 4+"; todos os demais — não importa de
+  // qual fase vieram nem quantos steps anteriores foram pulados — recebem
+  // "S1", "S2", "S3"... em sequência e a legenda de dias correspondente.
+  var seq = 0, dayIdx = 0;
   sprintDefs.forEach(function(sp) {
-    if(sp.lbl !== '∞' && sp.lbl !== 'M4+' && dayIdx < daysLabels.length) {
-      sp.days = daysLabels[dayIdx++];
-    } else {
+    if(sp.deferred) {
+      sp.lbl = 'M4+';
       sp.days = 'Mês 4+';
+    } else {
+      seq++;
+      sp.lbl = 'S' + seq;
+      sp.days = (dayIdx < daysLabels.length) ? daysLabels[dayIdx++] : 'Mês 4+';
     }
   });
 
@@ -2269,19 +2605,13 @@ function buildRoadmap() {
   // ── RENDER ────────────────────────────────────────────────────────────────
   var html = '';
 
-  // F4 deferred note
-  if(f4Note) {
-    html += '<div style="padding:12px 16px;background:rgba(74,69,88,0.3);border-radius:8px;border:1px solid rgba(74,69,88,0.5);font-size:12px;color:rgba(255,255,255,0.65);line-height:1.7;margin-bottom:16px">' +
-      '<strong style="color:rgba(255,255,255,0.8)">Sobre o Pilar 4:</strong> ' + f4Note + '</div>';
-  }
-
   sprints.forEach(function(sp, i) {
     var isLast = i === sprints.length - 1;
-    var isDeferred = sp.lbl === 'M4+' || sp.lbl === '∞';
+    var isDeferred = !!sp.deferred;
     var items = sp.items.map(function(it){return '<li>'+it+'</li>';}).join('');
 
     var focusHtml = sp.focus
-      ? '<div style="font-size:12px;color:rgba(255,255,255,0.55);font-style:italic;line-height:1.6;margin-bottom:10px;padding:8px 10px;background:rgba(255,255,255,0.03);border-radius:6px;border-left:2px solid '+ sp.color+'">' + sp.focus + '</div>'
+      ? '<div style="font-size:12.5px;color:rgba(255,255,255,0.55);font-style:italic;line-height:1.5;margin-bottom:12px;padding:9px 12px;background:rgba(255,255,255,0.03);border-radius:6px;border-left:2px solid '+ sp.color+'">' + sp.focus + '</div>'
       : '';
 
     html += '<div class="sprint">' +
@@ -2297,6 +2627,15 @@ function buildRoadmap() {
         '<span class="prod-tag" style="'+(isDeferred?'opacity:0.6':'')+'">'+sp.prod+'</span>' +
       '</div></div>';
   });
+
+  // F4 deferred note — colocada DEPOIS da timeline (não antes) porque o texto
+  // explicitamente se refere aos "sprints acima" ("com a base estruturada nos
+  // sprints acima..."); renderizá-la antes dos sprints deixava essa referência
+  // apontando para conteúdo que ainda não tinha aparecido na página.
+  if(f4Note) {
+    html += '<div style="padding:14px 20px;background:rgba(74,69,88,0.3);border-radius:8px;border:1px solid rgba(74,69,88,0.5);font-size:12.5px;color:rgba(255,255,255,0.65);line-height:1.75;margin-top:20px">' +
+      '<strong style="color:rgba(255,255,255,0.8)">Sobre o Pilar 4:</strong> ' + f4Note + '</div>';
+  }
 
   document.getElementById('roadmap-el').innerHTML = html;
 }
@@ -2370,12 +2709,40 @@ function applyPdfLightTheme(root) {
     c.style.color = '#1a1a1a';
   });
 
+  // Detecta se o elemento está dentro de um bloco com fundo intencionalmente escuro
+  // (depoimentos, barra do fluxo construtivo, próximos passos etc.) subindo a árvore
+  // e testando a luminância do primeiro background hexadecimal encontrado — em vez de
+  // listar cada tom de escuro usado no relatório (#14141b, #151722, #14161f, #181a24...),
+  // o que exige lembrar de atualizar essa lista toda vez que um novo bloco escuro for
+  // adicionado. Um bloco com fundo escuro nunca deve ter seu texto forçado para escuro.
+  function hasDarkAncestorBg(el) {
+    var node = el;
+    while (node && node !== root) {
+      // getComputedStyle (não .style.background bruto) — o navegador normaliza a cor
+      // especificada via atributo style para rgb()/rgba() de forma consistente, o que
+      // o regex em cima da string de estilo original não conseguia capturar de forma
+      // confiável (o valor podia já vir serializado como "rgb(20, 20, 27)").
+      var bg = window.getComputedStyle(node).backgroundColor;
+      var m = bg && bg.match(/rgba?\((\d+),\s*(\d+),\s*(\d+)(?:,\s*([\d.]+))?\)/);
+      if (m) {
+        var alpha = m[4] === undefined ? 1 : parseFloat(m[4]);
+        if (alpha > 0.4) {
+          var r = +m[1], g = +m[2], b = +m[3];
+          if ((0.299*r + 0.587*g + 0.114*b) < 100) return true;
+          return false; // fundo claro/opaco encontrado antes de qualquer escuro — para de subir
+        }
+      }
+      node = node.parentElement;
+    }
+    return false;
+  }
+
   // Fix ALL text elements — força texto escuro e reforça peso da fonte.
-  // Exceção: elementos dentro de cards com fundo intencionalmente escuro
-  // (depoimentos, barra do fluxo construtivo) mantêm suas cores originais —
-  // texto branco sobre fundo escuro já tem contraste correto e não deve ser escurecido.
-  root.querySelectorAll('p,div,span,li,td,th,h1,h2,h3,h4,h5,label').forEach(function(el) {
-    if (el.closest('[style*="background:#14141b"], [style*="background: #14141b"]')) return;
+  // Exceção: elementos dentro de cards com fundo intencionalmente escuro mantêm suas
+  // cores originais — texto claro sobre fundo escuro já tem contraste correto e não
+  // deve ser escurecido.
+  root.querySelectorAll('p,div,span,li,td,th,h1,h2,h3,h4,h5,label,strong').forEach(function(el) {
+    if (hasDarkAncestorBg(el)) return;
     var cs = window.getComputedStyle(el);
     var col = cs.color;
     var fontSize = parseFloat(cs.fontSize) || 0;
@@ -2452,7 +2819,168 @@ function applyPdfLightTheme(root) {
   });
 }
 
-function generatePDF(fromAdmin) {
+function applyPdfDarkTheme(root) {
+  root.style.background = '#0f1015';
+  root.style.color = '#ffffff';
+
+  root.querySelectorAll('.no-print,.btn-row,.top-nav,#progress-bar,#pdf-loading,#modal-save,#modal-import,#api-modal,.toast,#modal-overlay').forEach(function(b){
+    b.style.display = 'none';
+  });
+
+  root.querySelectorAll('.card,.card-wide').forEach(function(c){
+    c.style.background = '#151720';
+    c.style.border = '1px solid rgba(255,255,255,0.06)';
+    c.style.boxShadow = '0 6px 24px rgba(0,0,0,0.45)';
+    c.style.color = '#ffffff';
+  });
+
+  // Header
+  root.querySelectorAll('.rep-header').forEach(function(h){
+    h.style.borderBottom = '2.5px solid #ea580c';
+  });
+  root.querySelectorAll('#rep-meta').forEach(function(m){
+    m.style.color = '#94a3b8';
+  });
+
+  // Section titles
+  root.querySelectorAll('.rep-sec-title').forEach(function(t){
+    t.style.color = '#f8fafc';
+    t.style.borderBottom = '1px solid rgba(234,88,12,0.3)';
+  });
+
+  // KPI Insight Cards
+  root.querySelectorAll('.rep-ins-card').forEach(function(card){
+    card.style.background = '#1a1c26';
+    card.style.border = '1px solid rgba(255,255,255,0.06)';
+  });
+  root.querySelectorAll('.rep-ins-card .rn').forEach(function(e){ e.style.color = '#94a3b8'; });
+  root.querySelectorAll('.rep-ins-card .rv').forEach(function(e){ e.style.color = '#ffffff'; });
+  root.querySelectorAll('.rep-ins-card .rl').forEach(function(e){ e.style.color = '#94a3b8'; });
+  root.querySelectorAll('.rep-ins-card .rt').forEach(function(e){ e.style.color = '#cbd5e1'; });
+
+  // ROI Summary Inputs & ROI metric cards
+  root.querySelectorAll('#roi-inputs > div, #roi2-estrategica > div > div, #roi2-operacional > div > div').forEach(function(box){
+    box.style.background = '#1a1c26';
+    box.style.border = '1px solid rgba(255,255,255,0.06)';
+    box.style.color = '#ffffff';
+  });
+
+  // Tables
+  root.querySelectorAll('.opp-table th, .roi-table th').forEach(function(th){
+    th.style.background = '#181a24';
+    th.style.color = '#94a3b8';
+    th.style.borderBottom = '1px solid rgba(255,255,255,0.08)';
+    th.style.fontSize = '10px';
+    th.style.letterSpacing = '0.04em';
+  });
+  root.querySelectorAll('.opp-table td, .roi-table td').forEach(function(td){
+    td.style.color = '#e2e8f0';
+    td.style.borderBottom = '1px solid rgba(255,255,255,0.05)';
+  });
+  root.querySelectorAll('tr.roi-total, tr.roi-total td').forEach(function(td){
+    td.style.background = 'rgba(234,88,12,0.10)';
+    td.style.color = '#ffffff';
+    td.style.borderTop = '1.5px solid #ea580c';
+    td.style.borderBottom = 'none';
+  });
+
+  // Perdas Composição box
+  root.querySelectorAll('#perdas-composicao-box').forEach(function(box){
+    box.style.background = '#151720';
+    box.style.border = '1px solid rgba(255,255,255,0.06)';
+  });
+  root.querySelectorAll('#perdas-barra-comparativa').forEach(function(b){
+    b.style.background = '#252836';
+  });
+  root.querySelectorAll('#perdas-categorias-grid > div').forEach(function(d){
+    d.style.background = '#1a1c26';
+    d.style.border = '1px solid rgba(255,255,255,0.06)';
+    d.style.color = '#e2e8f0';
+  });
+
+  // Light/Gray styled boxes turned dark. Inclui var(--light) (#f4f1fc) — usado nas
+  // linhas "zebra" das tabelas roi-table (ex.: Perdas Financeiras) — que sem esta
+  // conversão ficam com fundo claro + texto claro (invisível) no PDF escuro.
+  root.querySelectorAll('[style*="background:#f8f8f8"], [style*="background: #f8f8f8"], [style*="background:#f9f9fb"], [style*="background: #f9f9fb"], [style*="background:#f8f9fa"], [style*="background: #f8f9fa"], [style*="background:#f8fafc"], [style*="background: #f8fafc"], [style*="background:var(--light)"], [style*="background: var(--light)"]').forEach(function(el){
+    el.style.background = '#12141c';
+    el.style.borderColor = 'rgba(255,255,255,0.06)';
+  });
+
+  // White inner cards turned dark
+  root.querySelectorAll('[style*="background:#fff"], [style*="background: #fff"], [style*="background:white"]').forEach(function(el){
+    if (el.classList && (el.classList.contains('card') || el.classList.contains('card-wide'))) return;
+    if (el.closest && el.closest('#screen-radar')) return;
+    el.style.background = '#181a24';
+    el.style.borderColor = 'rgba(255,255,255,0.08)';
+  });
+
+  // Depoimentos cards
+  root.querySelectorAll('[style*="background:#14141b"], [style*="background: #14141b"]').forEach(function(el){
+    el.style.background = '#12141c';
+    el.style.border = '1px solid rgba(255,255,255,0.08)';
+  });
+
+  // Next steps callout
+  root.querySelectorAll('#next-steps-container').forEach(function(el){
+    el.style.background = 'rgba(234,88,12,0.05)';
+    el.style.border = '1.5px solid rgba(234,88,12,0.25)';
+  });
+
+  // Text color adjustments for high contrast and elegance
+  root.querySelectorAll('p,div,span,li,td,th,h1,h2,h3,h4,h5,label,strong').forEach(function(el) {
+    if (el.style && el.style.color) {
+      var col = el.style.color.trim();
+      if (col === '#666' || col === '#555' || col === '#888' || col === '#999' || col === '#64748b' || col === 'rgb(102, 102, 102)' || col === 'rgb(136, 136, 136)') {
+        el.style.color = '#94a3b8';
+      } else if (col === '#333' || col === '#14141b' || col === '#0f172a' || col === '#1a1a1a' || col === '#000' || col === 'rgb(51, 51, 51)' || col === 'rgb(20, 20, 27)') {
+        el.style.color = '#f8fafc';
+      }
+    }
+  });
+
+  root.querySelectorAll('.score-bar').forEach(function(b){
+    b.style.background = 'rgba(255,255,255,0.06)';
+  });
+
+  // Design system "Executive Charcoal & Copper": o laranja vibrante da marca
+  // (#ff5f1f / var(--orange), usado no app ao vivo) é substituído pelo cobre
+  // refinado mate (#ea580c) só no PDF — sem brilho fluorescente. Cobre valores
+  // literais (#ff5f1f) e var(--orange) em qualquer atributo style, cor de texto
+  // computada ou borda.
+  var toCopper = function(hex){ return hex === '#ff5f1f' || hex === 'rgb(255, 95, 31)'; };
+  root.querySelectorAll('*').forEach(function(el){
+    if (!el.style) return;
+    ['color','background','backgroundColor','borderColor','borderTopColor','borderBottomColor','borderLeftColor','borderRightColor'].forEach(function(prop){
+      var v = el.style[prop];
+      if (v && v.indexOf('var(--orange)') >= 0 && v.indexOf('orange-dim') < 0 && v.indexOf('orange-mid') < 0) {
+        el.style[prop] = v.replace(/var\(--orange\)/g, '#ea580c');
+      }
+    });
+  });
+  root.querySelectorAll('[style*="#ff5f1f"]').forEach(function(el){
+    el.setAttribute('style', el.getAttribute('style').replace(/#ff5f1f/gi, '#ea580c'));
+  });
+  root.querySelectorAll('p,div,span,li,td,th,strong,h1,h2,h3,h4').forEach(function(el){
+    var cs = window.getComputedStyle(el);
+    if (toCopper(cs.color)) el.style.color = '#ea580c';
+    if (toCopper(cs.borderTopColor)) el.style.borderTopColor = '#ea580c';
+    if (toCopper(cs.borderBottomColor)) el.style.borderBottomColor = '#ea580c';
+  });
+
+  // Numerais tabulares: alinhamento à direita para valores monetários e
+  // percentuais, com font-variant-numeric:tabular-nums, nas colunas de valor.
+  root.querySelectorAll('.roi-val, [style*="text-align:right"]').forEach(function(el){
+    el.style.fontVariantNumeric = 'tabular-nums';
+  });
+}
+
+function generatePDF(fromAdmin, themeMode) {
+  // Design system "Executive Charcoal & Copper": o padrão de exportação agora é o
+  // tema escuro executivo (applyPdfDarkTheme) — o relatório em PDF deixou de ser
+  // convertido para fundo branco por padrão. themeMode:'light' continua disponível
+  // como alternativa explícita (botão secundário), mas não é mais o caminho padrão.
+  var isDark = (themeMode !== 'light');
+
   // Build report content first
   if(fromAdmin) {
     buildReport();
@@ -2463,9 +2991,9 @@ function generatePDF(fromAdmin) {
   // Show loading indicator
   var loadDiv = document.createElement('div');
   loadDiv.id = 'pdf-loading';
-  loadDiv.style.cssText = 'position:fixed;inset:0;background:rgba(20,20,27,0.92);z-index:1000;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:16px';
-  loadDiv.innerHTML = '<div style="width:48px;height:48px;border:3px solid rgba(255,255,255,0.1);border-top-color:#ff5f1f;border-radius:50%;animation:spin 0.8s linear infinite"></div>' +
-    '<div style="font-family:Bai Jamjuree;font-size:14px;color:white">Gerando PDF...</div>' +
+  loadDiv.style.cssText = 'position:fixed;inset:0;background:rgba(15,16,21,0.95);z-index:1000;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:16px';
+  loadDiv.innerHTML = '<div style="width:48px;height:48px;border:3px solid rgba(255,255,255,0.1);border-top-color:#ea580c;border-radius:50%;animation:spin 0.8s linear infinite"></div>' +
+    '<div style="font-family:Bai Jamjuree;font-size:14px;color:white">Gerando PDF ' + (isDark ? '(Dark Mode)' : '') + '...</div>' +
     '<div style="font-size:12px;color:var(--gray2)">Aguarde alguns segundos</div>';
   document.body.appendChild(loadDiv);
 
@@ -2481,7 +3009,18 @@ function generatePDF(fromAdmin) {
   setTimeout(function() {
     var reportEl = document.getElementById('screen-report');
     var wrapper = reportEl.querySelector(':scope > div');
-    var sections = wrapper ? Array.prototype.slice.call(wrapper.children) : [];
+    // Filtra fora do bin-packing os elementos que applyPdfDarkTheme/applyPdfLightTheme
+    // escondem (display:none) no clone usado para a captura real — ex.: a barra de
+    // botões .btn-row.no-print ("Gerar Análise Consultiva"/"Gerar PDF"/"Novo
+    // Diagnóstico"). Eles têm altura real na tela viva (medida abaixo por
+    // getBoundingClientRect), mas renderizam com 0px de altura no clone isolado —
+    // se a nova regra de data-section os isolar numa página só (por não pertencerem
+    // a nenhuma seção), o canvas de 0px gerado quebra o html2canvas/jsPDF
+    // ("Incomplete or corrupt PNG file"). Sem essa regra de seção, o guloso antigo
+    // sempre os fundia com conteúdo real vizinho, escondendo o problema.
+    var sections = wrapper ? Array.prototype.slice.call(wrapper.children).filter(function(el){
+      return !el.matches('.no-print, .btn-row');
+    }) : [];
 
     if(sections.length === 0) {
       document.body.removeChild(loadDiv);
@@ -2489,11 +3028,6 @@ function generatePDF(fromAdmin) {
       return;
     }
 
-    // Canvas gigante (a página inteira de uma vez) sai com o texto "borrado/apagado"
-    // no html2canvas — é uma limitação de qualidade em canvases muito grandes/altos.
-    // Por isso capturamos SEÇÃO POR SEÇÃO (cada card em um canvas pequeno e nítido)
-    // e cada grupo de seções que cabe numa página do PDF já nasce como uma página —
-    // isso também resolve, de graça, o corte de seção no meio entre páginas.
     var CONTENT_PX_WIDTH = 920; // == max-width do wrapper do relatório
     var jsPDFNS = window.jspdf ? window.jspdf.jsPDF : window.jsPDF;
     var pdf = new jsPDFNS({ orientation: 'portrait', unit: 'mm', format: 'a4', compress: true });
@@ -2506,30 +3040,95 @@ function generatePDF(fromAdmin) {
     var heightsPx = sections.map(function(s){ return s.getBoundingClientRect().height; });
 
     // Bin-packing simples: agrupa seções consecutivas até estourar a altura da página.
+    // PAGE_SAFETY_MM: a altura de cada seção é medida no documento vivo (getBoundingClientRect),
+    // mas capturada depois num clone isolado (temp div) — variações sutis de fonte/layout entre
+    // os dois contextos podem fazer o grupo ficar um pouco mais alto do que o estimado aqui. Sem
+    // essa margem, um grupo "quase no limite" passa no teste mas estoura na captura real, e o
+    // fatiamento de segurança do addImagePage (que impede sobreposição no rodapé) acaba cortando
+    // uma lasca ínfima do conteúdo para uma página seguinte quase em branco.
+    var PAGE_SAFETY_MM = 6;
+    // Seções de nível superior (data-section): cada card do relatório carrega um
+    // identificador de qual seção "editorial" ele pertence (gaps, perdas, ganhos,
+    // roi, roadmap, metodo, ultima — ver comentários no index.html). Isso é
+    // DIFERENTE de data-keep-group: keep-group é a granularidade fina que já
+    // existia (permite fatiar uma seção grande em vários cards para o
+    // bin-packing preencher com densidade o espaço de uma página); data-section
+    // é o identificador GROSSO da seção inteira à qual esses cards pertencem, e é
+    // o que a regra abaixo usa para decidir se duas seções DIFERENTES podem
+    // aparecer na mesma página.
+    //
+    // Histórico: uma versão anterior deste algoritmo era puramente gulosa por
+    // espaço, sem NENHUMA restrição de seção — o resultado foi conteúdo de
+    // seções completamente diferentes (ex.: Gaps + Perdas, ou Método + Plano de
+    // Ação Executivo) colado na mesma página sem separação visual, uma
+    // regressão grave de qualidade editorial. Uma versão ainda anterior a essa
+    // forçava quebra de página toda vez que a seção mudava (mesmo dentro do
+    // MESMO data-keep-group), o que deixava páginas com até ~90% de área em
+    // branco quando um grupo pequeno não coubesse no restante da página
+    // anterior.
+    //
+    // A regra atual busca o meio-termo, explícito e fixo (não depende de
+    // heurística de espaço disponível):
+    //   (a) cards da MESMA data-section sempre podem ficar juntos, inclusive
+    //       cruzando páginas quando não cabem todos numa só (o guloso por
+    //       espaço continua valendo DENTRO da mesma seção);
+    //   (b) um card de uma data-section DIFERENTE da que já está acumulada na
+    //       página atual só entra na mesma página se (i) a página atual ainda
+    //       está vazia (não há "troca" de seção, é só o primeiro conteúdo dela)
+    //       OU (ii) o par (seção-atual, seção-nova) está na lista explícita
+    //       SECTION_PAIRS_ALLOWED abaixo;
+    //   (c) fora isso, força quebra de página.
+    // Por especificação do produto, a lista de pares permitidos está VAZIA hoje
+    // — Gaps (Diagnóstico+Gaps), Perdas, Ganhos, ROI e Método(+Pilares
+    // +Depoimentos) já são, cada um, uma única data-section coesa (a coesão
+    // interna deles é resolvida por data-keep-group, não por essa lista); nenhum
+    // desses grupos compartilha página com uma seção diferente, e Roadmap /
+    // Última Página (Plano de Ação+Fluxo+Ecossistema) sempre abrem página nova.
+    // A lista existe como mecanismo genérico para o caso de, no futuro, um par
+    // específico de seções ser deliberadamente autorizado a compartilhar página.
+    var SECTION_PAIRS_ALLOWED = {}; // ex.: {'metodo|ultima': true} se algum dia for permitido
+    function sectionPairKey(a, b) { return a + '|' + b; }
+    function sectionPairAllowed(a, b) {
+      return !!(SECTION_PAIRS_ALLOWED[sectionPairKey(a, b)] || SECTION_PAIRS_ALLOWED[sectionPairKey(b, a)]);
+    }
+
     var pageGroups = [];
-    var cur = [], curHMm = 0;
+    var cur = [], curHMm = 0, curSections = []; // curSections: data-section(s) distintas já na página atual, na ordem em que entraram
     for(var i = 0; i < sections.length; i++) {
       var hMm = heightsPx[i] * mmPerPx;
-      var availMm = pageGroups.length === 0 ? (pageH - margin - 10) : (pageH - margin - margin);
-      if(cur.length > 0 && (curHMm + hMm) > availMm) {
+      var availMm = (pageGroups.length === 0 ? (pageH - margin - 10) : (pageH - margin - margin)) - PAGE_SAFETY_MM;
+      var secId = sections[i].getAttribute('data-section') || ('__sec' + i); // fallback: cada card sem data-section é sua própria seção isolada
+      var lastSec = curSections.length > 0 ? curSections[curSections.length - 1] : null;
+      var sameSection = (lastSec !== null && secId === lastSec);
+      var pageEmpty = (cur.length === 0);
+      var crossSectionAllowed = pageEmpty || sameSection || (lastSec !== null && curSections.length < 2 && sectionPairAllowed(lastSec, secId));
+
+      var forceBreak = (cur.length > 0) && !sameSection && !crossSectionAllowed;
+      var fitsHeight = (curHMm + hMm) <= availMm;
+
+      if(cur.length > 0 && (forceBreak || !fitsHeight)) {
         pageGroups.push(cur);
         cur = [];
         curHMm = 0;
+        curSections = [];
       }
       cur.push(i);
       curHMm += hMm;
+      if(curSections.indexOf(secId) === -1) curSections.push(secId);
     }
     if(cur.length > 0) pageGroups.push(cur);
 
     var pageIdx = 0;
-    var globalPageNum = 0; // numeração real do PDF — inclui a página do Radar antes das seções
+    var globalPageNum = 0;
 
     function finish() {
       var empresa = (S.empresa || 'diagnostico').replace(/[^a-zA-Z0-9]/g, '_');
       var data = (S.data || new Date().toISOString().split('T')[0]);
-      pdf.save('SIIGA_Assessment_' + empresa + '_' + data + '.pdf');
+      var suffix = isDark ? '_DARK_MODE' : '';
+      window.__LAST_PDF_DATA = pdf.output('datauristring');
+      pdf.save('SIIGA_Assessment_' + empresa + suffix + '_' + data + '.pdf');
       document.body.removeChild(loadDiv);
-      showToast('PDF gerado com sucesso!');
+      showToast('PDF ' + (isDark ? 'Dark Mode ' : '') + 'gerado com sucesso!');
     }
 
     function fail(err) {
@@ -2538,48 +3137,80 @@ function generatePDF(fromAdmin) {
       alert('Erro ao gerar PDF. Tente usar o botão Imprimir como alternativa.');
     }
 
-    // Desenha uma única página do PDF a partir de um canvas que já cabe inteiro
-    // na altura útil da página (ver addImagePage para quem garante isso).
-    function drawPageFromCanvas(canvas, hMm) {
-      var wMm = contentWMm;
+    // Desenha uma única página do PDF a partir de um canvas que já cabe inteiro.
+    // wMmOverride/xOffsetOverride: usados pelo caminho de "shrink-to-fit" do
+    // addImagePage() (estouro marginal) para desenhar a imagem um pouco menor e
+    // centralizada horizontalmente, em vez da largura/posição padrão.
+    function drawPageFromCanvas(canvas, hMm, wMmOverride, xOffsetOverride) {
+      var wMm = wMmOverride || contentWMm;
+      var xOffset = xOffsetOverride || margin;
       var imgData = canvas.toDataURL('image/png');
 
       if(globalPageNum > 0) pdf.addPage();
-      pdf.setFillColor(255, 95, 31);
-      pdf.rect(0, 0, pageW, globalPageNum === 0 ? 8 : 3, 'F');
+
+      if(isDark) {
+        pdf.setFillColor(15, 16, 21); // #0f1015 (Executive Charcoal)
+        pdf.rect(0, 0, pageW, pageH, 'F');
+      }
+
+      pdf.setFillColor(234, 88, 12); // #ea580c (Executive Copper)
+      pdf.rect(0, 0, pageW, globalPageNum === 0 ? 6 : 2.5, 'F');
 
       var yPos = globalPageNum === 0 ? 10 : margin;
-      pdf.addImage(imgData, 'PNG', margin, yPos, wMm, hMm);
+      pdf.addImage(imgData, 'PNG', xOffset, yPos, wMm, hMm);
 
       pdf.setFontSize(7);
-      pdf.setTextColor(150, 150, 150);
-      pdf.text('SIIGA Assessment · Agilean · Avaliação de Maturidade', margin, pageH - 4);
+      if(isDark) {
+        pdf.setTextColor(148, 163, 184); // #94a3b8
+      } else {
+        pdf.setTextColor(150, 150, 150);
+      }
+      pdf.text('SIIGA Assessment · Agilean · Avaliação de Maturidade e Gestão' + (isDark ? ' (Executive Dark)' : ''), margin, pageH - 4);
       pdf.text('Página ' + (globalPageNum + 1), pageW - margin - 15, pageH - 4);
 
       globalPageNum++;
     }
 
-    // Adiciona uma página ao PDF a partir de um canvas já capturado (radar ou seção do relatório).
-    // Uma seção do relatório é uma unidade indivisível para o bin-packing (buildPageGroups não
-    // a corta entre páginas) — mas seu conteúdo é dinâmico (ex: roadmap com um item por gap do
-    // diagnóstico) e pode crescer além da altura de uma página A4. Sem este corte, o addImage do
-    // jsPDF desenha a imagem inteira mesmo assim, e o excedente vaza por baixo do rodapé fixo,
-    // sobrepondo texto (bug relatado: seção "SIIGA — Sistema Integrado" sobreposta no PDF).
-    // Por isso: qualquer canvas mais alto que a área útil da página é fatiado em pedaços que
-    // cabem, cada um virando sua própria página — nunca deixa conteúdo vazar sobre o rodapé.
     function addImagePage(canvas) {
       var imgW = canvas.width, imgH = canvas.height;
       var wMm = contentWMm;
       var hMm = (imgH / imgW) * wMm;
-      var maxHmm = pageH - margin * 2 - 6; // reserva espaço pro rodapé fixo (texto em pageH-4)
+      var maxHmm = pageH - margin * 2 - 6;
 
       if(hMm <= maxHmm) {
         drawPageFromCanvas(canvas, hMm);
         return;
       }
 
-      var pxPerMm = imgH / hMm; // escala vertical do canvas (preserva proporção com a largura)
-      var sliceHpx = Math.max(1, Math.floor(maxHmm * pxPerMm));
+      // OVERFLOW_TOLERANCE: o bin-packing decide quantas seções cabem numa página
+      // medindo a altura no DOM vivo (getBoundingClientRect), mas a captura real
+      // acontece depois, num clone isolado (temp div) — pequenas variações de
+      // fonte/layout entre os dois contextos podem fazer um grupo "quase no
+      // limite" (mesmo com a margem de segurança do bin-packing) estourar a
+      // altura da página por poucos milímetros na captura real. Sem essa
+      // tolerância, esse estouro marginal disparava o fatiamento pixel-a-pixel
+      // abaixo, que corta uma última página com só uma lasca ínfima do conteúdo
+      // (ex.: a borda arredondada do fundo de um card) e o resto em branco —
+      // em vez disso, reduz a imagem inteira (uniformemente, sem distorcer) até
+      // caber numa única página quando o estouro é pequeno.
+      var OVERFLOW_TOLERANCE = 1.10;
+      if(hMm <= maxHmm * OVERFLOW_TOLERANCE) {
+        var scale = maxHmm / hMm;
+        var fitWMm = wMm * scale;
+        var fitXOffset = margin + (wMm - fitWMm) / 2;
+        drawPageFromCanvas(canvas, maxHmm, fitWMm, fitXOffset);
+        return;
+      }
+
+      // Estouro genuíno (conteúdo realmente maior que uma página): fatia em
+      // pedaços de altura IGUAL (imgH dividido pelo número de páginas
+      // necessárias), em vez de sempre maximizar o tamanho da fatia — isso evita
+      // que a última fatia sobre pequena/quase vazia quando o total não é um
+      // múltiplo exato da altura de página.
+      var pxPerMm = imgH / hMm;
+      var maxSliceHpx = Math.floor(maxHmm * pxPerMm);
+      var numPages = Math.max(1, Math.ceil(imgH / maxSliceHpx));
+      var sliceHpx = Math.ceil(imgH / numPages);
       var y = 0;
       while(y < imgH) {
         var thisHpx = Math.min(sliceHpx, imgH - y);
@@ -2597,16 +3228,22 @@ function generatePDF(fromAdmin) {
 
       var idxList = pageGroups[pageIdx];
       var temp = document.createElement('div');
-      temp.style.cssText = 'position:fixed;left:-99999px;top:0;width:' + CONTENT_PX_WIDTH + 'px;background:white;';
+      var bgCol = isDark ? '#0f1015' : 'white';
+      temp.style.cssText = 'position:fixed;left:-99999px;top:0;width:' + CONTENT_PX_WIDTH + 'px;background:' + bgCol + ';';
       idxList.forEach(function(i){ temp.appendChild(sections[i].cloneNode(true)); });
       document.body.appendChild(temp);
-      applyPdfLightTheme(temp);
+
+      if(isDark) {
+        applyPdfDarkTheme(temp);
+      } else {
+        applyPdfLightTheme(temp);
+      }
 
       html2canvas(temp, {
         scale: 2,
         useCORS: true,
         allowTaint: true,
-        backgroundColor: '#ffffff'
+        backgroundColor: isDark ? '#0f1015' : '#ffffff'
       }).then(function(canvas) {
         document.body.removeChild(temp);
         addImagePage(canvas);
@@ -2618,27 +3255,17 @@ function generatePDF(fromAdmin) {
       });
     }
 
-    // Radar SIIGA vira a primeira página do PDF — hoje só existia dentro do app,
-    // nunca aparecia no relatório exportado. O <canvas> do gráfico precisa virar
-    // <img> antes de clonar, porque clonar um canvas não copia o desenho.
     function captureRadarPage() {
       return new Promise(function(resolve) {
-        // RADAR_STATE normalmente já existe de quando o usuário passou pela tela
-        // do Radar durante o diagnóstico. Recalcula se faltar (ex: PDF gerado
-        // direto pelo admin) — a função só precisa rodar, não precisa da tela visível.
         if(!RADAR_STATE && typeof buildAndShowRadar === 'function') {
           try { buildAndShowRadar(); showScreen('screen-report'); } catch(e) {}
         }
         var radarCard = document.querySelector('#screen-radar > .card');
         if(!radarCard || !RADAR_STATE) { resolve(null); return; }
 
-        // Clona o card num container isolado (não mexe na tela ao vivo, nem
-        // precisa dela visível). O <canvas> clonado nasce sem desenho — em vez
-        // de copiar o bitmap do gráfico escuro do app, desenhamos um gráfico
-        // NOVO com cores para fundo branco (o do app usa branco/cinza claro
-        // nas grades e rótulos, invisível num PDF de fundo branco).
         var temp = document.createElement('div');
-        temp.style.cssText = 'position:fixed;left:-99999px;top:0;width:' + CONTENT_PX_WIDTH + 'px;background:white;';
+        var bgCol = isDark ? '#0f1015' : 'white';
+        temp.style.cssText = 'position:fixed;left:-99999px;top:0;width:' + CONTENT_PX_WIDTH + 'px;background:' + bgCol + ';';
         var clone = radarCard.cloneNode(true);
         temp.appendChild(clone);
         document.body.appendChild(temp);
@@ -2649,16 +3276,20 @@ function generatePDF(fromAdmin) {
           clonedCanvas.removeAttribute('style');
           clonedCanvas.width = 360;
           clonedCanvas.height = 360;
-          tempChart = drawRadarChart(clonedCanvas, RADAR_STATE, true);
+          tempChart = drawRadarChart(clonedCanvas, RADAR_STATE, isDark ? 'darkPdf' : true);
         }
 
-        applyPdfLightTheme(temp);
+        if(isDark) {
+          applyPdfDarkTheme(temp);
+        } else {
+          applyPdfLightTheme(temp);
+        }
 
         html2canvas(temp, {
           scale: 2,
           useCORS: true,
           allowTaint: true,
-          backgroundColor: '#ffffff'
+          backgroundColor: isDark ? '#0f1015' : '#ffffff'
         }).then(function(canvas) {
           if(tempChart) tempChart.destroy();
           document.body.removeChild(temp);
@@ -2678,13 +3309,13 @@ function generatePDF(fromAdmin) {
   }, 400);
 }
 
-function generatePDFFromAdmin(id) {
+function generatePDFFromAdmin(id, themeMode) {
   var list = getAllDiagnosticos();
   var rec = list.find(function(r){ return r.id === id; });
   if(!rec) return;
   S = rec.state;
   if(!S.ferramentas) S.ferramentas = {planejamento:'',medicao:'',qualidade:'',contratos:'',folha:''};
-  generatePDF(true);
+  generatePDF(true, themeMode);
 }
 
 
@@ -3381,7 +4012,13 @@ async function confirmSave() {
   closeSaveModal();
   clearDraft();
 
-  // Enviar para o Supabase
+  // Enviar para o Supabase — o admin.html lê EXCLUSIVAMENTE do Supabase (não do
+  // localStorage), então um insert que falha silenciosamente torna o diagnóstico
+  // permanentemente invisível no painel, enquanto o consultor acredita que foi salvo.
+  // Por isso o toast de sucesso só aparece se o insert realmente funcionar (ou se o
+  // Supabase nem estiver configurado — nesse caso não há "sync" para falhar, então
+  // o salvamento local já é o resultado esperado). Qualquer falha real de rede/API
+  // mostra um erro explícito, pedindo para tentar salvar novamente.
   if(sbClient) {
     try {
       const { data, error } = await sbClient.from('assessments').insert([{
@@ -3405,24 +4042,34 @@ async function confirmSave() {
       }]);
       if(error) {
         console.error("Erro ao salvar no Supabase:", error);
-      } else {
-        console.log("Salvo no Supabase com sucesso!");
+        showToast('Diagnóstico salvo apenas neste dispositivo — falha ao sincronizar com o painel. Tente salvar novamente.', 'error');
+        return;
       }
+      console.log("Salvo no Supabase com sucesso!");
+      showToast('Diagnóstico salvo com sucesso!');
     } catch(err) {
       console.error("Erro ao conectar com Supabase:", err);
+      showToast('Diagnóstico salvo apenas neste dispositivo — sem conexão com o painel. Tente salvar novamente.', 'error');
+      return;
     }
+  } else {
+    // Supabase não configurado nesta instância — não há sync a falhar; o
+    // salvamento local (já concluído acima) é o comportamento esperado.
+    showToast('Diagnóstico salvo com sucesso!');
   }
-
-  showToast('Diagnóstico salvo com sucesso!');
 }
 
-function showToast(msg) {
+function showToast(msg, type) {
+  var isError = type === 'error';
   var t = document.createElement('div');
   t.textContent = msg;
-  t.style.cssText = 'position:fixed;bottom:24px;left:50%;transform:translateX(-50%);background:#34d399;color:#14141b;padding:10px 20px;border-radius:8px;font-size:13px;font-weight:700;z-index:600;font-family:Bai Jamjuree;box-shadow:0 4px 16px rgba(0,0,0,0.3)';
+  t.style.cssText = 'position:fixed;bottom:24px;left:50%;transform:translateX(-50%);max-width:min(90vw,420px);text-align:center;background:' +
+    (isError ? '#ef4444' : '#34d399') + ';color:' + (isError ? '#fff' : '#14141b') +
+    ';padding:10px 20px;border-radius:8px;font-size:13px;font-weight:700;z-index:600;font-family:Bai Jamjuree;box-shadow:0 4px 16px rgba(0,0,0,0.3)';
   document.body.appendChild(t);
-  setTimeout(function(){ t.style.opacity='0'; t.style.transition='opacity 0.5s'; }, 2000);
-  setTimeout(function(){ document.body.removeChild(t); }, 2600);
+  var holdMs = isError ? 4200 : 2000;
+  setTimeout(function(){ t.style.opacity='0'; t.style.transition='opacity 0.5s'; }, holdMs);
+  setTimeout(function(){ if(t.parentNode) document.body.removeChild(t); }, holdMs + 600);
 }
 
 function formatDate(d) {

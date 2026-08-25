@@ -1,1 +1,4 @@
 .vercel
+node_modules
+scratch/*_pages/
+*.pdf
