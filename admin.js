@@ -320,6 +320,7 @@ function renderTable() {
         '<button onclick="toggleActionMenu(event, ' + index + ')" style="background:none; border:none; color:var(--gray); cursor:pointer; font-size:18px; padding:4px 8px; font-weight:bold; outline:none;">⋮</button>' +
         '<div id="action-menu-' + index + '" class="action-dropdown">' +
           '<a onclick="handleAction(\'view\', ' + index + ')">📄 Detalhes</a>' +
+          '<a onclick="handleAction(\'pdf\', ' + index + ')">🖨️ Gerar PDF</a>' +
           '<a onclick="handleAction(\'edit\', ' + index + ')">✏️ Editar</a>' +
           '<a onclick="handleAction(\'delete\', ' + index + ')" style="color:var(--red);">🗑️ Excluir</a>' +
         '</div>' +
@@ -1263,6 +1264,9 @@ function handleAction(action, index) {
   closeAllActionMenus();
   if (action === 'view') {
     openDetails(index);
+  } else if (action === 'pdf') {
+    var row = filteredData[index];
+    if (row) window.open('/?admin_pdf=' + row.id, '_blank');
   } else if (action === 'edit') {
     openEditModal(index);
   } else if (action === 'delete') {

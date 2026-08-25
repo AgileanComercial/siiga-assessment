@@ -549,6 +549,7 @@
           <p id="modal-subtitle" style="font-size: 13px; color: var(--gray); margin-top: 4px;">Detalhes completos do diagnóstico e lead scoring</p>
         </div>
         <div style="display:flex; align-items:center; gap:14px;">
+          <button onclick="if(currentDetailRow) window.open('/?admin_pdf=' + currentDetailRow.id, '_blank')" style="background:var(--surface); border:1px solid var(--border); color:var(--orange); font-family:var(--font-display); font-size:12px; font-weight:600; padding:8px 14px; border-radius:8px; cursor:pointer;">🖨️ Gerar PDF</button>
           <button onclick="exportLeadQuestionsCSV()" style="background:var(--surface); border:1px solid var(--border); color:var(--orange); font-family:var(--font-display); font-size:12px; font-weight:600; padding:8px 14px; border-radius:8px; cursor:pointer;">📥 Exportar Perguntas (CSV)</button>
           <button class="close-btn" onclick="closeModal()">&times;</button>
         </div>

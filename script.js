@@ -4209,6 +4209,32 @@ function importDiagnostico(input) {
   input.value = '';
 }
 
+// ═══════════════════════════════════════════
+//  GERAÇÃO DE PDF A PARTIR DO ADMIN (siiga.vercel.app/admin)
+// ═══════════════════════════════════════════
+// O admin (admin.html) não carrega este script.js nem o DOM do relatório —
+// por isso, o botão "Gerar PDF" ali abre esta página com ?admin_pdf=<id>,
+// que busca o registro direto no Supabase, popula o estado global S e
+// dispara a mesma geração de PDF usada no fluxo normal do diagnóstico.
+async function checkAdminPdfRequest() {
+  var params = new URLSearchParams(location.search);
+  var id = params.get('admin_pdf');
+  if(!id) return false;
+  if(!sbClient) { alert('Não foi possível conectar ao Supabase para carregar o diagnóstico.'); return true; }
+  try {
+    var result = await sbClient.from('assessments').select('*').eq('id', id).single();
+    if(result.error || !result.data) { alert('Diagnóstico não encontrado (id ' + id + ').'); return true; }
+    S = result.data.state;
+    if(!S.ferramentas) S.ferramentas = {planejamento:'',medicao:'',qualidade:'',contratos:'',folha:''};
+    generatePDF(true);
+  } catch(err) {
+    alert('Erro ao carregar diagnóstico: ' + err.message);
+  }
+  return true;
+}
+
 // Init
-checkAndOfferResume();
+checkAdminPdfRequest().then(function(handled) {
+  if(!handled) checkAndOfferResume();
+});
 if(document.getElementById('c-data')) document.getElementById('c-data').value = new Date().toISOString().split('T')[0];
