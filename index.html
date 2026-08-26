@@ -345,8 +345,9 @@ function maskPhone(input){var d=input.value.replace(/\D/g,'');if(d.length>11)d=d
       <div style="text-align:right;font-size:12px;color:#666" id="rep-meta"></div>
     </div>
 
-    <!-- Executive Snapshot — síntese de diretoria com os 3 KPIs vitais do
-         diagnóstico (Score de Maturidade, Exposição em Risco, Payback Estimado).
+    <!-- Executive Snapshot — síntese de diretoria com os 2 KPIs vitais do
+         diagnóstico (Score de Maturidade, Exposição em Risco). O card "Payback
+         Estimado" foi removido por pedido do usuário (Correções.docx, página 2).
          Preenchido por renderExecutiveSnapshot() em script.js, reaproveitando os
          mesmos cálculos usados no restante do relatório. -->
     <div class="card card-wide rep-mb" id="exec-snapshot" data-section="gaps" style="background:#151720;border:1px solid rgba(255,255,255,0.06)"></div>
@@ -359,9 +360,10 @@ function maskPhone(input){var d=input.value.replace(/\D/g,'');if(d.length>11)d=d
     <div class="card card-wide rep-mb" data-keep-group="gaps" data-section="gaps">
       <div class="rep-sec-title" id="rep-title-gaps">Gaps do Processo Atual</div>
       <p style="font-size:12px;color:#666;margin-bottom:8px">Gaps identificados no diagnóstico e seu impacto na operação atual.</p>
-      <!-- Chamada bi-focal (Seção 5 do plano de narrativa) — preenchida por
-           buildReport() em script.js com o valor real de roi.totalPortfolio. -->
-      <div id="rep-bifocal-gaps" style="font-size:10.5px;color:var(--gray2);line-height:1.5;margin-bottom:14px;padding-bottom:10px;border-bottom:1px dashed #e2e2e2"></div>
+      <!-- Chamada bi-focal removida por pedido do usuário (Correções.docx, página 2):
+           o texto "Visão Estratégica: ... | Visão Operacional: ..." que ficava aqui,
+           entre o parágrafo intro e os 3 KPIs, foi retirado. As outras 4 chamadas
+           bi-focais do relatório (Ganhos, FVS, etc.) não foram alteradas. -->
       <div id="gaps-summary-stats" style="display:grid;grid-template-columns:repeat(3,1fr);gap:10px"></div>
     </div>
 
@@ -385,12 +387,16 @@ function maskPhone(input){var d=input.value.replace(/\D/g,'');if(d.length>11)d=d
       <table class="roi-table" id="roi-table-el"></table>
     </div>
 
-    <!-- Card D: pressupostos do cálculo + composição visual de perdas.
-         O quadro de pressupostos (bloco cinza) some no PDF Resumido — mantém-se só
-         a composição visual (barra + totais por categoria), ver item 9 do pacote
-         de ajustes. -->
-    <div class="card card-wide rep-mb" data-keep-group="perdas" data-section="perdas">
-      <div class="pdf-resumo-hide" style="padding:14px 16px;background:#f8f8f8;border-radius:var(--r3);border:1px solid #e8e8e8">
+    <!-- Card D: pressupostos do cálculo. Some inteiro no PDF Resumido (classe
+         pdf-resumo-hide no próprio card).
+         Antes formava um único card junto com a composição visual de perdas
+         (Card E abaixo); separados em 2 cards para o PDF Detalhado poder mover
+         só a composição para a página 2 (junto do resumo de Gaps) mantendo os
+         pressupostos na página de Perdas — ver remapeamento/reordenação
+         condicionados a mode==='detalhado' em generatePDF() (script.js), mesmo
+         padrão já usado no PDF Resumido para este mesmo card de composição. -->
+    <div class="card card-wide rep-mb pdf-resumo-hide" data-keep-group="perdas" data-section="perdas">
+      <div style="padding:14px 16px;background:#f8f8f8;border-radius:var(--r3);border:1px solid #e8e8e8">
         <div style="font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:0.08em;color:#999;margin-bottom:8px">Pressupostos do cálculo</div>
         <div style="display:grid;grid-template-columns:1fr 1fr;gap:6px">
           <div style="font-size:11px;color:#666">• MO como % do custo da obra: <strong style="color:#333">45%</strong></div>
@@ -403,14 +409,20 @@ function maskPhone(input){var d=input.value.replace(/\D/g,'');if(d.length>11)d=d
         </div>
         <div style="margin-top:10px;font-size:11px;color:#888;font-style:italic">Valores baseados nas planilhas de ROI Agilean e em benchmarks de Lean Construction. Estimativa conservadora — não representa garantia contratual.</div>
       </div>
+    </div>
 
-      <!-- Composição Visual de Perdas x Portfólio -->
-      <div style="margin-top:14px;padding:14px 16px;background:#fff;border-radius:8px;border:1px solid #e2e8f0" id="perdas-composicao-box">
+    <!-- Card E: Composição Visual de Perdas x Portfólio. Card próprio (ver nota
+         no Card D acima) — id="perdas-composicao-card" no <div class="card">
+         para ser localizável direto pelo reordenamento condicional de
+         generatePDF() (script.js), tanto no modo Resumido (já existente) quanto
+         no Detalhado (novo). -->
+    <div class="card card-wide rep-mb" id="perdas-composicao-card" data-keep-group="perdas" data-section="perdas">
+      <div style="padding:14px 16px;background:#fff;border-radius:8px;border:1px solid #e2e8f0" id="perdas-composicao-box">
         <div style="font-family:'Bai Jamjuree';font-size:12px;font-weight:700;color:#14141b;margin-bottom:10px;display:flex;justify-content:space-between;align-items:center">
           <span>📊 Composição da Perda Identificada vs. Portfólio</span>
           <span id="perdas-pct-total" style="color:var(--orange);font-size:11px;font-weight:700"></span>
         </div>
-        <div style="height:12px;width:100%;background:#e2e8f0;border-radius:6px;overflow:hidden;display:flex;margin-bottom:12px" id="perdas-barra-comparativa"></div>
+        <div style="width:100%;height:240px;margin-bottom:12px"><canvas id="perdas-chart-canvas"></canvas></div>
         <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:8px" id="perdas-categorias-grid"></div>
       </div>
     </div>
@@ -424,8 +436,8 @@ function maskPhone(input){var d=input.value.replace(/\D/g,'');if(d.length>11)d=d
          classe de problema). A tabela de rotina (Card A2) fica separada porque seu
          tamanho varia pouco e ela sozinha já é a unidade certa para completar o
          espaço livre de uma página vizinha. -->
-    <div class="card card-wide rep-mb" id="qualitative-section" data-keep-group="ganhos" data-section="ganhos" style="padding:22px 26px;margin-bottom:10px">
-      <div class="rep-sec-title" id="rep-title-ganhos">Ganhos para a Empresa — SIIGA</div>
+    <div class="card card-wide rep-mb" id="qualitative-section" data-keep-group="ganhos" data-section="ganhos" style="padding:22px 26px;margin-bottom:6px">
+      <div class="rep-sec-title" id="rep-title-ganhos">Plano de Ganho de Maturidade Lean — Escopo SIIGA para Empresa</div>
       <p style="font-size:12px;color:#666;margin-bottom:8px" id="rep-sub-ganhos">
         Com base nos gaps identificados, o plano de aumento da maturidade Lean contempla os seguintes ajustes em seus processos, estruturando o método SIIGA e a tecnologia Agilean para estancar perdas e destravar a produtividade da sua operação:
       </p>
@@ -436,8 +448,10 @@ function maskPhone(input){var d=input.value.replace(/\D/g,'');if(d.length>11)d=d
       </div>
     </div>
 
-    <!-- Card A2: Tabela de Transformação da Rotina Operacional -->
-    <div class="card card-wide rep-mb" data-keep-group="ganhos" data-section="ganhos" style="padding:22px 26px;margin-bottom:10px">
+    <!-- Card A2: Tabela de Transformação da Rotina Operacional. id="ganhos-rotina-card"
+         usado por generatePDF() (script.js) pra comprimir padding/fonte SÓ no PDF
+         Resumido (restaurado em finish()/fail()) — Detalhado e tela não mudam. -->
+    <div class="card card-wide rep-mb" id="ganhos-rotina-card" data-keep-group="ganhos" data-section="ganhos" style="padding:22px 26px;margin-bottom:6px">
       <div style="font-family:'Bai Jamjuree';font-size:13px;font-weight:700;color:#14141b;margin-bottom:8px;display:flex;align-items:center;gap:8px">
         <span>🔄</span><span>Transformação da Rotina Operacional — Como sua obra passa a rodar com SIIGA e Agilean</span>
       </div>
@@ -467,7 +481,7 @@ function maskPhone(input){var d=input.value.replace(/\D/g,'');if(d.length>11)d=d
          topo da última página do relatório (barra de escala e autoridade),
          liberando espaço nesta página para o bloco "Ganho Esperado com o SIIGA" a
          seguir e mantendo a página densa e sem vazios. -->
-    <div class="card card-wide rep-mb" data-keep-group="ganhos" data-section="ganhos" style="padding:22px 26px;margin-bottom:10px">
+    <div class="card card-wide rep-mb" id="ganhos-grid-card" data-keep-group="ganhos" data-section="ganhos" style="padding:22px 26px;margin-bottom:6px">
       <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px" id="qualitative-grid"></div>
     </div>
 
@@ -480,19 +494,40 @@ function maskPhone(input){var d=input.value.replace(/\D/g,'');if(d.length>11)d=d
          Card compactado (padding/tipografia reduzidos) e agrupado via
          data-keep-group="ganhos" com os 3 cards acima para caber, os 4 juntos,
          numa única página do PDF — ver bin-packing em generatePDF() (script.js). -->
-    <div class="card card-wide rep-mb" data-keep-group="ganhos" data-section="ganhos" style="background:linear-gradient(135deg,#f0fdf9,#ffffff);border-color:rgba(16,185,129,0.3);padding:18px 22px">
-      <div class="rep-sec-title" style="color:#0d6b45;border-bottom-color:rgba(16,185,129,0.3);margin-bottom:10px">Ganho Esperado com o SIIGA</div>
-      <p style="font-size:11.5px;color:#666;margin-bottom:10px">A mesma oportunidade identificada nos gaps deste diagnóstico — agora na chave de ganho, no portfólio total sob gestão:</p>
-      <div style="display:flex;justify-content:center;margin-bottom:10px">
-        <div style="padding:14px 24px;background:#fff;border-radius:10px;border:1px solid rgba(16,185,129,0.25);display:flex;flex-direction:column;align-items:center;text-align:center;max-width:420px">
+    <!-- id="ganho-esperado-card": no PDF Resumido, generatePDF() (script.js)
+         remove em runtime (com restore em finish()/fail()) o background/borda/
+         padding deste container — some a "moldura" externa do card e o título+
+         intro (classe pdf-resumo-hide abaixo), sobrando só o miolo (sub-card
+         branco com o número). No Detalhado e na tela nada muda: continua com
+         título, intro e moldura verde completos. -->
+    <div class="card card-wide rep-mb" id="ganho-esperado-card" data-keep-group="ganhos" data-section="ganhos" style="background:linear-gradient(135deg,#f0fdf9,#ffffff);border-color:rgba(16,185,129,0.3);padding:14px 18px;margin-bottom:8px">
+      <div class="rep-sec-title pdf-resumo-hide" style="color:#0d6b45;border-bottom-color:rgba(16,185,129,0.3);margin-bottom:7px">Ganho Esperado com o SIIGA</div>
+      <p class="pdf-resumo-hide" style="font-size:11.5px;color:#666;margin-bottom:7px">A mesma oportunidade identificada nos gaps deste diagnóstico — agora na chave de ganho, no portfólio total sob gestão:</p>
+      <div style="display:flex;justify-content:center;margin-bottom:0">
+        <div style="padding:10px 24px;background:#fff;border-radius:10px;border:1px solid rgba(16,185,129,0.25);display:flex;flex-direction:column;align-items:center;text-align:center;max-width:420px">
           <div style="font-size:9.5px;color:#999;text-transform:uppercase;letter-spacing:0.08em;margin-bottom:4px">Capturável no portfólio total</div>
           <div id="ganho-portfolio-valor" style="font-family:'Bai Jamjuree';font-size:26px;font-weight:700;color:#0d6b45;font-variant-numeric:tabular-nums;line-height:1.15">—</div>
           <div style="font-size:10px;color:#777;margin-top:3px;line-height:1.35">Estancamento das perdas identificadas nos gaps de maturidade, ao longo da implantação do SIIGA</div>
         </div>
       </div>
-      <!-- Memória de cálculo analítica — preenchida por renderGanhoEsperado(). Some
-           inteira no PDF Resumido (fica só o número acima), ver item 9. -->
-      <div id="ganho-memoria-calculo" class="pdf-resumo-hide" style="padding:10px 12px;background:rgba(16,185,129,0.05);border-radius:10px;border:1px solid rgba(16,185,129,0.2)"></div>
+    </div>
+
+    <!-- Tabela "Fonte de Ganho" simplificada — só para o PDF Resumido (classe
+         pdf-resumido-only, oposta de pdf-resumo-hide: fica oculta por padrão na
+         tela e no PDF Detalhado, e é exibida SÓ durante a geração do PDF
+         Resumido, ver generatePdfFromReport() em script.js). Reaproveita os
+         MESMOS itens/valores de roi.items já usados na tabela completa (Card C,
+         #roi-table-el) — remove apenas as colunas de memória de cálculo
+         (Pressuposto/Fator), mantendo nome da fonte + valores por obra/portfólio.
+         Preenchida por renderPerdasFonteSimplificada() em script.js. Movida da
+         página de Perdas/Gaps para a página de Ganhos (data-section="ganhos", em
+         vez de remapeamento condicional) por pedido do usuário: no Resumido, faz
+         mais sentido editorial "Fonte de Ganho" ficar junto do bloco de Ganhos +
+         ROI do que junto de Gaps/Perdas. Card próprio (não card-wide) para o
+         bin-packing poder empacotar com o restante do grupo "ganhos". -->
+    <div class="card card-wide rep-mb pdf-resumido-only" id="roi-table-simplificada-card" data-keep-group="ganhos" data-section="ganhos" style="display:none;padding:14px 18px;margin-bottom:6px">
+      <div style="font-family:'Bai Jamjuree';font-size:12px;font-weight:700;color:#14141b;margin-bottom:8px">Fonte de Ganho</div>
+      <table class="roi-table" id="roi-table-simplificada-el" style="width:100%"></table>
     </div>
 
     <!-- 5. ROI REAL ESTIMADO — posicionado IMEDIATAMENTE APÓS o slide de Ganhos,
@@ -503,81 +538,82 @@ function maskPhone(input){var d=input.value.replace(/\D/g,'');if(d.length>11)d=d
          (faixa de retorno + pressupostos) recue e complete o espaço livre da
          página anterior (Ganho Esperado com o SIIGA), que sozinha ficava com
          ~50% de página em branco. -->
-    <div class="card card-wide rep-mb" id="rep-title-roi" data-keep-group="roi" data-section="roi" style="padding:25px 32px;margin-bottom:12px">
-      <div class="rep-sec-title" style="margin-bottom:10px">ROI Real Estimado — Dados da Operação do Cliente</div>
-      <p style="font-size:12px;color:#666;margin-bottom:10px">Cálculo baseado nos dados financeiros e de rotina coletados diretamente neste diagnóstico — não apenas na maturidade medida. Ajuste a mensalidade e o cenário de captura antes de apresentar.</p>
-      <div id="roi2-config" class="no-print" style="display:grid;grid-template-columns:repeat(2,1fr);gap:14px;margin-bottom:8px;max-width:520px"></div>
-      <div id="roi2-summary" style="font-size:11.5px;color:#888"></div>
+    <div class="card card-wide rep-mb" id="rep-title-roi" data-keep-group="roi" data-section="roi" style="padding:14px 20px;margin-bottom:6px">
+      <div class="rep-sec-title" style="margin-bottom:7px">ROI Real Estimado — Dados da Operação do Cliente</div>
+      <!-- Frase de abertura do card de ROI: texto completo (2 frases) é o padrão
+           de tela/Detalhado, com a 2ª frase ("Ajuste a mensalidade...") sendo
+           instrução interna pro consultor — só faz sentido no Detalhado (o
+           documento que ele usa ao vivo). No Resumido (pdf-resumo-hide oculta a
+           2ª frase), o pdf-resumido-only injeta só o ponto final que faltaria. -->
+      <p style="font-size:12px;color:#666;margin-bottom:7px">Cálculo baseado nos dados financeiros e de rotina coletados diretamente neste diagnóstico<span class="pdf-resumido-only" style="display:none">.</span><span class="pdf-resumo-hide"> — não apenas na maturidade medida. Ajuste a mensalidade e o cenário de captura antes de apresentar.</span></p>
+      <div id="roi2-config" class="no-print" style="display:grid;grid-template-columns:repeat(2,1fr);gap:14px;margin-bottom:4px;max-width:520px"></div>
     </div>
 
     <!-- Visão Estratégica/Operacional em card próprio: unidade pequena o bastante
          para recuar e completar o espaço livre da página anterior (Ganho Esperado
          com o SIIGA), que sozinha ficava com ~50% de página em branco. Compactado
          (padding/tabelas mais densos) para caber, junto com os outros 2 cards do
-         grupo "roi", numa única página do PDF. -->
-    <div class="card card-wide rep-mb" data-keep-group="roi" data-section="roi" style="padding:25px 32px;margin-bottom:12px">
+         grupo "roi", numa única página do PDF.
+         O texto "Mensalidade considerada / Cenário" (#roi2-summary) vive AQUI,
+         na mesma linha do título "Visão Estratégica" (flex space-between), em vez
+         de solto acima do card (posição antiga) ou duplicado dentro do card só no
+         Resumido — unificação: antes havia 2 blocos (um pdf-resumo-hide fora do
+         card, outro pdf-resumido-only dentro, alternados por modo) porque cada
+         modo queria essa linha num lugar diferente; agora os dois modos querem o
+         mesmo lugar (ao lado do título), então um único elemento, sempre visível,
+         resolve os dois — sem toggling de modo. Isso também alinha a altura dos
+         títulos "Visão Estratégica"/"Visão Operacional" (mesma linha, mesmo
+         font-size), fazendo os grids de KPI abaixo começarem na mesma altura nas
+         duas colunas. -->
+    <div class="card card-wide rep-mb" data-keep-group="roi" data-section="roi" style="padding:14px 20px;margin-bottom:6px">
       <div style="display:grid;grid-template-columns:1fr 1fr;gap:22px">
         <div>
-          <div style="font-size:11.5px;font-weight:700;text-transform:uppercase;letter-spacing:0.08em;color:#999;margin-bottom:8px">Visão Estratégica</div>
+          <div style="display:flex;align-items:baseline;justify-content:space-between;gap:10px;margin-bottom:5px">
+            <div style="font-size:11.5px;font-weight:700;text-transform:uppercase;letter-spacing:0.08em;color:#999;white-space:nowrap">Visão Estratégica</div>
+            <div id="roi2-summary" style="font-size:9.5px;color:#888;text-align:right"></div>
+          </div>
           <div id="roi2-estrategica"></div>
         </div>
         <div>
-          <div style="font-size:11.5px;font-weight:700;text-transform:uppercase;letter-spacing:0.08em;color:#999;margin-bottom:8px">Visão Operacional</div>
+          <div style="font-size:11.5px;font-weight:700;text-transform:uppercase;letter-spacing:0.08em;color:#999;margin-bottom:5px">Visão Operacional</div>
           <div id="roi2-operacional"></div>
         </div>
       </div>
     </div>
 
-    <div class="card card-wide rep-mb pdf-resumo-hide" data-keep-group="roi" data-section="roi" style="padding:25px 32px">
+    <!-- Faixa de Retorno + Pressupostos: card detalhado-only (pdf-resumo-hide —
+         não existe no Resumido). Compactado (mesmo padrão de padding/margem já
+         aplicado aos 2 cards "roi" acima) para caber, os 3 juntos, numa única
+         página do PDF Detalhado — antes era uma página própria (7ª página) só
+         para este card; com a compactação das páginas de Perdas e Ganhos (que
+         perderam, respectivamente, o card de Composição e o balão de Mitigação
+         de Perdas de Obra) e a mensalidade virando rodapé, sobra espaço
+         suficiente na página de ROI para os 3 cards do grupo "roi" caberem
+         juntos. Se um diagnóstico específico gerar conteúdo alto demais (ex.:
+         muitos gaps elevando a tabela de cenários), o bin-packing por altura
+         (generatePDF() em script.js) empurra este card sozinho para uma 2ª
+         página — não há quebra forçada aqui, só compactação. -->
+    <div class="card card-wide rep-mb pdf-resumo-hide" data-keep-group="roi" data-section="roi" style="padding:14px 20px">
       <!-- Faixa de retorno por cenário -->
-      <div style="margin-bottom:14px">
-        <div style="font-size:11.5px;font-weight:700;text-transform:uppercase;letter-spacing:0.08em;color:#999;margin-bottom:8px">Faixa de retorno por cenário</div>
-        <table class="roi-table" id="roi2-cenarios-table" style="margin-bottom:8px"></table>
-        <div style="font-size:10.5px;color:#888;font-style:italic">Cálculo baseado nas planilhas de ROI Agilean. Estimativa a partir dos dados informados pelo cliente — não representa garantia contratual.</div>
+      <div style="margin-bottom:8px">
+        <div style="font-size:11.5px;font-weight:700;text-transform:uppercase;letter-spacing:0.08em;color:#999;margin-bottom:5px">Faixa de retorno por cenário</div>
+        <table class="roi-table" id="roi2-cenarios-table" style="margin-bottom:5px"></table>
+        <div style="font-size:10px;color:#888;font-style:italic">Cálculo baseado nas planilhas de ROI Agilean. Estimativa a partir dos dados informados pelo cliente — não representa garantia contratual.</div>
       </div>
 
       <!-- Pressupostos acoplados ao mesmo card -->
-      <div style="border-top:1px solid #eee;padding-top:14px;margin-top:12px">
-        <div style="font-size:10.5px;font-weight:700;text-transform:uppercase;letter-spacing:0.08em;color:#999;margin-bottom:8px">Pressupostos do cálculo · dados informados nesta operação</div>
-        <div id="roi2-params-box" style="padding:11px 15px;background:#f8f8f8;border-radius:var(--r3);border:1px solid #e8e8e8;font-size:11px"></div>
+      <div style="border-top:1px solid #eee;padding-top:8px;margin-top:6px">
+        <div style="font-size:10.5px;font-weight:700;text-transform:uppercase;letter-spacing:0.08em;color:#999;margin-bottom:5px">Pressupostos do cálculo · dados informados nesta operação</div>
+        <div id="roi2-params-box" style="padding:9px 13px;background:#f8f8f8;border-radius:var(--r3);border:1px solid #e8e8e8;font-size:10.5px"></div>
       </div>
     </div>
 
-    <!-- 6. SEÇÃO DE ROADMAP DE IMPLEMENTAÇÃO (Logo após ROI Real).
-         Título/contexto e timeline voltaram a ser UM único card: a tentativa
-         anterior de separá-los em 2 cards (para dar granularidade ao
-         bin-packing) tinha o efeito colateral de deixar o card de
-         título+intro (só 2 linhas de texto) sozinho numa página quase em
-         branco sempre que ele não coubesse no restante da página anterior e a
-         timeline (bem maior) fosse para a página seguinte. Como uma unidade
-         só, o bin-packing move o bloco inteiro para a próxima página quando
-         necessário, em vez de deixar o título órfão. -->
-    <div class="card card-wide rep-mb" data-section="roadmap">
-      <div class="rep-sec-title" id="rep-title-roadmap">Roadmap de Implementação SIIGA</div>
-      <p style="font-size:13px;color:#666;margin-bottom:16px">A sequência do SIIGA é inegociável: cada fase depende da anterior. O plano prioriza os gaps de maior impacto do diagnóstico.</p>
-      <!-- Chamada bi-focal — Roadmap (Seção 5 do plano de narrativa). Esta é a
-           linha de maior destaque das 5 (é a "recompensa" do relatório, conforme
-           validado com o usuário), por isso ganha caixa própria em vez do
-           formato compacto usado nas demais 4 seções. -->
-      <div style="display:flex;gap:0;margin-bottom:20px;border-radius:8px;overflow:hidden;border:1px solid rgba(255,95,31,0.2)">
-        <div style="flex:1;padding:14px 18px;background:rgba(255,95,31,0.06)">
-          <div style="font-size:10.5px;font-weight:700;text-transform:uppercase;letter-spacing:0.08em;color:var(--orange);margin-bottom:5px">Visão Estratégica</div>
-          <div style="font-size:12.5px;color:#333;line-height:1.5">"Sequência de implementação com retorno comprovado em cada fase — risco de execução controlado."</div>
-        </div>
-        <div style="flex:1;padding:14px 18px;background:rgba(136,136,136,0.06);border-left:1px solid rgba(255,95,31,0.2)">
-          <div style="font-size:10.5px;font-weight:700;text-transform:uppercase;letter-spacing:0.08em;color:#888;margin-bottom:5px">Visão Operacional</div>
-          <div style="font-size:12.5px;color:#333;line-height:1.5">"Plano passo a passo sem pico de carga sobre a equipe atual, com marcos claros de entrega."</div>
-        </div>
-      </div>
-      <div class="roadmap-tl" id="roadmap-el"></div>
-    </div>
-
-    <!-- Bloco SIIGA — Origem do Método & Garantias.
-         Card independente (era parte do card do roadmap acima): o roadmap tem tamanho
-         variável — cresce com o número de gaps do diagnóstico — e o gerador de PDF trata
-         cada card como uma unidade que não pode ser dividida entre páginas. Com os dois
-         juntos, um roadmap longo empurrava este bloco para além da altura da página,
-         sobrepondo o rodapé. Separados, cada um pagina corretamente por conta própria. -->
+    <!-- Bloco SIIGA — Origem do Método & Garantias. Restaurado do commit e577e33
+         (removido temporariamente durante o experimento de Proposta Comercial
+         separada; decisão final do usuário: 1 único documento, o Diagnóstico).
+         Card independente: o roadmap que antes vinha antes dele foi descartado
+         de vez do Diagnóstico (fica só na ferramenta externa de proposta do
+         usuário), então este card agora vem logo após ROI Real. -->
     <div class="card card-wide rep-mb" data-keep-group="metodo" data-section="metodo">
       <div style="font-family:'Bai Jamjuree';font-size:13px;font-weight:700;color:#14141b;margin-bottom:12px">SIIGA — Sistema Integrado e Inteligente de Gestão Agilean</div>
       <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px">
@@ -608,12 +644,9 @@ function maskPhone(input){var d=input.value.replace(/\D/g,'');if(d.length>11)d=d
       </div>
     </div>
 
-    <!-- Lâmina dos 4 Pilares SIIGA — vetorizada 100% em HTML/CSS nativo (sem
-         imagem PNG estática): 4 colunas verticais editoriais + métricas
-         institucionais inferiores. Card próprio (era parte do bloco "Origem do
-         Método" acima): mesma lógica de granularidade fina para o bin-packing —
-         permite que este bloco combine com o espaço livre remanescente de
-         qualquer página vizinha em vez de ficar preso ao card anterior. -->
+    <!-- Lâmina dos 4 Pilares SIIGA — restaurada do commit e577e33. Idêntica nos
+         dois modos (resumido e detalhado), sem toggling — nunca teve modo resumido
+         separado. -->
     <div class="card card-wide rep-mb" data-keep-group="metodo" data-section="metodo">
       <div>
         <div style="font-size:9.5px;font-weight:700;text-transform:uppercase;letter-spacing:0.08em;color:#999;margin-bottom:10px">Os 4 Pilares SIIGA</div>
@@ -647,14 +680,9 @@ function maskPhone(input){var d=input.value.replace(/\D/g,'');if(d.length>11)d=d
       </div>
     </div>
 
-    <!-- Card C — página institucional 2: Pareceres de Lideranças do Setor
-         (Prova Social Institucional). Título + os 3 depoimentos, lado a lado em
-         3 colunas mais estreitas/verticais (em vez das 2 colunas mais largas de
-         antes), para caber os 3 na mesma largura reunidos no MESMO
-         data-keep-group="metodo" do bloco Método/Pilares acima — objetivo:
-         caber tudo (Origem do Método + Pilares + Pareceres) numa única página
-         do PDF. Padding interno e tipografia dos cards foram reduzidos para
-         manter legibilidade na coluna mais estreita. -->
+    <!-- Pareceres de Lideranças do Setor (Prova Social Institucional) — restaurado
+         do commit e577e33, mesmo data-keep-group="metodo" do bloco Método/Pilares
+         acima. Idêntica nos dois modos. -->
     <div class="card card-wide rep-mb" data-keep-group="metodo" data-section="metodo" style="padding:28px 30px;margin-top:16px">
       <div style="font-family:'Bai Jamjuree';font-size:13.5px;font-weight:700;color:#14141b;letter-spacing:0.04em;text-transform:uppercase;margin-bottom:20px">
         Pareceres de Lideranças do Setor & Resultados Comprovados
@@ -699,7 +727,9 @@ function maskPhone(input){var d=input.value.replace(/\D/g,'');if(d.length>11)d=d
       </div>
     </div>
 
-    <!-- 7. PÁGINA PRÓPRIA: PRÓXIMOS PASSOS & FLUXO CONSTRUTIVO AGILEAN -->
+    <!-- ÚLTIMA PÁGINA: Próximos Passos (Ato 1/2/3) + Fluxo Metodológico + Ecossistema
+         ERP + assinatura — restaurada do commit e577e33 SEM edição de texto (validada
+         visualmente pelo usuário). Idêntica nos dois modos. -->
     <div class="card card-wide rep-mb" id="next-steps-page" data-section="ultima" style="background:#fff">
 
       <!-- Seção Próximos Passos (Ato 1, 2, 3) -->
@@ -714,12 +744,7 @@ function maskPhone(input){var d=input.value.replace(/\D/g,'');if(d.length>11)d=d
     </div>
 
     <!-- Card Y — Infográfico: Gestão do Fluxo Construtivo com o Agilean + Barra de
-         escala e autoridade + Ecossistema ERP + fechamento. Separado do card
-         "Próximos Passos" (Card X) acima pela mesma razão dos demais blocos desta
-         rodada: são 2 unidades de tamanho fixo (não variam por diagnóstico) que o
-         bin-packing pode agora combinar de forma independente com os depoimentos
-         da página institucional 2, em vez de ficarem presas como 1 card gigante
-         de ~230mm que raramente encaixa de forma balanceada com o conteúdo vizinho. -->
+         escala e autoridade + Ecossistema ERP + fechamento. -->
     <div class="card card-wide rep-mb" id="next-steps-page-2" data-section="ultima" style="background:#fff">
       <div>
         <div style="background:#151722;color:#ffffff;padding:16px 22px;border-radius:8px;font-family:'Bai Jamjuree';font-size:13.5px;font-weight:700;letter-spacing:0.06em;text-transform:uppercase;margin-bottom:18px;border:1px solid rgba(255,255,255,0.08);display:flex;align-items:center;justify-content:space-between">
@@ -779,10 +804,7 @@ function maskPhone(input){var d=input.value.replace(/\D/g,'');if(d.length>11)d=d
 
         </div>
 
-        <!-- Barra de escala e autoridade — movida da página de Ganhos para aqui,
-             imediatamente acima de "Ecossistema & Integrações Nativas de ERP", por
-             exigência da ordenação executiva do relatório. Fita escura elegante,
-             divisores sutis, números em cobre — sem elementos lúdicos. -->
+        <!-- Barra de escala e autoridade -->
         <div style="background:#181a24;border:1px solid rgba(255,255,255,0.08);border-radius:10px;padding:18px 10px;margin-top:18px;display:grid;grid-template-columns:repeat(4,1fr)">
           <div style="text-align:center;padding:0 8px;border-right:1px solid rgba(255,255,255,0.08)"><div style="font-family:'Bai Jamjuree';font-weight:700;color:#ea580c;font-size:18px;font-variant-numeric:tabular-nums">+1.500</div><div style="font-size:10.5px;color:#94a3b8;margin-top:3px">Canteiros gerenciados</div></div>
           <div style="text-align:center;padding:0 8px;border-right:1px solid rgba(255,255,255,0.08)"><div style="font-family:'Bai Jamjuree';font-weight:700;color:#ea580c;font-size:18px;font-variant-numeric:tabular-nums">70M m²</div><div style="font-size:10.5px;color:#94a3b8;margin-top:3px">Construídos com Agilean</div></div>
@@ -872,17 +894,7 @@ function maskPhone(input){var d=input.value.replace(/\D/g,'');if(d.length>11)d=d
 
       </div>
 
-      <!-- Bloco de assinatura formal de fechamento da última página — substitui o
-           antigo texto "Sobre este diagnóstico" + chamada bi-focal de Escalabilidade.
-           Duas colunas: quem elaborou (consultor Agilean) e quem, do lado do cliente,
-           é o responsável pela empresa neste diagnóstico (dados já capturados no
-           Bloco 0 do formulário e usados no cabeçalho da 1ª página).
-           Mantido DENTRO do card next-steps-page (em vez de um card próprio) de
-           propósito: é um bloco curto (poucos mm) que, isolado, formaria uma
-           página quase vazia sempre que os depoimentos da página institucional 2
-           empurrassem 1 depoimento extra para a página anterior. Anexado ao card
-           final ele sempre viaja junto com o conteúdo que efetivamente preenche
-           a última página. -->
+      <!-- Bloco de assinatura formal de fechamento da última página. -->
       <div style="margin-top:24px;padding-top:24px;border-top:1px solid rgba(128,128,128,0.25)">
         <div style="display:grid;grid-template-columns:1fr 1fr;gap:30px;max-width:640px;margin:0 auto">
           <div style="text-align:center">
@@ -907,7 +919,56 @@ function maskPhone(input){var d=input.value.replace(/\D/g,'');if(d.length>11)d=d
         <button class="btn btn-p" onclick="generatePDF(false, null, 'resumido')" style="background:#14161f;border:1.5px solid #ff5f1f;color:#ff5f1f;box-shadow:0 0 14px rgba(255,95,31,0.25)" title="Versão enxuta, para entregar ao cliente">📄 Gerar PDF Resumido</button>
         <button class="btn btn-p" onclick="generatePDF(false, null, 'detalhado')" style="background:#14161f;border:1.5px solid #1B4F8A;color:#7fb0ff;box-shadow:0 0 14px rgba(27,79,138,0.25)" title="Versão completa, com tabelas e pressupostos, para apresentação ao vivo">🖥️ Gerar PDF Detalhado</button>
         <button class="btn btn-s" onclick="generatePDF(false, 'light', 'detalhado')" style="font-size:11px" title="Versão alternativa em fundo claro (detalhado)">PDF em fundo claro</button>
+        <button class="btn btn-p" onclick="generateProposta('resumido')" style="background:#14161f;border:1.5px solid #10b981;color:#34d399;box-shadow:0 0 14px rgba(16,185,129,0.2)" title="Proposta Comercial (reunião 2) — versão enxuta">📝 Gerar Proposta Resumida</button>
+        <button class="btn btn-p" onclick="generateProposta('detalhado')" style="background:#14161f;border:1.5px solid #10b981;color:#34d399;box-shadow:0 0 14px rgba(16,185,129,0.2)" title="Proposta Comercial (reunião 2) — versão completa">📝 Gerar Proposta Detalhada</button>
         <button class="btn btn-p" onclick="restartAssessment()">Novo Diagnóstico</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+
+<!-- PROPOSTA COMERCIAL SCREEN (reunião 2) — documento SEPARADO do Diagnóstico
+     (screen-report acima). Ver PLANO_PROPOSTA_COMERCIAL_REUNIAO2.md (raiz do
+     projeto) para o contexto de negócio completo. 6 seções, cada uma com seu
+     próprio data-section (proposta-capa/escopo/investimento/retorno/timeline/
+     termos) — não colidem com os data-section do Diagnóstico (gaps/perdas/
+     ganhos/roi/cta-final), então o bin-packing de generateProposta() (script.js)
+     sempre isola cada seção em seu próprio grupo de páginas. Conteúdo
+     preenchido por buildProposta(mode) — mode 'resumido'/'detalhado', mesmo
+     conceito de profundidade já usado no Diagnóstico. -->
+<div class="screen" id="screen-proposta">
+  <div style="width:100%;max-width:920px">
+
+    <div class="card card-wide rep-mb" id="prop-capa-card" data-section="proposta-capa" style="background:#151720;border:1px solid rgba(255,255,255,0.06)">
+      <div id="prop-capa-container"></div>
+    </div>
+
+    <div class="card card-wide rep-mb" id="prop-escopo-card" data-keep-group="proposta-escopo" data-section="proposta-escopo">
+      <div id="prop-escopo-container"></div>
+    </div>
+
+    <div class="card card-wide rep-mb" id="prop-investimento-card" data-keep-group="proposta-investimento" data-section="proposta-investimento">
+      <div id="prop-investimento-container"></div>
+    </div>
+
+    <div class="card card-wide rep-mb" id="prop-retorno-card" data-keep-group="proposta-retorno" data-section="proposta-retorno">
+      <div id="prop-retorno-container"></div>
+    </div>
+
+    <div class="card card-wide rep-mb" id="prop-timeline-card" data-keep-group="proposta-timeline" data-section="proposta-timeline">
+      <div id="prop-timeline-container"></div>
+    </div>
+
+    <div class="card card-wide rep-mb" id="prop-termos-card" data-section="proposta-termos" style="background:#151720;border:1px solid rgba(255,255,255,0.06);padding:22px 26px">
+      <div id="prop-termos-container"></div>
+    </div>
+
+    <div class="btn-row no-print" style="max-width:920px;justify-content:space-between">
+      <button class="btn btn-s" onclick="showScreen('screen-report')">← Voltar ao Relatório</button>
+      <div style="display:flex;gap:10px;flex-wrap:wrap;justify-content:flex-end">
+        <button class="btn btn-p" onclick="generateProposta('resumido')" style="background:#14161f;border:1.5px solid #10b981;color:#34d399">📝 Gerar Proposta Resumida</button>
+        <button class="btn btn-p" onclick="generateProposta('detalhado')" style="background:#14161f;border:1.5px solid #10b981;color:#34d399">📝 Gerar Proposta Detalhada</button>
       </div>
     </div>
   </div>

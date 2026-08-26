@@ -31,7 +31,7 @@ var S = {
     fluxoPlanejar: 0, fluxoCurto: 0, fluxoMedio: 0, fluxoReprogramar: 0,
     fluxoMedir: 0, fluxoConferir: 0, fluxoERP: 0, fluxoCruzar: 0
   },
-  mensalidade: 2000, captura: 0.50
+  mensalidade: 2000, captura: 0.50, mensalidadeManual: false
 };
 
 var currentBlock = 'b0';
@@ -40,6 +40,7 @@ var phaseOrder = ['f1','f2','f3','f4'];
 var currentPhaseIdx = 0;
 var radarChartInst = null;
 var RADAR_STATE = null; // último dado usado no radar — reaproveitado para desenhar a versão clara do PDF
+var perdasChartInst = null; // instância do gráfico de colunas de "Composição da Perda" — destruída/recriada a cada renderPerdasComposicao()
 
 // Desenha o radar SIIGA num <canvas>. light=true usa cores para fundo branco
 // (usado na exportação do PDF claro); light='darkPdf' usa cores vibrantes para o PDF escuro;
@@ -1489,6 +1490,11 @@ function renderQualitativeGains() {
   }).join('');
 }
 
+// Última Página do Diagnóstico — Plano de Ação Executivo (3 Atos) + citação de
+// fechamento. Restaurado do commit e577e33 SEM edição de texto (validado
+// visualmente pelo usuário). Preenche #next-steps-container (card
+// #next-steps-page, data-section="ultima", em index.html). Igual nos dois
+// modos (resumido e detalhado) — nunca teve modo resumido separado.
 function renderNextSteps() {
   var container = document.getElementById('next-steps-container');
   if (!container) return;
@@ -1508,7 +1514,7 @@ function renderNextSteps() {
   container.innerHTML =
     '<div>' +
       '<div style="font-size:10.5px;font-weight:700;text-transform:uppercase;letter-spacing:0.12em;color:#ea580c;margin-bottom:8px">Plano de Ação Executivo</div>' +
-      '<div style="font-family:\'Bai Jamjuree\';font-size:17px;font-weight:700;color:#ffffff;margin-bottom:14px">Apresentação da Solução Agilean & Próximos Passos</div>' +
+      '<div style="font-family:\'Bai Jamjuree\';font-size:17px;font-weight:700;color:#ffffff;margin-bottom:14px">Apresentação do Projeto de Solução para a ' + empresa + '</div>' +
       '<p style="font-size:13px;color:#cbd5e1;line-height:1.75;margin-bottom:20px">' +
         'Com base no diagnóstico da <strong>' + empresa + '</strong> (' + obras + ' obra(s) no perfil <em>' + tipologiaLabel + '</em> com <em>' + moLabel + '</em>), estruturamos uma demonstração executiva focada nos 3 atos de transformação operacional:' +
       '</p>' +
@@ -1592,23 +1598,44 @@ function renderPerdasComposicao(roi) {
   var pctEl = document.getElementById('perdas-pct-total');
   if (pctEl) pctEl.textContent = fmtNum(perdaTotal) + ' em risco no portfólio';
 
+  // Paleta tonal cobre/laranja (variações de #ea580c, claro → escuro) para
+  // harmonizar as colunas com a identidade visual "Executive Charcoal &
+  // Copper" do resto do relatório, em vez de cores genéricas saturadas
+  // (azul/vermelho/verde/roxo) que destoavam do tema.
   var catColors = {
-    mo: '#ea580c',
-    retrabalho: '#e11d48',
-    time: '#3b82f6',
-    velocidade: '#10b981',
-    erros: '#8b5cf6'
+    mo: '#9a3412',
+    retrabalho: '#c2410c',
+    time: '#fdba74',
+    velocidade: '#fb923c',
+    erros: '#ea580c'
   };
 
-  var barraHtml = '';
+  // Nomes curtos para o eixo X do gráfico de colunas (categorias estreitas não
+  // comportam os labels completos legivelmente). O nome completo continua
+  // aparecendo no grid de cards de texto logo abaixo do gráfico (gridHtml).
+  var catShortLabels = {
+    mo: 'Mão de obra',
+    retrabalho: 'Retrabalhos',
+    time: 'Time de gestão',
+    velocidade: 'Velocidade',
+    erros: 'Erros de medição'
+  };
+
   var gridHtml = '';
+  var labels = [];
+  var values = [];
+  var colors = [];
+  var pcts = [];
 
   roi.items.forEach(function(item) {
     var val = item.portfolio || 0;
     var pct = Math.round((val / perdaTotal) * 100);
     var col = catColors[item.key] || '#64748b';
 
-    barraHtml += '<div style="width:' + pct + '%;background:' + col + ';height:100%" title="' + item.label + ': ' + pct + '%"></div>';
+    labels.push(catShortLabels[item.key] || item.label);
+    values.push(val);
+    colors.push(col);
+    pcts.push(pct);
 
     gridHtml += '<div style="padding:8px 10px;background:#181a24;border-radius:6px;border-left:2.5px solid ' + col + '">' +
       '<div style="font-size:10px;color:#94a3b8;font-weight:600;margin-bottom:2px">' + item.label + '</div>' +
@@ -1616,11 +1643,128 @@ function renderPerdasComposicao(roi) {
     '</div>';
   });
 
-  var barraEl = document.getElementById('perdas-barra-comparativa');
-  if (barraEl) barraEl.innerHTML = barraHtml;
-
   var gridEl = document.getElementById('perdas-categorias-grid');
   if (gridEl) gridEl.innerHTML = gridHtml;
+
+  // Guarda os dados já calculados para o gráfico ser REDESENHADO (não só
+  // "printscreenado") no momento da exportação do PDF — ver uso em
+  // generatePdfFromReport()/renderPage(), que precisa de um desenho com
+  // cores de texto/eixo apropriadas para o card escuro do PDF (ver comentário
+  // em drawPerdasChart sobre o card #perdas-composicao-box ser sempre branco
+  // na tela, mas virar escuro no PDF via applyPdfDarkTheme).
+  window.__LAST_PERDAS_CHART = { labels: labels, values: values, colors: colors, pcts: pcts };
+
+  var chartCanvas = document.getElementById('perdas-chart-canvas');
+  if (chartCanvas && typeof Chart !== 'undefined') {
+    if (perdasChartInst) { perdasChartInst.destroy(); perdasChartInst = null; }
+    perdasChartInst = drawPerdasChart(chartCanvas, labels, values, colors, pcts, false);
+  }
+}
+
+// Desenha o gráfico de colunas de "Composição da Perda Identificada vs.
+// Portfólio" num <canvas>. mode=true (ou 'light') usa cores para fundo
+// branco (exportação do PDF claro); mode='darkPdf' usa cores vibrantes para
+// o PDF escuro; mode=false (padrão) usa o tema do card, que já é sempre
+// claro (#perdas-composicao-box tem fundo branco fixo mesmo no app escuro —
+// ver index.html). Segue o mesmo padrão de drawRadarChart() para manter
+// consistência visual entre os gráficos do relatório.
+function drawPerdasChart(canvasEl, labels, values, colors, pcts, mode) {
+  var isLightPdf = (mode === true || mode === 'light');
+  var isDarkPdf = (mode === 'darkPdf');
+  var isStaticExport = isLightPdf || isDarkPdf;
+
+  // Grid horizontal bem sutil, só para dar profundidade/referência visual —
+  // sem ticks/números (o eixo Y numérico continua escondido: o valor + % de
+  // cada coluna já é desenhado acima dela pelo plugin perdasValueLabels).
+  var gridColor  = isDarkPdf ? 'rgba(255,255,255,0.055)' : 'rgba(0,0,0,0.055)';
+  var tickColor  = isDarkPdf ? 'rgba(255,255,255,0.65)' : 'rgba(0,0,0,0.55)';
+  var labelColor = isDarkPdf ? '#f8fafc' : '#334155';
+
+  return new Chart(canvasEl.getContext('2d'), {
+    type: 'bar',
+    data: {
+      labels: labels,
+      datasets: [{
+        data: values,
+        backgroundColor: colors,
+        borderRadius: 8,
+        borderSkipped: false,
+        barPercentage: 0.62,
+        categoryPercentage: 0.72
+      }]
+    },
+    plugins: [{
+      id: 'perdasValueLabels',
+      afterDatasetsDraw: function(chart) {
+        var ctx = chart.ctx;
+        var meta = chart.getDatasetMeta(0);
+        ctx.save();
+        ctx.font = "700 12px 'Bai Jamjuree', sans-serif";
+        ctx.fillStyle = labelColor;
+        ctx.textAlign = 'center';
+        ctx.textBaseline = 'bottom';
+        meta.data.forEach(function(bar, i) {
+          var label = fmtNum(values[i]) + ' (' + pcts[i] + '%)';
+          ctx.fillText(label, bar.x, bar.y - 6);
+        });
+        ctx.restore();
+      }
+    }],
+    options: {
+      responsive: !isStaticExport,
+      maintainAspectRatio: false,
+      animation: isStaticExport ? false : undefined,
+      layout: { padding: { top: 24 } },
+      scales: {
+        x: {
+          grid: { display: false },
+          border: { display: false },
+          ticks: { color: tickColor, font: { family: 'Bai Jamjuree', size: 12, weight: '600' } }
+        },
+        // Eixo Y: números/ticks escondidos (redundantes com os rótulos
+        // valor+% acima de cada coluna), mas a escala continua ativa para
+        // desenhar um grid horizontal bem tênue (referência visual/profundidade
+        // sem poluir o card).
+        y: {
+          display: true,
+          beginAtZero: true,
+          border: { display: false },
+          ticks: { display: false },
+          grid: { color: gridColor, drawTicks: false }
+        }
+      },
+      plugins: { legend: { display: false }, tooltip: { callbacks: { label: function(ctx){ var i = ctx.dataIndex; return fmtNum(values[i]) + ' (' + pcts[i] + '%)'; } } } }
+    }
+  });
+}
+
+// Versão simplificada da tabela "Fonte de Ganho" (roi-table-el) — usada SÓ no PDF
+// Resumido (ver classe pdf-resumido-only no index.html e a lógica de
+// exibição/ocultação em generatePdfFromReport()). Reaproveita os MESMOS
+// roi.items já calculados por calculateROI()/renderReport principal: mantém
+// nome da fonte + valores por obra/portfólio, removendo as colunas de memória
+// de cálculo (Pressuposto/Fator) que só interessam ao detalhado.
+function renderPerdasFonteSimplificada(roi) {
+  var el = document.getElementById('roi-table-simplificada-el');
+  if (!el || !roi) return;
+  var html = '<thead><tr>' +
+    '<th>Fonte de Ganho</th>' +
+    '<th style="text-align:right">Por obra</th>' +
+    '<th style="text-align:right">Portfólio</th>' +
+    '</tr></thead><tbody>';
+  roi.items.forEach(function(item, i) {
+    html += '<tr style="'+(i%2===0?'background:var(--light)':'')+'">' +
+      '<td>'+item.label+'</td>' +
+      '<td style="text-align:right" class="roi-val">'+fmtNum(item.porObra)+'</td>' +
+      '<td style="text-align:right;font-weight:600" class="roi-val">'+fmtNum(item.portfolio)+'</td>' +
+      '</tr>';
+  });
+  html += '<tr class="roi-total" style="background:#f4f4f6;border-top:2px solid #ddd">' +
+    '<td style="font-weight:700;padding:10px 12px">PERDA FINANCEIRA NO PORTFÓLIO</td>' +
+    '<td style="text-align:right;color:#555;font-weight:600;white-space:nowrap;padding:10px 12px">'+fmtNum(roi.totalPorObra)+' / obra</td>' +
+    '<td style="text-align:right;color:var(--orange);font-weight:700;white-space:nowrap;padding:10px 12px">'+fmtNum(roi.totalPortfolio)+'</td>' +
+    '</tr></tbody>';
+  el.innerHTML = html;
 }
 
 // Preenche o card "Ganho Esperado com o SIIGA" — contraponto em chave de ganho da
@@ -1634,41 +1778,22 @@ function renderGanhoEsperado(roi) {
   if (!portfolioEl || !roi) return;
 
   portfolioEl.textContent = fmtNum(roi.totalPortfolio);
-
-  // Memória de cálculo — demonstra, em linguagem analítica, de onde vem o número
-  // de destaque acima. Não introduz valor novo: apenas decompõe roi.totalPortfolio
-  // (mitigação de perdas de obra) nas mesmas parcelas já usadas na tabela de
-  // Perdas Financeiras. Some inteira no PDF Resumido (classe pdf-resumo-hide no HTML).
-  var memEl = document.getElementById('ganho-memoria-calculo');
-  if (memEl) {
-    var itemEstouro = (roi.items||[]).filter(function(it){ return /estouro|orçamento/i.test(it.label||''); })[0];
-    var itemRetrabalho = (roi.items||[]).filter(function(it){ return /retrabalho/i.test(it.label||''); })[0];
-    var mitigacaoObra = (itemEstouro ? itemEstouro.portfolio : 0) + (itemRetrabalho ? itemRetrabalho.portfolio : 0);
-
-    memEl.innerHTML =
-      '<div style="font-size:9px;font-weight:700;text-transform:uppercase;letter-spacing:0.08em;color:#0d6b45;margin-bottom:6px">Memória de Cálculo — Composição do Ganho</div>' +
-      '<div style="display:flex;justify-content:center">' +
-        '<div style="max-width:420px;text-align:center">' +
-          '<div style="font-size:10px;font-weight:700;color:#333;margin-bottom:2px">Mitigação de Perdas de Obra</div>' +
-          '<div style="font-size:9.5px;color:#666;line-height:1.35">Redução de estouro de orçamento de MO + estancamento de retrabalho de portfólio.</div>' +
-          '<div style="font-family:tabular-nums;font-variant-numeric:tabular-nums;text-align:center;font-size:12px;font-weight:700;color:#0d6b45;margin-top:3px">'+fmtNum(mitigacaoObra)+' no portfólio total</div>' +
-        '</div>' +
-      '</div>';
-  }
+  // Memória de cálculo analítica ("Mitigação de Perdas de Obra") removida deste
+  // card (era rodapé, id="ganho-memoria-calculo") — já não existe no HTML nem
+  // no Resumido (pdf-resumo-hide) nem no Detalhado (feedback do usuário: card
+  // redundante com a tabela "Fonte de Ganho" completa da página de Perdas).
 }
 
-// Executive Snapshot — síntese de diretoria no topo do relatório, com os 3 KPIs
+// Executive Snapshot — síntese de diretoria no topo do relatório, com os 2 KPIs
 // vitais do diagnóstico. Reaproveita os MESMOS cálculos já usados no restante do
-// relatório (score de maturidade das 4 fases, roi.totalPortfolio e o payback do
-// cenário conservador de calcROIReal) — nenhum número novo é inventado aqui.
+// relatório (score de maturidade das 4 fases e roi.totalPortfolio) — nenhum
+// número novo é inventado aqui. O KPI "Payback Estimado" foi removido por pedido
+// do usuário (Correções.docx, página 2) — grid ajustado de 3 para 2 colunas.
 function renderExecutiveSnapshot(totalScore, totalMax, roi, rEstrategica) {
   var el = document.getElementById('exec-snapshot');
   if (!el) return;
   var pct = totalMax ? totalScore/totalMax : 0;
   var nivel = levelFromPct(pct);
-  var paybackTxt = (rEstrategica && isFinite(rEstrategica.estrategica.payback))
-    ? '< ' + Math.ceil(rEstrategica.estrategica.payback) + ' meses'
-    : '—';
 
   var kpi = function(label, value, sub) {
     return '<div style="padding:16px 18px;background:#151720;border:1px solid rgba(255,255,255,0.06);border-radius:10px">' +
@@ -1680,12 +1805,28 @@ function renderExecutiveSnapshot(totalScore, totalMax, roi, rEstrategica) {
 
   el.innerHTML =
     '<div style="font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:0.12em;color:#ea580c;margin-bottom:4px">Executive Snapshot</div>' +
-    '<div style="font-size:12px;color:#94a3b8;margin-bottom:14px">Síntese de diretoria — os três indicadores que definem a urgência e o retorno da decisão.</div>' +
-    '<div style="display:grid;grid-template-columns:repeat(3,1fr);gap:14px">' +
+    '<div style="font-size:12px;color:#94a3b8;margin-bottom:14px">Síntese de diretoria — os indicadores que definem a urgência e o retorno da decisão.</div>' +
+    '<div style="display:grid;grid-template-columns:repeat(2,1fr);gap:14px">' +
       kpi('Score de Maturidade', totalScore+'/'+totalMax, nivel) +
       kpi('Exposição em Risco', fmtNum(roi ? roi.totalPortfolio : 0), 'Perda estimada no portfólio, sem intervenção') +
-      kpi('Payback Estimado', paybackTxt, 'Cenário conservador de captura') +
     '</div>';
+}
+
+// Score de maturidade agregado (0-60, mesma escala/pesos usados em
+// renderExecutiveSnapshot dentro de buildReport()) — extraído como função
+// própria para ser reaproveitado pela Proposta Comercial (Capa +
+// Recapitulação Executiva, seção 1) sem duplicar a soma por fase.
+function getMaturityScoreSummary() {
+  var maxes = {f1:21,f2:9,f3:15,f4:12};
+  var total = 0, max = 0;
+  ['f1','f2','f3','f4'].forEach(function(k) {
+    var arr = S.scores[k];
+    var sum = Array.isArray(arr) ? arr.reduce(function(a,b){return a+(b||0);},0) : 0;
+    total += sum;
+    max += (maxes[k]||0);
+  });
+  var pct = max ? total/max : 0;
+  return { score: total, max: max, pct: pct, nivel: levelFromPct(pct) };
 }
 
 function buildReport() {
@@ -1702,29 +1843,12 @@ function buildReport() {
   var tGaps = document.getElementById('rep-title-gaps');
   if (tGaps) tGaps.textContent = 'Gaps do Processo atual da ' + nomeEmpresa;
 
-  // Chamada bi-focal — Diagnóstico de Gaps (Seção 5 do plano de narrativa).
-  // Reaproveita o mesmo cálculo de roi.totalPortfolio usado na tabela de
-  // Perdas Financeiras logo abaixo — nenhum número novo é inventado aqui.
-  var bifocalGaps = document.getElementById('rep-bifocal-gaps');
-  if (bifocalGaps) {
-    var roiGapsPreview = calculateROI();
-    bifocalGaps.innerHTML =
-      '<strong style="color:#333">Visão Estratégica:</strong> "Exposição de ' + fmtNum(roiGapsPreview.totalPortfolio) + ' em risco no portfólio."' +
-      '<span style="color:#ccc;margin:0 6px">|</span>' +
-      '<strong style="color:#333">Visão Operacional:</strong> "Mapeamento dos gargalos que sobrecarregam sua equipe no dia a dia."';
-  }
-
   var tGanhos = document.getElementById('rep-title-ganhos');
-  if (tGanhos) tGanhos.textContent = 'Ganhos para a ' + nomeEmpresa + ' — SIIGA';
+  if (tGanhos) tGanhos.textContent = 'Plano de Ganho de Maturidade Lean — Escopo SIIGA para ' + nomeEmpresa;
 
   var subGanhos = document.getElementById('rep-sub-ganhos');
   if (subGanhos) {
     subGanhos.textContent = 'Com base nos gaps identificados, o plano de aumento da maturidade Lean para a ' + nomeEmpresa + ' contempla os seguintes ajustes em seus processos, estruturando o método SIIGA e a tecnologia Agilean para estancar perdas e destravar a produtividade da sua operação:';
-  }
-
-  var tRoadmap = document.getElementById('rep-title-roadmap');
-  if (tRoadmap) {
-    tRoadmap.textContent = 'Roadmap de Implementação SIIGA para a ' + nomeEmpresa;
   }
 
   var fechConsultor = document.getElementById('rep-fechamento-consultor');
@@ -1849,6 +1973,7 @@ function buildReport() {
   // ROI table
   var roi = calculateROI();
   renderPerdasComposicao(roi);
+  renderPerdasFonteSimplificada(roi);
   renderGanhoEsperado(roi);
   var roiHtml = '<thead><tr>' +
     '<th>Fonte de Ganho</th>' +
@@ -1893,6 +2018,34 @@ function buildReport() {
   renderExecutiveSnapshot(snapTotalScore, snapTotalMax, roi, window._lastROIReal);
 }
 
+// Motor de precificação — Plano Maestria, coluna "Tabela" (maior valor),
+// fonte: Agilean_Preços Revisados_2026.xlsx / Tabela de Vendas Agilean 2026 ·
+// Semestre 01 (decisão validada em PLANO_PROPOSTA_COMERCIAL_REUNIAO2.md §4.1).
+// Substitui o valor arbitrário que antes pré-preenchia o campo de mensalidade
+// do ROI — o consultor ainda pode sobrescrever manualmente o campo.
+var TABELA_PRECO_MAESTRIA = [
+  { max: 1,          precoPorObra: 2392, label: '1 obra' },
+  { max: 3,          precoPorObra: 2162, label: '2 a 3 obras' },
+  { max: 5,          precoPorObra: 1932, label: '4 a 5 obras' },
+  { max: 7,          precoPorObra: 1702, label: '6 a 7 obras' },
+  { max: 10,         precoPorObra: 1472, label: '8 a 10 obras' },
+  { max: Infinity,   precoPorObra: 1242, label: 'Acima de 10 obras' }
+];
+function precoPorObraPadrao(numObras) {
+  var n = numObras || 1;
+  var faixa = TABELA_PRECO_MAESTRIA.find(function(f){ return n <= f.max; }) || TABELA_PRECO_MAESTRIA[TABELA_PRECO_MAESTRIA.length - 1];
+  return faixa.precoPorObra;
+}
+function calcularMensalidadePadrao(numObras) {
+  return precoPorObraPadrao(numObras) * (numObras || 1);
+}
+
+// Mensalidade padrão usada no ROI do Diagnóstico (não na Proposta Comercial,
+// que continua ancorada na TABELA_PRECO_MAESTRIA real via calcularMensalidadePadrao):
+// pedido do usuário para simplificar a leitura do ROI, evitando que o
+// investimento por obra varie por faixa/nº de obras nesta tela.
+var MENSALIDADE_ROI_POR_OBRA = 2000;
+
 function roiCapturaLabel(fator) {
   var pct = Math.round(fator*100);
   if(pct <= 35) return 'Pessimista';
@@ -1902,9 +2055,26 @@ function roiCapturaLabel(fator) {
 }
 
 function buildROIReal() {
+  var pctMensalidadeOrcamentoFmt = ''; // preenchido no bloco do #roi2-summary, consumido pelo KPI em #roi2-estrategica
   var mensInput = document.getElementById('roi2-mensalidade');
   var capInput = document.getElementById('roi2-captura');
-  if(mensInput) S.mensalidade = mensInput.dataset.raw ? parseInt(mensInput.dataset.raw,10) : parseBRL(mensInput.value);
+  // Mensalidade: pré-preenchida pela tabela de preço padrão (calcularMensalidadePadrao),
+  // mas o consultor pode sobrescrever manualmente — a partir daí o valor digitado
+  // é preservado entre re-renders (ex.: navegação entre telas do relatório), em vez
+  // de voltar a ser sobrescrito a cada chamada. Detecta a edição manual comparando
+  // o valor lido do campo com o último valor que NÓS mesmos preenchemos por padrão
+  // (S._mensalidadeAuto) — se divergem, o consultor mexeu no campo.
+  if(mensInput) {
+    var mensLida = mensInput.dataset.raw ? parseInt(mensInput.dataset.raw,10) : parseBRL(mensInput.value);
+    if(!S.mensalidadeManual && S._mensalidadeAuto !== undefined && mensLida !== S._mensalidadeAuto) {
+      S.mensalidadeManual = true;
+    }
+    S.mensalidade = mensLida;
+  }
+  if(!S.mensalidadeManual) {
+    S.mensalidade = MENSALIDADE_ROI_POR_OBRA * (S.numObras || 1);
+    S._mensalidadeAuto = S.mensalidade;
+  }
   if(capInput && capInput.value !== '') S.captura = Math.max(0.30, Math.min(1, parseFloat(capInput.value)/100));
 
   var r = calcROIReal(S.captura);
@@ -1916,21 +2086,32 @@ function buildROIReal() {
   var pC = function(t){ return '<strong style="color:#1B4F8A">'+t+'</strong>'; };
   var pF = function(t){ return '<span style="color:#888">'+t+'</span>'; };
   var pS = function(t){ return '<strong style="color:var(--orange)">'+t+'</strong>'; };
+  // roiRow: linha de tabela só com Item + Valor — a coluna "Como é calculado"
+  // (2º argumento antigo) foi removida por pedido do usuário (Correções.docx,
+  // página 6) para simplificar a leitura; as fórmulas foram migradas para o
+  // bloco "Pressupostos do Cálculo" (ver roi2-params-box acima). O 2º argumento
+  // (formula) continua aceito nos call sites por compatibilidade, mas é ignorado.
   var roiRow = function(label, formula, val) {
     return '<tr><td style="color:#333;font-size:11.5px">'+label+'</td>' +
-      '<td style="font-size:10.5px;line-height:1.45">'+(formula||'')+'</td>' +
       '<td style="text-align:right;font-weight:600;white-space:nowrap" class="roi-val">'+val+'</td></tr>';
   };
-  var roiLegend = '<div style="display:flex;flex-wrap:wrap;gap:14px;font-size:9.5px;color:#888;margin-bottom:10px">' +
-    '<span>'+pC('■')+' dado informado nesta operação</span>' +
-    '<span>'+pF('■')+' referência de mercado (Agilean/Lean Construction)</span>' +
-    '<span>'+pS('■')+' fator do cenário escolhido</span>' +
-  '</div>';
   // sub: rótulo curto de recorte/escala (ex.: "por mês", "por obra", "no portfólio
   // total") — feedback do CEO: com números em escalas muito diferentes na mesma
   // página, deixar o recorte explícito evita a impressão de que os valores "não batem".
-  var roiCard = function(label, val, sub) {
-    return '<div style="padding:12px 14px;background:var(--light);border-radius:var(--r3)">' +
+  // highlight: quando true, renderiza como o KPI de maior destaque da página —
+  // fundo com leve tingimento cobre, borda cobre mais forte, valor em cobre e em
+  // fonte maior. Usado exclusivamente pelo KPI "Mensalidade / Orçamento"
+  // (feedback do CEO: precisa comunicar "isso aqui é o dado mais importante
+  // desta página", não apenas "mais um card igual aos outros dois").
+  var roiCard = function(label, val, sub, highlight) {
+    if (highlight) {
+      return '<div style="padding:16px 18px;background:linear-gradient(135deg,rgba(234,88,12,0.10),rgba(234,88,12,0.03));border:1.5px solid rgba(234,88,12,0.45);border-radius:var(--r3)">' +
+        '<div style="font-size:10.5px;color:#ea580c;font-weight:700;text-transform:uppercase;letter-spacing:0.07em">'+label+'</div>' +
+        '<div style="font-family:Bai Jamjuree;font-size:26px;font-weight:700;margin-top:3px;color:#ea580c">'+val+'</div>' +
+        (sub ? '<div style="font-size:10px;color:#999;margin-top:3px">'+sub+'</div>' : '') +
+      '</div>';
+    }
+    return '<div style="padding:9px 12px;background:var(--light);border-radius:var(--r3)">' +
       '<div style="font-size:10px;color:#999;text-transform:uppercase;letter-spacing:0.06em">'+label+'</div>' +
       '<div style="font-family:Bai Jamjuree;font-size:18px;font-weight:700;margin-top:2px">'+val+'</div>' +
       (sub ? '<div style="font-size:9.5px;color:#999;margin-top:2px">'+sub+'</div>' : '') +
@@ -1946,18 +2127,28 @@ function buildROIReal() {
         '<input class="text-input" id="roi2-captura" type="number" min="30" max="100" step="5" oninput="buildROIReal()" value="'+Math.round(S.captura*100)+'"></div>';
   }
 
+  // Peso relativo do investimento — métrica de evidência (validada em
+  // PLANO_PROPOSTA_COMERCIAL_REUNIAO2.md §4.1): mensalidade (preço de tabela
+  // por obra) ÷ orçamento médio de UMA obra. Independe de o consultor ter
+  // sobrescrito manualmente o campo de mensalidade: é sempre ancorada no
+  // preço de tabela por obra. Calculada fora do `if(sumEl)` porque também
+  // alimenta o KPI grande renderizado mais abaixo em #roi2-estrategica.
+  var orcamentoMedioAtual = S.orcamentoMedio || 8000000;
+  var precoPorObraAtual = MENSALIDADE_ROI_POR_OBRA;
+  var prazoMedioAtual = S.prazoMedio || 18;
+  var pctMensalidadeOrcamento = orcamentoMedioAtual ? (precoPorObraAtual * prazoMedioAtual / orcamentoMedioAtual) * 100 : 0;
+  pctMensalidadeOrcamentoFmt = pctMensalidadeOrcamento < 0.01
+    ? '< 0,01%'
+    : pctMensalidadeOrcamento.toLocaleString('pt-BR', {maximumFractionDigits: 2}) + '%';
+
   var sumEl = document.getElementById('roi2-summary');
   if(sumEl) {
-    // Peso relativo do investimento — deixa explícito, ao lado da mensalidade e do
-    // cenário, que a mensalidade é um recorte MUITO menor que o orçamento de uma obra
-    // (feedback do CEO: evitar que valores em escalas diferentes pareçam "não bater").
-    var orcamentoMedioAtual = S.orcamentoMedio || 8000000;
-    var pctMensalidadeOrcamento = orcamentoMedioAtual ? (S.mensalidade / orcamentoMedioAtual) * 100 : 0;
-    var pctFmt = pctMensalidadeOrcamento < 0.01
-      ? '< 0,01%'
-      : pctMensalidadeOrcamento.toLocaleString('pt-BR', {maximumFractionDigits: 2}) + '%';
-    sumEl.innerHTML = 'Mensalidade considerada: <strong style="color:#333">'+fmtNum(S.mensalidade)+'/mês</strong> · Cenário: <strong style="color:#333">'+Math.round(S.captura*100)+'% ('+roiCapturaLabel(S.captura)+')</strong>' +
-      '<br>Mensalidade representa <strong style="color:#333">'+pctFmt+'</strong> do orçamento médio de uma obra do portfólio — investimento pontual frente ao valor em risco.';
+    // Exibe o preço por obra (mensalidade média fixa do ROI), não a mensalidade
+    // total do portfólio (S.mensalidade = preço/obra × nº de obras) — pedido do
+    // usuário: esse texto de resumo deve comunicar o investimento de UMA obra,
+    // não o total. S.mensalidade continua intocado e usado normalmente nos
+    // demais cálculos de ROI (ROI Mensal, Payback, tabela "Como é calculado").
+    sumEl.innerHTML = 'Investimento por obra: <strong style="color:#333">'+fmtNum(MENSALIDADE_ROI_POR_OBRA)+'/mês</strong> · Cenário: <strong style="color:#333">'+Math.round(S.captura*100)+'% ('+roiCapturaLabel(S.captura)+')</strong>';
   }
 
   // Parâmetros base informados pelo cliente (alimentam as linhas de R$ abaixo)
@@ -1966,16 +2157,41 @@ function buildROIReal() {
     var color = isMarket ? '#888' : '#1B4F8A';
     return '<div style="font-size:10.5px;color:#666">• '+label+': <strong style="color:'+color+'">'+val+'</strong></div>';
   };
+  // Fórmulas de cálculo — migradas para cá (rodapé "Pressupostos do Cálculo")
+  // das colunas "Como é calculado" que existiam nas tabelas de Visão Estratégica
+  // e Visão Operacional (removidas por pedido do usuário, Correções.docx página
+  // 6, para simplificar a leitura das tabelas). Mantidas aqui, junto do item
+  // correspondente, para quem quiser o detalhe analítico continuar encontrando.
+  var formulaItem = function(label, formula) {
+    return '<div style="font-size:10px;color:#666;line-height:1.5">• <strong style="color:#333">'+label+':</strong> '+formula+'</div>';
+  };
   var paramsEl = document.getElementById('roi2-params-box');
   if(paramsEl) {
     paramsEl.innerHTML =
-      '<div style="font-size:10px;color:#888;margin-bottom:8px">'+pC('■')+' dado informado nesta operação &nbsp; '+pF('■')+' referência de mercado</div>' +
-      '<div style="display:grid;grid-template-columns:1fr 1fr;gap:8px">' +
+      '<div style="font-size:10px;color:#888;margin-bottom:8px">'+pC('■')+' dado informado nesta operação &nbsp; '+pF('■')+' referência de mercado &nbsp; '+pS('■')+' fator do cenário escolhido</div>' +
+      '<div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:10px">' +
         paramItem('Folha de MO própria/mês', fmtNum(S.roi2.folha||0)) +
         paramItem('Custo hora técnica', 'R$ '+ROI_REAL_K.CUSTO_HORA_TECNICA+'/h', true) +
         paramItem('Dias p/ fechar medição/folha hoje', fmtNumBare(diasFechamento)+' dias <span style="color:#999;font-weight:400">(resposta do Bloco MO)</span>') +
         paramItem('Horas/dia dedicadas a esse fechamento', fmtH(S.roi2.hDiaAtual)) +
         paramItem('Horas/semana conferindo qualidade', fmtH(S.roi2.hSemQualidade)) +
+      '</div>' +
+      '<div style="border-top:1px dashed #ddd;padding-top:8px;margin-top:2px">' +
+        '<div style="font-size:9.5px;font-weight:700;text-transform:uppercase;letter-spacing:0.06em;color:#999;margin-bottom:6px">Como é calculado — Visão Estratégica</div>' +
+        formulaItem('Retrabalho administrativo liberado', pC('Dias de fechamento informados')+' × 8h/dia × '+pF('R$115/h')+' × '+pS('fator do cenário')) +
+        formulaItem('Pagamentos por retrabalho evitados', pC('Folha de MO própria informada')+' × '+pF('5% de retrabalho')+' × '+pS('fator do cenário')) +
+        formulaItem('Pagamentos indevidos rastreados', pC('Folha de MO própria informada')+' × '+pF('5% indevidos × 80% sem sobreposição')+' × '+pS('fator do cenário')) +
+        formulaItem('Recuperação financeira total', 'Soma das 3 linhas acima') +
+        formulaItem('Capacidade de gestão liberada', pC('Soma dos 8 fluxos informados')+' (quadro "De onde vêm as horas") × '+pS('fator do cenário')+' × '+pF('R$115/h')) +
+        formulaItem('Investimento Agilean (mensalidade)', 'Valor definido pelo consultor') +
+      '</div>' +
+      '<div style="border-top:1px dashed #ddd;padding-top:8px;margin-top:8px">' +
+        '<div style="font-size:9.5px;font-weight:700;text-transform:uppercase;letter-spacing:0.06em;color:#999;margin-bottom:6px">Como é calculado — Visão Operacional</div>' +
+        formulaItem('Economia nos fluxos de gestão', pC('Soma das horas informadas nos 8 fluxos')+' (quadro "De onde vêm as horas") × '+pF('% de economia por fluxo')) +
+        formulaItem('Fechamento de medição mais rápido', '('+pC('dias × horas/dia informados hoje')+') − (mesmos dados × '+pF('70% de redução SIIGA')+')') +
+        formulaItem('Fim da conferência manual de qualidade', pC('Horas/semana informadas')+' × '+pF('4,33 semanas/mês')) +
+        formulaItem('Desconto de sobreposição entre blocos', 'Soma bruta das linhas acima × '+pF('15% de sobreposição')) +
+        formulaItem('Potencial pleno (antes do fator de captura)', 'Soma bruta − desconto de sobreposição') +
       '</div>';
   }
 
@@ -2001,28 +2217,38 @@ function buildROIReal() {
 
   var estEl = document.getElementById('roi2-estrategica');
   if(estEl) {
+    // A linha "Mensalidade considerada / Cenário" (#roi2-summary) agora vive
+    // sempre na mesma linha do título "Visão Estratégica" (index.html, flex
+    // space-between) — mesmo elemento/posição nos dois modos (Resumido e
+    // Detalhado) e na tela, sem toggling por modo. Antes havia 2 blocos
+    // duplicados (um pdf-resumo-hide solto acima do card, outro
+    // pdf-resumido-only aqui dentro do topo do card) porque cada modo queria a
+    // linha num lugar diferente; unificado porque agora os dois querem o mesmo
+    // lugar (ver comentário em index.html junto ao card "Visão Estratégica").
+    // Os cards "ROI Mensal" e "Payback" foram removidos por pedido do usuário
+    // (Correções.docx, página 6) — sobra só o KPI "Mensalidade/Orçamento" abaixo,
+    // como único destaque desta coluna (mantido o tratamento visual de destaque
+    // que já tinha: cor cobre, fonte grande).
     estEl.innerHTML =
-      '<div style="display:grid;grid-template-columns:repeat(2,1fr);gap:10px;margin-bottom:12px">' +
-        roiCard('ROI Mensal', Math.round(r.estrategica.roi*100)+'%', 'sobre a mensalidade, por mês') +
-        roiCard('Payback', isFinite(r.estrategica.payback) ? fmtNumBare(r.estrategica.payback)+' meses' : '—', 'meses até recuperar o investido') +
+      // KPI "Mensalidade / Orçamento": % da mensalidade (preço de tabela por obra)
+      // sobre o orçamento médio de uma obra do portfólio — o dado mais importante
+      // desta página (feedback do CEO), e agora o ÚNICO destaque da Visão
+      // Estratégica.
+      '<div style="padding-top:0;display:flex;align-items:baseline;justify-content:space-between;gap:10px;margin-bottom:8px">' +
+        '<div>' +
+          '<div style="font-size:9.5px;color:#ea580c;font-weight:700;text-transform:uppercase;letter-spacing:0.06em">Mensalidade / Orçamento</div>' +
+          '<div style="font-size:9px;color:#999;margin-top:1px">mensalidade total do contrato (preço/obra × prazo médio) sobre o orçamento da obra</div>' +
+        '</div>' +
+        '<div style="font-family:Bai Jamjuree;font-size:22px;font-weight:700;color:#ea580c;white-space:nowrap">'+pctMensalidadeOrcamentoFmt+'</div>' +
       '</div>' +
       '<div class="pdf-resumo-hide">' +
-      roiLegend +
-      '<table class="roi-table"><thead><tr><th>Item</th><th>Como é calculado</th><th style="text-align:right">Valor</th></tr></thead><tbody>' +
-        roiRow('Retrabalho administrativo liberado ('+fmtH(r.estrategica.horasAdmLib)+')',
-          pC('Dias de fechamento informados')+' × 8h/dia × '+pF('R$115/h')+' × '+pS('fator do cenário'),
-          fmtNum(r.estrategica.rec1)) +
-        roiRow('Pagamentos por retrabalho evitados',
-          pC('Folha de MO própria informada')+' × '+pF('5% de retrabalho')+' × '+pS('fator do cenário'),
-          fmtNum(r.estrategica.rec2)) +
-        roiRow('Pagamentos indevidos rastreados',
-          pC('Folha de MO própria informada')+' × '+pF('5% indevidos × 80% sem sobreposição')+' × '+pS('fator do cenário'),
-          fmtNum(r.estrategica.rec3)) +
-        roiRow('<strong>Recuperação financeira total</strong>', '<span style="color:#999">Soma das 3 linhas acima</span>', '<strong>'+fmtNum(r.estrategica.recTotal)+'</strong>') +
-        roiRow('Capacidade de gestão liberada ('+fmtH(r.estrategica.horasLib)+')',
-          pC('Soma dos 8 fluxos informados')+' (quadro "De onde vêm as horas") × '+pS('fator do cenário')+' × '+pF('R$115/h'),
-          fmtNum(r.estrategica.valorCapacidade)) +
-        roiRow('Investimento Agilean (mensalidade)', '<span style="color:#999">Valor definido pelo consultor</span>', '− '+fmtNum(S.mensalidade)+'/mês') +
+      '<table class="roi-table"><thead><tr><th>Item</th><th style="text-align:right">Valor</th></tr></thead><tbody>' +
+        roiRow('Retrabalho administrativo liberado ('+fmtH(r.estrategica.horasAdmLib)+')', null, fmtNum(r.estrategica.rec1)) +
+        roiRow('Pagamentos por retrabalho evitados', null, fmtNum(r.estrategica.rec2)) +
+        roiRow('Pagamentos indevidos rastreados', null, fmtNum(r.estrategica.rec3)) +
+        roiRow('<strong>Recuperação financeira total</strong>', null, '<strong>'+fmtNum(r.estrategica.recTotal)+'</strong>') +
+        roiRow('Capacidade de gestão liberada ('+fmtH(r.estrategica.horasLib)+')', null, fmtNum(r.estrategica.valorCapacidade)) +
+        roiRow('Investimento Agilean (mensalidade)', null, '− '+fmtNum(S.mensalidade)+'/mês') +
       '</tbody></table>' +
       '</div>';
   }
@@ -2030,27 +2256,18 @@ function buildROIReal() {
   var opEl = document.getElementById('roi2-operacional');
   if(opEl) {
     opEl.innerHTML =
-      '<div style="display:grid;grid-template-columns:repeat(3,1fr);gap:10px;margin-bottom:12px">' +
+      '<div style="display:grid;grid-template-columns:repeat(3,1fr);gap:10px;margin-bottom:8px">' +
         roiCard('Horas recuperadas/mês', fmtH(r.operacional.hMes), 'no total da operação') +
         roiCard('Horas recuperadas/obra', fmtH(r.operacional.hObra), 'por obra, no mês') +
         roiCard('% da jornada liberada', (Math.round(r.operacional.pctJornada*1000)/10)+'%', 'da jornada individual do time técnico') +
       '</div>' +
       '<div class="pdf-resumo-hide">' +
-      roiLegend +
-      '<table class="roi-table"><thead><tr><th>Item</th><th>Como é calculado</th><th style="text-align:right">Valor</th></tr></thead><tbody>' +
-        roiRow('Economia nos fluxos de gestão',
-          pC('Soma das horas informadas nos 8 fluxos')+' (quadro "De onde vêm as horas") × '+pF('% de economia por fluxo'),
-          fmtH(r.operacional.subtotalFluxos)) +
-        roiRow('Fechamento de medição mais rápido',
-          '('+pC('dias × horas/dia informados hoje')+') − (mesmos dados × '+pF('70% de redução SIIGA')+')',
-          fmtH(r.operacional.fechRapido)) +
-        roiRow('Fim da conferência manual de qualidade',
-          pC('Horas/semana informadas')+' × '+pF('4,33 semanas/mês'),
-          fmtH(r.operacional.fimConf)) +
-        roiRow('Desconto de sobreposição entre blocos',
-          '<span style="color:#999">Soma bruta das linhas acima</span> × '+pF('15% de sobreposição'),
-          '− '+fmtH(r.operacional.descBlocos)) +
-        roiRow('<strong>Potencial pleno (antes do fator de captura)</strong>', '<span style="color:#999">Soma bruta − desconto de sobreposição</span>', '<strong>'+fmtH(r.operacional.potPleno)+'</strong>') +
+      '<table class="roi-table"><thead><tr><th>Item</th><th style="text-align:right">Valor</th></tr></thead><tbody>' +
+        roiRow('Economia nos fluxos de gestão', null, fmtH(r.operacional.subtotalFluxos)) +
+        roiRow('Fechamento de medição mais rápido', null, fmtH(r.operacional.fechRapido)) +
+        roiRow('Fim da conferência manual de qualidade', null, fmtH(r.operacional.fimConf)) +
+        roiRow('Desconto de sobreposição entre blocos', null, '− '+fmtH(r.operacional.descBlocos)) +
+        roiRow('<strong>Potencial pleno (antes do fator de captura)</strong>', null, '<strong>'+fmtH(r.operacional.potPleno)+'</strong>') +
       '</tbody></table>' +
       '</div>';
   }
@@ -2407,115 +2624,182 @@ function calcROIReal(fator) {
   };
 }
 
-function buildRoadmap() {
+// Variante de calcROIReal() que recebe a mensalidade explicitamente em vez de
+// ler S.mensalidade — usada pela Proposta Comercial (seção 4, Retorno
+// Projetado), que precisa recalcular o ROI ancorado no preço de tabela real
+// da proposta (calcularMensalidadePadrao), independente de o consultor ter
+// sobrescrito manualmente o campo de mensalidade na tela de ROI do
+// Diagnóstico (S.mensalidadeManual). Troca S.mensalidade temporariamente
+// (calcROIReal só lê o valor global), chama o cálculo já existente sem
+// duplicar nenhuma fórmula, e restaura o valor original em seguida — nunca
+// deixa efeito colateral no estado global.
+function calcROIRealComMensalidade(fator, mensalidade) {
+  var prev = S.mensalidade;
+  S.mensalidade = mensalidade;
+  var r = calcROIReal(fator);
+  S.mensalidade = prev;
+  return r;
+}
+
+// ── SPRINT LIBRARY — full item sets per phase ───────────────────────────────
+// Hoisted para fora de buildRoadmap() (era uma var local) para ser reaproveitada
+// também pela Proposta Comercial (Escopo de Implementação, seção 2) via
+// selectRoadmapSprints() — mesma lógica de priorização por gap, apresentação
+// diferente (narrativa no Diagnóstico teaser vs. tabela contratual na Proposta).
+// Campos `criterio`/`respAgilean`/`respCliente` adicionados só para a Proposta
+// (o Diagnóstico não os usa) — responsabilidades do lado do cliente são um
+// julgamento plausível de implementação B2B, não uma decisão de negócio
+// validada; ajustar livremente se o time comercial quiser outra redação.
+var ROADMAP_SPRINTS = {
+  f1_critical: {
+    color:'#1B4F8A',
+    title:'Estruturar a base do planejamento',
+    focus:'Os gaps de planejamento identificados impedem que os demais pilares funcionem. A prioridade é criar uma linha de base confiável antes de qualquer outra iniciativa.',
+    items: [
+      'Lean EAP e Dicionário de Pacotes validados — o que inclui, o que exclui e critério de terminalidade por pacote',
+      'Linha de Balanço elaborada com lotes, ritmos e equipes dimensionadas',
+      'Físico-financeiro conectado ao orçamento gerando Curva S confiável',
+      'Cronograma de suprimentos gerado a partir do planejamento — eliminando compras emergenciais',
+      'Análise de viabilidade do prazo contratual com a estrutura atual de equipes'
+    ],
+    prod:'Planejamento estratégico e linha de base',
+    entregavel:'Lean EAP, Linha de Balanço e Curva S implantados e validados com a equipe de planejamento',
+    criterio:'Linha de Balanço e Curva S aprovadas pelo engenheiro responsável, com pacotes de trabalho rastreáveis até o orçamento',
+    respAgilean:'Configuração da plataforma, modelagem da EAP e treinamento da equipe de planejamento',
+    respCliente:'Disponibilizar orçamento analítico atualizado e indicar o responsável técnico pelo planejamento'
+  },
+  f1_medium: {
+    color:'#1B4F8A',
+    title:'Consolidar e integrar o planejamento',
+    focus:'O planejamento existe mas precisa ser conectado ao orçamento e ao canteiro para gerar previsibilidade real.',
+    items: [
+      'Refinamento da Linha de Balanço com ritmos e defasagens validadas',
+      'Curva S e cronograma bancário integrados ao planejamento vigente',
+      'Integração planejamento × suprimentos — compras antecipadas pelo cronograma',
+      'Alinhamento EAP × orçamento para viabilizar físico-financeiro confiável'
+    ],
+    prod:'Planejamento estratégico e linha de base',
+    entregavel:'Planejamento vigente integrado ao orçamento e ao cronograma de suprimentos',
+    criterio:'Curva S física-financeira gerando desvio calculado automaticamente, sem apontamento manual em planilha',
+    respAgilean:'Integração da base de planejamento existente à plataforma e ajuste dos ritmos/lotes',
+    respCliente:'Ceder o planejamento e orçamento vigentes e validar os ritmos/lotes propostos'
+  },
+  f2_critical: {
+    color:'#0D7C8C',
+    title:'Implantar proteção da execução',
+    focus:'Sem lookahead e gestão de restrições, os problemas só aparecem quando já travaram a produção. A obra precisa sair do modo reativo antes de evoluir para o canteiro.',
+    items: [
+      'Lookahead das próximas 4 semanas implantado com responsáveis por restrição',
+      'Gestão de restrições ativa — lista semanal com categoria, responsável e prazo de remoção',
+      'Custo de MO comprometido por pacote para as próximas 2 semanas',
+      'Primeiro ciclo de reprogramação baseado nos desvios identificados',
+      'Rotina de reunião de médio prazo com pauta e saídas estruturadas'
+    ],
+    prod:'Proteção do plano e antecipação de riscos',
+    entregavel:'Lookahead de 4 semanas e gestão de restrições operando com rotina semanal',
+    criterio:'Reunião de médio prazo realizada com lista de restrições ativa e responsável/prazo por item',
+    respAgilean:'Implantação do módulo de lookahead/restrições e facilitação das primeiras reuniões de médio prazo',
+    respCliente:'Indicar responsáveis por restrição (suprimentos, produção, projeto) e garantir presença na rotina semanal'
+  },
+  f2_medium: {
+    color:'#0D7C8C',
+    title:'Fortalecer a proteção da execução',
+    focus:'O lookahead existe mas não está gerando accountability. O foco é transformar a reunião de médio prazo em um ciclo real de decisão.',
+    items: [
+      'Padronização do lookahead com análise de restrições por categoria',
+      'IRR (Índice de Remoção de Restrições) como indicador semanal de acompanhamento',
+      'Ciclo de reprogramação tática com ajuste da Linha de Balanço a cada 30 dias',
+      'Alertas automáticos de pacotes sem MO associada nas próximas 2 semanas'
+    ],
+    prod:'Proteção do plano e antecipação de riscos',
+    entregavel:'IRR semanal ativo e ciclo de reprogramação tática rodando a cada 30 dias',
+    criterio:'IRR calculado automaticamente por, no mínimo, 4 ciclos semanais consecutivos',
+    respAgilean:'Configuração do indicador IRR e do ciclo de reprogramação de 30 dias',
+    respCliente:'Validar categorização de restrições e participar do ciclo mensal de reprogramação'
+  },
+  f3_critical: {
+    color:'#0D6B45',
+    title:'Fazer o planejamento chegar ao canteiro',
+    focus:'O principal gap está entre o que é planejado e o que chega ao dia a dia da obra. O objetivo é criar o ciclo diário e semanal que conecta planejamento e execução.',
+    items: [
+      'Plano semanal com metas por equipe desdobrado do lookahead',
+      'Ritual de check-in e checkout implantado — pauta fixa, até 30 min, causa padrão registrada',
+      'Registro de avanço físico em tempo real — canteiro gera dado, gestão age na semana',
+      'Primeiro PPC semanal por equipe com causas de não cumprimento',
+      'Prévia quinzenal de MO — improdutividade visível antes do fechamento'
+    ],
+    prod:'Gestão integrada de produção e mão de obra',
+    entregavel:'Ritual diário de check-in/checkout e apontamento de avanço em tempo real no canteiro',
+    criterio:'PPC semanal calculado por equipe, com causas de não cumprimento registradas por, no mínimo, 4 semanas',
+    respAgilean:'Treinamento de encarregados/mestres de obra no app de campo e acompanhamento das primeiras semanas',
+    respCliente:'Disponibilizar dispositivos móveis/conectividade no canteiro e liberar a equipe de campo para o treinamento'
+  },
+  f3_medium: {
+    color:'#0D6B45',
+    title:'Fortalecer o ciclo de produção',
+    focus:'O canteiro já tem rotinas, mas o dado gerado ainda não alimenta a gestão com velocidade suficiente. O foco é qualidade do dado e integração com qualidade e MO.',
+    items: [
+      'Vínculo qualidade × pagamento ativado — FVS integrada ao ciclo de medição',
+      'Autoapontamento de avanço com validação do encarregado',
+      'Análise quinzenal de MO improdutiva com plano de ação por funcionário',
+      'PPC semanal com análise de causas acumuladas — Pareto de desvios por frente'
+    ],
+    prod:'Gestão integrada de produção e mão de obra',
+    entregavel:'FVS vinculada à medição e análise quinzenal de improdutividade de MO ativa',
+    criterio:'Nenhuma medição aprovada no período sem FVS associada; Pareto de desvios atualizado a cada quinzena',
+    respAgilean:'Configuração do vínculo FVS × medição e do relatório quinzenal de MO',
+    respCliente:'Definir critérios de qualidade por serviço junto à engenharia e aprovar o fluxo de bloqueio de pagamento'
+  },
+  f4_intro: {
+    color:'#4a4558',
+    title:'Primeiros passos de controle executivo',
+    focus:'Com os pilares anteriores estruturados, os dados já existem para alimentar o ciclo de performance. O foco é criar a reunião de inteligência e o fechamento baseado em evidência.',
+    items: [
+      'Reunião mensal de inteligência com engenharia — análise de prazo, qualidade e custo',
+      'Relatório executivo automático para diretoria com indicadores consolidados',
+      'Pagamento por evidência — sugestão de folha e medição baseada em produção registrada'
+    ],
+    prod:'Controle, performance e inteligência de gestão',
+    entregavel:'Reunião executiva mensal com Performance HUB e sugestão de pagamento por evidência',
+    criterio:'Relatório executivo consolidado gerado automaticamente, sem compilação manual de planilhas',
+    respAgilean:'Configuração do Performance HUB, integração com o fluxo de aprovação e capacitação da diretoria',
+    respCliente:'Indicar o fluxo de aprovação hierárquica vigente e participar da 1ª reunião executiva de validação'
+  },
+  f4_deferred: {
+    deferred:true, color:'#4a4558',
+    title:'Controle e Performance — Mês 4 em diante',
+    focus:null,
+    items: [
+      'Reunião mensal de inteligência com indicadores reais de prazo, custo e qualidade',
+      'Pagamento baseado em evidência de produção com aprovação hierárquica',
+      'Ciclo virtuoso SIIGA operando de forma autônoma'
+    ],
+    prod:'Controle, performance e inteligência de gestão',
+    entregavel:'Ciclo executivo de performance operando de forma autônoma, com dados já maduros dos pilares anteriores',
+    criterio:'Ciclo mensal de inteligência rodando sem intervenção da Agilean por, no mínimo, 2 meses consecutivos',
+    respAgilean:'Suporte contínuo e ajustes finos do Performance HUB conforme maturidade dos dados evolui',
+    respCliente:'Manter a rotina de apontamento em campo e a cadência da reunião executiva mensal'
+  }
+};
+
+// Converte a legenda em dias ("Dias 1–30") usada no Diagnóstico para semanas —
+// formato contratual pedido para a Proposta (seção "Escopo de Implementação").
+var ROADMAP_WEEK_LABELS = ['Semanas 1–4', 'Semanas 5–8', 'Semanas 9–12'];
+var ROADMAP_WEEK_DEFERRED = 'A partir da Semana 13 (Mês 4+)';
+
+// Lógica de seleção/priorização de fases — extraída de buildRoadmap() (antes
+// uma função monolítica que só existia para o Roadmap do Diagnóstico) para ser
+// reaproveitada, sem duplicação, também pela Proposta Comercial. Retorna a
+// MESMA seleção/ordem de fases que o Diagnóstico usava (nenhuma mudança de
+// comportamento), só que como dado puro (sem tocar o DOM) — quem chama decide
+// se apresenta como narrativa (Diagnóstico, hoje desativado) ou como tabela
+// contratual (Proposta).
+function selectRoadmapSprints() {
   var f1p = getAvgPct('f1');
   var f2p = getAvgPct('f2');
   var f3p = getAvgPct('f3');
   var f4p = getAvgPct('f4');
-
-  // ── SPRINT LIBRARY — full item sets per phase ─────────────────────────────
-  var SPRINTS = {
-    f1_critical: {
-      color:'#1B4F8A',
-      title:'Estruturar a base do planejamento',
-      focus:'Os gaps de planejamento identificados impedem que os demais pilares funcionem. A prioridade é criar uma linha de base confiável antes de qualquer outra iniciativa.',
-      items: [
-        'Lean EAP e Dicionário de Pacotes validados — o que inclui, o que exclui e critério de terminalidade por pacote',
-        'Linha de Balanço elaborada com lotes, ritmos e equipes dimensionadas',
-        'Físico-financeiro conectado ao orçamento gerando Curva S confiável',
-        'Cronograma de suprimentos gerado a partir do planejamento — eliminando compras emergenciais',
-        'Análise de viabilidade do prazo contratual com a estrutura atual de equipes'
-      ],
-      prod:'Planejamento estratégico e linha de base'
-    },
-    f1_medium: {
-      color:'#1B4F8A',
-      title:'Consolidar e integrar o planejamento',
-      focus:'O planejamento existe mas precisa ser conectado ao orçamento e ao canteiro para gerar previsibilidade real.',
-      items: [
-        'Refinamento da Linha de Balanço com ritmos e defasagens validadas',
-        'Curva S e cronograma bancário integrados ao planejamento vigente',
-        'Integração planejamento × suprimentos — compras antecipadas pelo cronograma',
-        'Alinhamento EAP × orçamento para viabilizar físico-financeiro confiável'
-      ],
-      prod:'Planejamento estratégico e linha de base'
-    },
-    f2_critical: {
-      color:'#0D7C8C',
-      title:'Implantar proteção da execução',
-      focus:'Sem lookahead e gestão de restrições, os problemas só aparecem quando já travaram a produção. A obra precisa sair do modo reativo antes de evoluir para o canteiro.',
-      items: [
-        'Lookahead das próximas 4 semanas implantado com responsáveis por restrição',
-        'Gestão de restrições ativa — lista semanal com categoria, responsável e prazo de remoção',
-        'Custo de MO comprometido por pacote para as próximas 2 semanas',
-        'Primeiro ciclo de reprogramação baseado nos desvios identificados',
-        'Rotina de reunião de médio prazo com pauta e saídas estruturadas'
-      ],
-      prod:'Proteção do plano e antecipação de riscos'
-    },
-    f2_medium: {
-      color:'#0D7C8C',
-      title:'Fortalecer a proteção da execução',
-      focus:'O lookahead existe mas não está gerando accountability. O foco é transformar a reunião de médio prazo em um ciclo real de decisão.',
-      items: [
-        'Padronização do lookahead com análise de restrições por categoria',
-        'IRR (Índice de Remoção de Restrições) como indicador semanal de acompanhamento',
-        'Ciclo de reprogramação tática com ajuste da Linha de Balanço a cada 30 dias',
-        'Alertas automáticos de pacotes sem MO associada nas próximas 2 semanas'
-      ],
-      prod:'Proteção do plano e antecipação de riscos'
-    },
-    f3_critical: {
-      color:'#0D6B45',
-      title:'Fazer o planejamento chegar ao canteiro',
-      focus:'O principal gap está entre o que é planejado e o que chega ao dia a dia da obra. O objetivo é criar o ciclo diário e semanal que conecta planejamento e execução.',
-      items: [
-        'Plano semanal com metas por equipe desdobrado do lookahead',
-        'Ritual de check-in e checkout implantado — pauta fixa, até 30 min, causa padrão registrada',
-        'Registro de avanço físico em tempo real — canteiro gera dado, gestão age na semana',
-        'Primeiro PPC semanal por equipe com causas de não cumprimento',
-        'Prévia quinzenal de MO — improdutividade visível antes do fechamento'
-      ],
-      prod:'Gestão integrada de produção e mão de obra'
-    },
-    f3_medium: {
-      color:'#0D6B45',
-      title:'Fortalecer o ciclo de produção',
-      focus:'O canteiro já tem rotinas, mas o dado gerado ainda não alimenta a gestão com velocidade suficiente. O foco é qualidade do dado e integração com qualidade e MO.',
-      items: [
-        'Vínculo qualidade × pagamento ativado — FVS integrada ao ciclo de medição',
-        'Autoapontamento de avanço com validação do encarregado',
-        'Análise quinzenal de MO improdutiva com plano de ação por funcionário',
-        'PPC semanal com análise de causas acumuladas — Pareto de desvios por frente'
-      ],
-      prod:'Gestão integrada de produção e mão de obra'
-    },
-    f4_intro: {
-      color:'#4a4558',
-      title:'Primeiros passos de controle executivo',
-      focus:'Com os pilares anteriores estruturados, os dados já existem para alimentar o ciclo de performance. O foco é criar a reunião de inteligência e o fechamento baseado em evidência.',
-      items: [
-        'Reunião mensal de inteligência com engenharia — análise de prazo, qualidade e custo',
-        'Relatório executivo automático para diretoria com indicadores consolidados',
-        'Pagamento por evidência — sugestão de folha e medição baseada em produção registrada'
-      ],
-      prod:'Controle, performance e inteligência de gestão'
-    },
-    f4_deferred: {
-      deferred:true, color:'#4a4558',
-      title:'Controle e Performance — Mês 4 em diante',
-      focus:null,
-      items: [
-        'Reunião mensal de inteligência com indicadores reais de prazo, custo e qualidade',
-        'Pagamento baseado em evidência de produção com aprovação hierárquica',
-        'Ciclo virtuoso SIIGA operando de forma autônoma'
-      ],
-      prod:'Controle, performance e inteligência de gestão'
-    }
-  };
-
-  // ── PLAN SELECTION LOGIC ──────────────────────────────────────────────────
-  var sprints = [];
+  var SPRINTS = ROADMAP_SPRINTS;
   var f4Note = null;
 
   // Check if client did a focused diagnosis with priority order
@@ -2617,7 +2901,19 @@ function buildRoadmap() {
     }
   });
 
-  sprints = sprintDefs;
+  return { sprintDefs: sprintDefs, f4Note: f4Note };
+}
+
+function buildRoadmap() {
+  // Roadmap de Implementação removido do Diagnóstico (migrou para a futura
+  // Proposta Comercial — reunião 2). O elemento #roadmap-el não existe mais
+  // no HTML do Diagnóstico; sem esta guarda o innerHTML final do arquivo
+  // quebraria com "Cannot set properties of null".
+  if (!document.getElementById('roadmap-el')) return;
+
+  var sel = selectRoadmapSprints();
+  var sprints = sel.sprintDefs;
+  var f4Note = sel.f4Note;
 
   // ── RENDER ────────────────────────────────────────────────────────────────
   var html = '';
@@ -2666,7 +2962,7 @@ function restartAssessment() {
     ferramentas:{planejamento:'',medicao:'',qualidade:'',contratos:'',folha:''},
     scores:{b03:0,f1:[0,0,0,0,0,0,0,0],f2:[0,0,0,0],f3:[0,0,0,0,0,0],mo:{},f4:[0,0,0,0,0]},showMO:false,
     roi2:{folha:0,hDiaAtual:0,hSemQualidade:0,fluxoPlanejar:0,fluxoCurto:0,fluxoMedio:0,fluxoReprogramar:0,fluxoMedir:0,fluxoConferir:0,fluxoERP:0,fluxoCruzar:0},
-    mensalidade:2000, captura:0.50};
+    mensalidade:2000, captura:0.50, mensalidadeManual:false};
   currentBlock='b0'; currentQIdx=0; currentPhaseIdx=0; phaseOrder=['f1','f2','f3','f4'];
   radarChartInst=null;
   document.getElementById('c-empresa').value='';
@@ -2876,7 +3172,7 @@ function applyPdfDarkTheme(root) {
   root.querySelectorAll('.rep-ins-card .rt').forEach(function(e){ e.style.color = '#cbd5e1'; });
 
   // ROI Summary Inputs & ROI metric cards
-  root.querySelectorAll('#roi-inputs > div, #roi2-estrategica > div > div, #roi2-operacional > div > div').forEach(function(box){
+  root.querySelectorAll('#roi-inputs > div, .roi-kpi-grid > div, #roi2-operacional > div > div').forEach(function(box){
     box.style.background = '#1a1c26';
     box.style.border = '1px solid rgba(255,255,255,0.06)';
     box.style.color = '#ffffff';
@@ -2935,12 +3231,6 @@ function applyPdfDarkTheme(root) {
   root.querySelectorAll('[style*="background:#14141b"], [style*="background: #14141b"]').forEach(function(el){
     el.style.background = '#12141c';
     el.style.border = '1px solid rgba(255,255,255,0.08)';
-  });
-
-  // Next steps callout
-  root.querySelectorAll('#next-steps-container').forEach(function(el){
-    el.style.background = 'rgba(234,88,12,0.05)';
-    el.style.border = '1.5px solid rgba(234,88,12,0.25)';
   });
 
   // Text color adjustments for high contrast and elegance
@@ -3047,6 +3337,144 @@ function generatePDF(fromAdmin, themeMode, mode) {
       hiddenEls.forEach(function(h){ h.el.style.display = h.prevDisplay; });
     }
 
+    // PDF Resumido: compressão (só dimensionamento — padding/margem/fonte, nunca
+    // conteúdo/linhas) dos blocos de Ganhos que já existiam (título+intro,
+    // tabela "Transformação da Rotina Operacional", grid 2x2 de ganhos
+    // qualitativos) e do card "Ganho Esperado com o SIIGA" (moldura/título
+    // removidos, ver pdf-resumo-hide em index.html — aqui só o padding externo).
+    // Abre espaço na página de Ganhos pra caber, junto, a tabela "Fonte de
+    // Ganho" (movida pra cá numa rodada anterior) sem estourar pra uma 5ª
+    // página no PDF Resumido. Mesmo padrão de mutação de estilo inline + restore
+    // em finish()/fail() já usado em hiddenEls acima. Só no Resumido — o
+    // Detalhado (e a tela) não são tocados.
+    var compressedEls = [];
+    function compressStyle(selector, styles, all) {
+      var els = all ? document.querySelectorAll(selector) : [document.querySelector(selector)];
+      Array.prototype.forEach.call(els, function(el){
+        if (!el) return;
+        var prev = {};
+        Object.keys(styles).forEach(function(k){ prev[k] = el.style[k]; el.style[k] = styles[k]; });
+        compressedEls.push({ el: el, prev: prev });
+      });
+    }
+    if (isResumido) {
+      compressStyle('#qualitative-section', { padding: '12px 16px', marginBottom: '4px' });
+      compressStyle('#qualitative-section p', { marginBottom: '5px', fontSize: '10.5px' });
+      compressStyle('#ganhos-rotina-card', { padding: '12px 16px' });
+      compressStyle('#ganhos-rotina-card .roi-table th', { padding: '4px 7px', fontSize: '8.5px' }, true);
+      compressStyle('#ganhos-rotina-card .roi-table td', { padding: '5px 7px', fontSize: '9.5px' }, true);
+      compressStyle('#ganhos-grid-card', { padding: '12px 16px' });
+      compressStyle('#qualitative-grid', { gap: '8px' });
+      compressStyle('#qualitative-grid > div', { padding: '8px 10px' }, true);
+      compressStyle('#ganho-esperado-card', { background: 'none', border: 'none', boxShadow: 'none', padding: '4px 0 4px 0' });
+    }
+    function restoreCompressed() {
+      compressedEls.forEach(function(c){
+        Object.keys(c.prev).forEach(function(k){ c.el.style[k] = c.prev[k]; });
+      });
+    }
+
+    // PDF Resumido: os elementos .no-print aninhados DENTRO de um card (ex.: o
+    // grid de inputs #roi2-config, editável só na tela) já são escondidos no
+    // CLONE isolado usado pra captura (ver applyPdfDarkTheme/applyPdfLightTheme,
+    // que rodam só no clone) — mas continuam com altura real no documento vivo,
+    // que é o que o bin-packing mede (heightsPx abaixo) pra decidir se dois
+    // grupos cabem juntos numa página. Isso infla artificialmente a altura
+    // estimada de qualquer card que contenha um .no-print (ex.: o card "ROI Real
+    // Estimado" contém #roi2-config), fazendo o bin-packing separar em duas
+    // páginas um conteúdo que na imagem final já cabia junto. Escondido aqui, no
+    // documento vivo, ANTES de medir — mesmo padrão de hiddenEls acima —
+    // restaurado em finish()/fail(). Só no resumido: no detalhado o
+    // comportamento (e a paginação) continuam exatamente como já eram.
+    var hiddenNoPrintEls = [];
+    if (isResumido) {
+      Array.prototype.forEach.call(document.querySelectorAll('.card .no-print, .card-wide .no-print'), function(el){
+        hiddenNoPrintEls.push({ el: el, prevDisplay: el.style.display });
+        el.style.display = 'none';
+      });
+    }
+    function restoreHiddenNoPrint() {
+      hiddenNoPrintEls.forEach(function(h){ h.el.style.display = h.prevDisplay; });
+    }
+
+    // PDF Resumido: mostra os blocos marcados com a classe pdf-resumido-only
+    // (oposta de pdf-resumo-hide acima) — hoje só o card da tabela simplificada
+    // "Fonte de Ganho" (id="roi-table-simplificada-card", data-section="ganhos",
+    // fisicamente posicionado junto ao bloco de Ganhos no index.html). Ficam
+    // ocultos por padrão (display:none inline no index.html) tanto na tela
+    // quanto no PDF Detalhado; só aparecem durante a captura do PDF Resumido.
+    // Restaurado em finish()/fail(), mesmo padrão de hiddenEls.
+    var shownEls = [];
+    if (isResumido) {
+      Array.prototype.forEach.call(document.querySelectorAll('.pdf-resumido-only'), function(el){
+        shownEls.push({ el: el, prevDisplay: el.style.display });
+        // SPAN inline (ex.: complemento de frase curto no card de ROI) precisa
+        // de display:inline para não quebrar o fluxo do parágrafo; blocos
+        // maiores (ex.: card "Fonte de Ganho") precisam de display:block.
+        el.style.display = (el.tagName === 'SPAN' ? 'inline' : 'block');
+      });
+    }
+    function restoreResumidoShown() {
+      shownEls.forEach(function(h){ h.el.style.display = h.prevDisplay; });
+    }
+
+    // PDF Resumido (só neste modo): funde duas páginas isoladas nas páginas
+    // vizinhas remapeando temporariamente o data-section de cards específicos
+    // ANTES do bin-packing (que decide quebra de página só olhando data-section
+    // fixo) — e restaura os valores originais em finish()/fail(), mesmo padrão
+    // já usado acima para os blocos pdf-resumo-hide. Confirmado com o usuário:
+    // essa fusão vale SÓ pro resumido; o detalhado mantém 'perdas' e 'roi' como
+    // seções de página própria, cheias de tabelas/pressupostos.
+    //   (1) o card "Composição da Perda Identificada vs. Portfólio" (o único
+    //       card de data-section="perdas" que sobrevive no resumido, o resto é
+    //       pdf-resumo-hide) passa a contar como data-section="gaps", juntando
+    //       com Executive Snapshot/Diagnóstico/Gaps.
+    //   (2) os cards de ROI resumido (data-section="roi" que sobrevivem ao
+    //       pdf-resumo-hide: título+KPIs de Visão Estratégica e Visão
+    //       Operacional) passam a contar como data-section="ganhos", juntando
+    //       com o bloco de Ganhos.
+    // Nota: remapeia TODOS os cards de data-section="perdas"/"roi", inclusive os
+    // que já ficam com display:none pelo pdf-resumo-hide acima (não só os que
+    // sobrevivem no resumido) — mesmo escondidos, eles continuam entrando no
+    // array `sections` do bin-packing (só ficam com altura 0), e se sobrar um
+    // com o data-section ORIGINAL entre dois cards já remapeados, a troca de
+    // seção "fantasma" força uma quebra de página para um grupo de 0px de
+    // altura, quebrando o html2canvas ("Incomplete or corrupt PNG file").
+    var remappedSections = [];
+    if (isResumido) {
+      Array.prototype.forEach.call(document.querySelectorAll('[data-section="perdas"]'), function(el){
+        remappedSections.push({ el: el, prev: el.getAttribute('data-section') });
+        el.setAttribute('data-section', 'gaps');
+      });
+      Array.prototype.forEach.call(document.querySelectorAll('[data-section="roi"]'), function(el){
+        remappedSections.push({ el: el, prev: el.getAttribute('data-section') });
+        el.setAttribute('data-section', 'ganhos');
+      });
+    }
+    function restoreRemappedSections() {
+      remappedSections.forEach(function(r){ r.el.setAttribute('data-section', r.prev); });
+    }
+
+    // PDF Detalhado (só neste modo): move SÓ o card "Composição da Perda
+    // Identificada vs. Portfólio" (id="perdas-composicao-card") para a página
+    // de Gaps — mesmo objetivo do remapeamento acima (Resumido), mas aqui
+    // remapeia um único card por id em vez de TODOS os `[data-section="perdas"]`:
+    // no Detalhado a tabela completa "Fonte de Ganho" (roi-table-el) e o quadro
+    // de Pressupostos do cálculo continuam, intactos, na própria página de
+    // Perdas Financeiras — só a Composição sai de lá.
+    var isDetalhado = (mode === 'detalhado');
+    var remappedSectionsDetalhado = [];
+    if (isDetalhado) {
+      var composicaoCardDet = document.getElementById('perdas-composicao-card');
+      if (composicaoCardDet) {
+        remappedSectionsDetalhado.push({ el: composicaoCardDet, prev: composicaoCardDet.getAttribute('data-section') });
+        composicaoCardDet.setAttribute('data-section', 'gaps');
+      }
+    }
+    function restoreRemappedSectionsDetalhado() {
+      remappedSectionsDetalhado.forEach(function(r){ r.el.setAttribute('data-section', r.prev); });
+    }
+
     var reportEl = document.getElementById('screen-report');
     var wrapper = reportEl.querySelector(':scope > div');
     // Filtra fora do bin-packing os elementos que applyPdfDarkTheme/applyPdfLightTheme
@@ -3062,8 +3490,51 @@ function generatePDF(fromAdmin, themeMode, mode) {
       return !el.matches('.no-print, .btn-row');
     }) : [];
 
+    // PDF Resumido (só neste modo): reordena o card "Composição da Perda
+    // Identificada vs. Portfólio" para logo APÓS o card do resumo de Gaps (3
+    // estatísticas, #gaps-summary-stats) e ANTES da tabela de Gaps
+    // (#opp-table-card) — só na lista `sections` que alimenta o bin-packing,
+    // sem mexer na ordem real do DOM (o card de Composição continua fisicamente
+    // depois da tabela de Gaps no documento; só a ordem de PROCESSAMENTO muda).
+    // Isso faz a Composição da Perda cair na mesma página do resumo de Gaps
+    // (ambos leves) em vez de ficar colada com a tabela de Gaps (grande) — a
+    // tabela, sozinha, cai naturalmente para a página seguinte. No detalhado a
+    // ordem do DOM é mantida como está (sections não é tocado).
+    if (isResumido) {
+      var composicaoInner = document.getElementById('perdas-composicao-box');
+      var composicaoCard = composicaoInner ? composicaoInner.closest('.card') : null;
+      var oppTableCard = document.getElementById('opp-table-card');
+      if (composicaoCard && oppTableCard) {
+        var composicaoIdx = sections.indexOf(composicaoCard);
+        var oppTableIdx = sections.indexOf(oppTableCard);
+        if (composicaoIdx > oppTableIdx && oppTableIdx !== -1) {
+          sections.splice(composicaoIdx, 1);
+          sections.splice(oppTableIdx, 0, composicaoCard);
+        }
+      }
+    }
+
+    // PDF Detalhado (só neste modo): mesma reordenação de PROCESSAMENTO acima
+    // (não mexe na ordem real do DOM), agora para o card "Composição da Perda"
+    // isolado (id="perdas-composicao-card", ver split em index.html) — cai
+    // logo após o resumo de Gaps e antes da tabela de Gaps, igual ao Resumido.
+    if (isDetalhado) {
+      var composicaoCardD = document.getElementById('perdas-composicao-card');
+      var oppTableCardD = document.getElementById('opp-table-card');
+      if (composicaoCardD && oppTableCardD) {
+        var composicaoIdxD = sections.indexOf(composicaoCardD);
+        var oppTableIdxD = sections.indexOf(oppTableCardD);
+        if (composicaoIdxD > oppTableIdxD && oppTableIdxD !== -1) {
+          sections.splice(composicaoIdxD, 1);
+          sections.splice(oppTableIdxD, 0, composicaoCardD);
+        }
+      }
+    }
+
     if(sections.length === 0) {
       restoreResumidoHidden();
+      restoreCompressed();
+      restoreResumidoShown();
       document.body.removeChild(loadDiv);
       alert('Erro ao gerar PDF: conteúdo do relatório não encontrado.');
       return;
@@ -3164,6 +3635,11 @@ function generatePDF(fromAdmin, themeMode, mode) {
 
     function finish() {
       restoreResumidoHidden();
+      restoreCompressed();
+      restoreHiddenNoPrint();
+      restoreResumidoShown();
+      restoreRemappedSections();
+      restoreRemappedSectionsDetalhado();
       var empresa = (S.empresa || 'diagnostico').replace(/[^a-zA-Z0-9]/g, '_');
       var data = (S.data || new Date().toISOString().split('T')[0]);
       var suffix = (isDark ? '_DARK_MODE' : '') + (isResumido ? '_RESUMIDO' : '_DETALHADO');
@@ -3175,6 +3651,11 @@ function generatePDF(fromAdmin, themeMode, mode) {
 
     function fail(err) {
       restoreResumidoHidden();
+      restoreCompressed();
+      restoreHiddenNoPrint();
+      restoreResumidoShown();
+      restoreRemappedSections();
+      restoreRemappedSectionsDetalhado();
       document.body.removeChild(loadDiv);
       console.error('PDF error:', err);
       alert('Erro ao gerar PDF. Tente usar o botão Imprimir como alternativa.');
@@ -3275,6 +3756,35 @@ function generatePDF(fromAdmin, themeMode, mode) {
       temp.style.cssText = 'position:fixed;left:-99999px;top:0;width:' + CONTENT_PX_WIDTH + 'px;background:' + bgCol + ';';
       idxList.forEach(function(i){ temp.appendChild(sections[i].cloneNode(true)); });
       document.body.appendChild(temp);
+
+      // O card "Composição da Perda" (perdas-chart-canvas) passa pelo mesmo
+      // clone genérico (cloneNode) usado pelas demais seções — diferente do
+      // radar, que tem captura dedicada (captureRadarPage). cloneNode NÃO
+      // copia o bitmap já desenhado pelo Chart.js num <canvas> (o clone nasce
+      // em branco), então sem este passo o gráfico sairia vazio no PDF.
+      // REDESENHA o gráfico diretamente no <canvas> clonado (mesmo padrão do
+      // radar — ver captureRadarPage/drawRadarChart) em vez de só printscreenar
+      // o canvas ao vivo: o canvas ao vivo é sempre desenhado no "tema claro"
+      // (mode=false), porque o card #perdas-composicao-box tem fundo branco
+      // fixo na TELA — mas no PDF escuro esse mesmo card vira escuro via
+      // applyPdfDarkTheme logo abaixo. Um simples snapshot do canvas claro
+      // ficava com baixo contraste (rótulos escuros sobre card escuro).
+      // Redesenhando com mode='darkPdf' (ou true, no PDF claro) garante cores
+      // de eixo/rótulo corretas para o fundo final do card.
+      var clonedPerdasCanvas = temp.querySelector('#perdas-chart-canvas');
+      if (clonedPerdasCanvas && window.__LAST_PERDAS_CHART) {
+        try {
+          var pdChart = window.__LAST_PERDAS_CHART;
+          var pdRect = clonedPerdasCanvas.parentNode.getBoundingClientRect();
+          var pdW = Math.max(200, Math.round(pdRect.width) || 700);
+          var pdH = Math.max(120, Math.round(pdRect.height) || 240);
+          clonedPerdasCanvas.removeAttribute('style');
+          clonedPerdasCanvas.style.cssText = 'width:100%;height:100%;display:block';
+          clonedPerdasCanvas.width = pdW;
+          clonedPerdasCanvas.height = pdH;
+          drawPerdasChart(clonedPerdasCanvas, pdChart.labels, pdChart.values, pdChart.colors, pdChart.pcts, isDark ? 'darkPdf' : true);
+        } catch (e) { /* mantém canvas em branco como fallback silencioso */ }
+      }
 
       if(isDark) {
         applyPdfDarkTheme(temp);
@@ -4277,6 +4787,539 @@ async function checkAdminPdfRequest() {
     alert('Erro ao carregar diagnóstico: ' + err.message);
   }
   return true;
+}
+
+// ═══════════════════════════════════════════
+//  PROPOSTA COMERCIAL (reunião 2) — documento separado do Diagnóstico
+//  Ver PLANO_PROPOSTA_COMERCIAL_REUNIAO2.md (raiz do projeto) para o contexto
+//  de negócio completo. Reaproveita o estado global S (já coletado no
+//  Diagnóstico) e vários motores de cálculo já existentes (precificação,
+//  ROI, roadmap por gap) — não duplica nenhuma fórmula, só reformata a
+//  apresentação para um documento contratual de venda.
+// ═══════════════════════════════════════════
+
+// Converte a legenda em dias ("Dias 1–30") usada no Roadmap do Diagnóstico
+// para semanas — formato contratual pedido pra seção "Escopo de
+// Implementação" da Proposta.
+var PROPOSTA_WEEK_LABELS = ['Semanas 1–4', 'Semanas 5–8', 'Semanas 9–12'];
+var PROPOSTA_WEEK_DEFERRED = 'A partir da Semana 13 (Mês 4+)';
+
+// ── SEÇÃO 1: CAPA + RECAPITULAÇÃO EXECUTIVA ─────────────────────────────────
+// Reaproveita SÓ os 3 números do Executive Snapshot do Diagnóstico (Score,
+// Exposição em Risco, Payback) — não repete a tabela de gaps nem os textos
+// completos do Diagnóstico. Igual nos dois modos (resumido/detalhado): é uma
+// capa, não faz sentido "resumir" mais do que isso.
+function buildPropostaCapa(mode) {
+  var container = document.getElementById('prop-capa-container');
+  if (!container) return;
+
+  var m = getMaturityScoreSummary();
+  var roi = calculateROI(); // mesma função usada no Diagnóstico p/ Exposição em Risco
+  var r = window._lastROIReal || calcROIReal(S.captura);
+  var paybackFinito = r && isFinite(r.estrategica.payback);
+  var paybackTxt = paybackFinito ? ('< ' + Math.ceil(r.estrategica.payback) + ' meses') : 'Payback Imediato';
+  var dataEmissao = new Date().toLocaleDateString('pt-BR');
+
+  var kpi = function(label, value, sub) {
+    return '<div style="padding:16px 18px;background:#1a1c26;border:1px solid rgba(255,255,255,0.08);border-radius:10px">' +
+      '<div style="font-size:9.5px;font-weight:700;text-transform:uppercase;letter-spacing:0.1em;color:#94a3b8;margin-bottom:8px">'+label+'</div>' +
+      '<div style="font-family:Bai Jamjuree,sans-serif;font-size:24px;font-weight:700;color:#f8fafc">'+value+'</div>' +
+      (sub ? '<div style="font-size:10.5px;color:#cbd5e1;margin-top:4px">'+sub+'</div>' : '') +
+    '</div>';
+  };
+
+  container.innerHTML =
+    '<div style="text-align:center;padding:30px 10px 26px;border-bottom:1px solid rgba(255,255,255,0.08);margin-bottom:22px">' +
+      '<div style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:0.18em;color:#ea580c;margin-bottom:16px">Proposta Comercial · SIIGA + Agilean</div>' +
+      '<div style="font-family:Bai Jamjuree;font-size:32px;font-weight:700;color:#f8fafc;margin-bottom:10px;line-height:1.15">'+(S.empresa||'Empresa')+'</div>' +
+      '<div style="font-size:12.5px;color:#94a3b8">Emitida em '+dataEmissao+' &nbsp;·&nbsp; Consultor responsável: '+(S.consultor||'Equipe Agilean')+'</div>' +
+    '</div>' +
+    '<div style="font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:0.12em;color:#ea580c;margin-bottom:4px">Recapitulação Executiva</div>' +
+    '<div style="font-size:12px;color:#94a3b8;margin-bottom:14px">Baseado no diagnóstico realizado em '+(S.data||'—')+'. Os números abaixo resumem o Executive Snapshot já apresentado — o detalhamento de gaps não é repetido aqui.</div>' +
+    '<div style="display:grid;grid-template-columns:repeat(3,1fr);gap:14px">' +
+      kpi('Score de Maturidade', m.score+'/'+m.max, m.nivel) +
+      kpi('Exposição em Risco', fmtNum(roi.totalPortfolio), 'Perda estimada no portfólio, sem intervenção') +
+      kpi('Payback Estimado', paybackTxt, 'Cenário conservador de captura') +
+    '</div>';
+}
+
+// ── SEÇÃO 2: ESCOPO DE IMPLEMENTAÇÃO ────────────────────────────────────────
+// Reaproveita EXATAMENTE a mesma seleção/priorização de fases por gap do
+// Roadmap do Diagnóstico (selectRoadmapSprints()) — reformatada de narrativa
+// de sprint para tabela contratual (Entregável | Prazo em semanas | Critério
+// de conclusão | Responsabilidade Agilean vs. Cliente).
+function buildPropostaEscopo(mode) {
+  var container = document.getElementById('prop-escopo-container');
+  if (!container) return;
+  var isResumido = (mode === 'resumido');
+
+  var sel = selectRoadmapSprints();
+  var sprints = sel.sprintDefs;
+
+  var rows = sprints.map(function(sp) {
+    var isDeferred = !!sp.deferred;
+    var prazo = isDeferred
+      ? PROPOSTA_WEEK_DEFERRED
+      : (PROPOSTA_WEEK_LABELS[parseInt((sp.lbl||'S1').replace('S',''), 10) - 1] || PROPOSTA_WEEK_DEFERRED);
+    var focusHtml = (!isResumido && sp.focus)
+      ? '<div style="font-size:10.5px;color:#94a3b8;margin-top:6px;line-height:1.5;font-style:italic">'+sp.focus+'</div>'
+      : '';
+    return '<tr>' +
+      '<td style="white-space:nowrap"><span style="display:inline-block;padding:3px 10px;border-radius:20px;background:'+sp.color+'33;color:'+sp.color+';font-size:10.5px;font-weight:700">'+sp.lbl+'</span></td>' +
+      '<td>' +
+        '<strong style="color:#f8fafc">'+sp.title+'</strong>' +
+        '<div style="font-size:11px;color:#cbd5e1;margin-top:4px">'+sp.entregavel+'</div>' +
+        focusHtml +
+      '</td>' +
+      '<td style="white-space:nowrap">'+prazo+'</td>' +
+      '<td style="font-size:11px">'+sp.criterio+'</td>' +
+      '<td style="font-size:11px">' +
+        '<div style="margin-bottom:5px"><strong style="color:#ea580c">Agilean:</strong> '+sp.respAgilean+'</div>' +
+        '<div><strong style="color:#94a3b8">Cliente:</strong> '+sp.respCliente+'</div>' +
+      '</td>' +
+    '</tr>';
+  }).join('');
+
+  var f4NoteHtml = (!isResumido && sel.f4Note)
+    ? '<div style="margin-top:14px;padding:12px 16px;background:rgba(74,69,88,0.3);border-radius:8px;border:1px solid rgba(74,69,88,0.5);font-size:11.5px;color:#cbd5e1;line-height:1.65">' +
+        '<strong style="color:#f8fafc">Sobre o Pilar 4:</strong> ' + sel.f4Note + '</div>'
+    : '';
+
+  container.innerHTML =
+    '<div class="rep-sec-title">Escopo de Implementação — Plano de Trabalho Contratual</div>' +
+    '<div style="font-size:12px;color:#94a3b8;margin-bottom:14px">Fases priorizadas pelos gaps de maior impacto identificados neste diagnóstico específico — fases já maduras no portfólio da '+(S.empresa||'empresa')+' são omitidas.</div>' +
+    '<div style="overflow-x:auto"><table class="opp-table" style="min-width:680px"><thead><tr>' +
+      '<th>Fase</th><th>Entregável</th><th>Prazo</th><th>Critério de Conclusão</th><th>Responsabilidade</th>' +
+    '</tr></thead><tbody>' + rows + '</tbody></table></div>' +
+    f4NoteHtml;
+}
+
+// ── SEÇÃO 3: INVESTIMENTO ───────────────────────────────────────────────────
+// Reaproveita o motor de precificação já implementado no Diagnóstico
+// (precoPorObraPadrao/calcularMensalidadePadrao, Plano Maestria · coluna
+// Tabela) — não duplica a tabela de preço, só reapresenta o mesmo cálculo
+// num formato de investimento formal.
+//
+// PLACEHOLDER DE NEGÓCIO (ver PLANO_PROPOSTA_COMERCIAL_REUNIAO2.md §4.2-4.4,
+// "ainda pendente"): a lista "O que está incluso" e as "Condições de
+// pagamento" abaixo são um preenchimento plausível e genérico de produto
+// SaaS B2B — NÃO é uma decisão de negócio validada. Ajustar/substituir
+// conforme o time comercial definir.
+function buildPropostaInvestimento(mode) {
+  var container = document.getElementById('prop-investimento-container');
+  if (!container) return;
+  var isResumido = (mode === 'resumido');
+
+  var numObras = S.numObras || 1;
+  var precoObra = precoPorObraPadrao(numObras);
+  var mensalidadeProposta = calcularMensalidadePadrao(numObras);
+  var orcamentoMedio = S.orcamentoMedio || 8000000;
+  var pctMensalidadeOrcamento = orcamentoMedio ? (precoObra / orcamentoMedio) * 100 : 0;
+  var pctFmt = pctMensalidadeOrcamento < 0.01
+    ? '< 0,01%'
+    : pctMensalidadeOrcamento.toLocaleString('pt-BR', {maximumFractionDigits: 2}) + '%';
+
+  var tabelaRows = TABELA_PRECO_MAESTRIA.map(function(f) {
+    var isFaixaAtual = f.precoPorObra === precoObra;
+    return '<tr style="'+(isFaixaAtual ? 'background:rgba(234,88,12,0.12);border-left:3px solid #ea580c' : '')+'">' +
+      '<td>'+(isFaixaAtual ? '<strong style="color:#ea580c">✓ '+f.label+'</strong>' : f.label)+'</td>' +
+      '<td style="text-align:right" class="roi-val">'+fmtBRL(f.precoPorObra)+' /obra/mês</td>' +
+    '</tr>';
+  }).join('');
+
+  var kpi = function(label, value, sub, highlight) {
+    if (highlight) {
+      return '<div style="padding:16px 18px;background:rgba(234,88,12,0.10);border:1.5px solid rgba(234,88,12,0.45);border-radius:10px">' +
+        '<div style="font-size:10.5px;color:#ea580c;font-weight:700;text-transform:uppercase;letter-spacing:0.07em">'+label+'</div>' +
+        '<div style="font-family:Bai Jamjuree;font-size:26px;font-weight:700;margin-top:3px;color:#ea580c">'+value+'</div>' +
+        (sub ? '<div style="font-size:10px;color:#94a3b8;margin-top:3px">'+sub+'</div>' : '') +
+      '</div>';
+    }
+    return '<div style="padding:12px 14px;background:#1a1c26;border:1px solid rgba(255,255,255,0.08);border-radius:8px">' +
+      '<div style="font-size:10px;color:#94a3b8;text-transform:uppercase;letter-spacing:0.06em">'+label+'</div>' +
+      '<div style="font-family:Bai Jamjuree;font-size:20px;font-weight:700;margin-top:3px;color:#f8fafc">'+value+'</div>' +
+      (sub ? '<div style="font-size:9.5px;color:#94a3b8;margin-top:2px">'+sub+'</div>' : '') +
+    '</div>';
+  };
+
+  // "O que está incluso" — PLACEHOLDER (ver comentário no topo da função).
+  var inclusoItems = [
+    'Acesso à plataforma SIIGA para todas as obras contempladas neste plano',
+    'Suporte técnico via canal dedicado em horário comercial',
+    'Treinamento inicial da equipe de planejamento, campo e engenharia',
+    'Atualizações e novas funcionalidades da plataforma incluídas, sem custo adicional',
+    'Integração nativa com o ERP utilizado pela empresa (Sienge, TOTVS, Informakon, Mega ou UAU)'
+  ];
+
+  var memoriaCalculo = isResumido ? '' :
+    '<div style="margin-top:16px;padding-top:12px;border-top:1px solid rgba(255,255,255,0.08)">' +
+      '<div style="font-size:10.5px;font-weight:700;text-transform:uppercase;letter-spacing:0.08em;color:#94a3b8;margin-bottom:8px">Memória de cálculo</div>' +
+      '<div style="font-size:11px;color:#cbd5e1;line-height:1.7">' +
+        '• Faixa de preço: <strong style="color:#f8fafc">'+numObras+' obra(s)</strong> → preço/obra de tabela (Plano Maestria)<br>' +
+        '• Mensalidade total = preço/obra × nº de obras = '+fmtBRL(precoObra)+' × '+numObras+' = <strong style="color:#f8fafc">'+fmtNum(mensalidadeProposta)+'/mês</strong><br>' +
+        '• % Mensalidade/Orçamento = preço/obra ÷ orçamento médio de 1 obra = '+fmtBRL(precoObra)+' ÷ '+fmtNum(orcamentoMedio)+' = <strong style="color:#f8fafc">'+pctFmt+'</strong>' +
+      '</div>' +
+    '</div>';
+
+  container.innerHTML =
+    '<div class="rep-sec-title">Investimento</div>' +
+    '<div style="display:grid;grid-template-columns:repeat(3,1fr);gap:12px;margin-bottom:16px">' +
+      kpi('Nº de obras do plano', numObras, 'informado no diagnóstico') +
+      kpi('Mensalidade total', fmtNum(mensalidadeProposta), fmtBRL(precoObra)+' /obra/mês · Plano Maestria') +
+      kpi('Mensalidade / Orçamento', pctFmt, 'preço de 1 obra sobre o orçamento médio de 1 obra', true) +
+    '</div>' +
+    (isResumido ? '' :
+      '<div style="margin-bottom:16px"><div style="font-size:10.5px;font-weight:700;text-transform:uppercase;letter-spacing:0.08em;color:#94a3b8;margin-bottom:8px">Tabela de preços — Plano Maestria (por obra/mês)</div>' +
+      '<table class="roi-table"><tbody>'+tabelaRows+'</tbody></table></div>'
+    ) +
+    '<div style="display:grid;grid-template-columns:1fr 1fr;gap:16px;margin-top:4px">' +
+      '<div>' +
+        '<div style="font-size:10.5px;font-weight:700;text-transform:uppercase;letter-spacing:0.08em;color:#94a3b8;margin-bottom:8px">O que está incluso</div>' +
+        '<ul style="list-style:none;display:flex;flex-direction:column;gap:6px;font-size:11.5px;color:#e2e8f0;line-height:1.4">' +
+          inclusoItems.map(function(it){ return '<li style="display:flex;gap:8px"><span style="color:#ea580c;flex-shrink:0">→</span>'+it+'</li>'; }).join('') +
+        '</ul>' +
+      '</div>' +
+      '<div>' +
+        '<div style="font-size:10.5px;font-weight:700;text-transform:uppercase;letter-spacing:0.08em;color:#94a3b8;margin-bottom:8px">Condições de pagamento</div>' +
+        '<div style="font-size:11.5px;color:#e2e8f0;line-height:1.6;padding:12px 14px;background:#1a1c26;border-radius:8px;border:1px solid rgba(255,255,255,0.08)">' +
+          'Mensal, via boleto ou cartão — condições especiais para pagamento anual disponíveis mediante consulta ao time comercial.' +
+        '</div>' +
+      '</div>' +
+    '</div>' +
+    memoriaCalculo;
+}
+
+// ── SEÇÃO 4: RETORNO PROJETADO ──────────────────────────────────────────────
+// Reaproveita calcROIReal() (mesma fórmula do Diagnóstico), mas ancorado na
+// mensalidade REAL desta proposta (motor de precificação da seção 3), não
+// mais numa mensalidade hipotética/editável — usa calcROIRealComMensalidade()
+// para isso sem tocar o estado global S.mensalidade.
+function buildPropostaRetorno(mode) {
+  var container = document.getElementById('prop-retorno-container');
+  if (!container) return;
+  var isResumido = (mode === 'resumido');
+
+  var mensalidadeProposta = calcularMensalidadePadrao(S.numObras);
+  var r = calcROIRealComMensalidade(S.captura, mensalidadeProposta);
+  var paybackFinito = isFinite(r.estrategica.payback);
+  var fmtH = function(n){ return (n||0).toLocaleString('pt-BR',{maximumFractionDigits:1}) + ' h'; };
+
+  var kpi = function(label, value, sub) {
+    return '<div style="padding:12px 14px;background:#1a1c26;border:1px solid rgba(255,255,255,0.08);border-radius:8px">' +
+      '<div style="font-size:10px;color:#94a3b8;text-transform:uppercase;letter-spacing:0.06em">'+label+'</div>' +
+      '<div style="font-family:Bai Jamjuree;font-size:20px;font-weight:700;margin-top:3px;color:#f8fafc">'+value+'</div>' +
+      (sub ? '<div style="font-size:9.5px;color:#94a3b8;margin-top:2px">'+sub+'</div>' : '') +
+    '</div>';
+  };
+
+  var memoria = isResumido ? '' :
+    '<div style="margin-top:16px;padding-top:12px;border-top:1px solid rgba(255,255,255,0.08)">' +
+      '<div style="font-size:10.5px;font-weight:700;text-transform:uppercase;letter-spacing:0.08em;color:#94a3b8;margin-bottom:8px">Como é calculado</div>' +
+      '<table class="roi-table"><thead><tr><th>Item</th><th style="text-align:right">Valor</th></tr></thead><tbody>' +
+        '<tr><td>Recuperação financeira total (retrabalho + pagamentos indevidos)</td><td style="text-align:right" class="roi-val">'+fmtNum(r.estrategica.recTotal)+'</td></tr>' +
+        '<tr><td>Capacidade de gestão liberada ('+fmtH(r.estrategica.horasLib)+')</td><td style="text-align:right" class="roi-val">'+fmtNum(r.estrategica.valorCapacidade)+'</td></tr>' +
+        '<tr><td>Investimento Agilean (mensalidade desta proposta)</td><td style="text-align:right" class="roi-val">− '+fmtNum(mensalidadeProposta)+'/mês</td></tr>' +
+        '<tr class="roi-total"><td>Horas recuperadas/mês (visão operacional)</td><td style="text-align:right">'+fmtH(r.operacional.hMes)+'</td></tr>' +
+      '</tbody></table>' +
+    '</div>';
+
+  container.innerHTML =
+    '<div class="rep-sec-title">Retorno Projetado</div>' +
+    '<div style="font-size:12px;color:#94a3b8;margin-bottom:14px">Com base no investimento proposto na seção anterior — mensalidade de '+fmtNum(mensalidadeProposta)+'/mês, não mais uma simulação hipotética.</div>' +
+    '<div style="display:grid;grid-template-columns:repeat(2,1fr);gap:10px;margin-bottom:10px">' +
+      kpi('ROI Mensal', Math.round(r.estrategica.roi*100)+'%', 'sobre a mensalidade proposta, por mês') +
+      kpi('Payback', paybackFinito ? fmtNumBare(r.estrategica.payback)+' meses' : 'Payback Imediato', paybackFinito ? 'meses até recuperar o investido' : 'retorno já no 1º mês') +
+    '</div>' +
+    '<div style="display:grid;grid-template-columns:repeat(3,1fr);gap:10px">' +
+      kpi('Horas recuperadas/mês', fmtH(r.operacional.hMes), 'no total da operação') +
+      kpi('Horas recuperadas/obra', fmtH(r.operacional.hObra), 'por obra, no mês') +
+      kpi('% da jornada liberada', (Math.round(r.operacional.pctJornada*1000)/10)+'%', 'da jornada individual do time técnico') +
+    '</div>' +
+    memoria;
+}
+
+// ── SEÇÃO 5: O QUE MUDA A PARTIR DA ASSINATURA (30/60/90 DIAS) ──────────────
+// Reaproveita a mesma seleção de fases do Escopo (selectRoadmapSprints),
+// resumida em marcos de timeline, com nomes de responsáveis: papel fixo do
+// lado Agilean ("Implementation Manager Agilean") e o contato/cargo reais
+// capturados no diagnóstico (S.contato/S.cargo) do lado do cliente.
+function buildPropostaTimeline(mode) {
+  var container = document.getElementById('prop-timeline-container');
+  if (!container) return;
+  var isResumido = (mode === 'resumido');
+
+  var sel = selectRoadmapSprints();
+  var sprints = sel.sprintDefs;
+  var pontoFocal = 'Ponto focal ' + (S.contato || S.empresa || 'do cliente') + (S.cargo ? ', ' + S.cargo : '');
+
+  var marks = sprints.map(function(sp) {
+    var isDeferred = !!sp.deferred;
+    var marco = isDeferred ? 'Mês 4+' : ('Dia ' + (parseInt((sp.lbl||'S1').replace('S',''),10) * 30));
+    var bulletCount = isResumido ? 2 : 3;
+    var bullets = sp.items.slice(0, bulletCount).map(function(it){ return '<li>'+it+'</li>'; }).join('');
+    return '<div class="sprint">' +
+      '<div class="sprint-marker">' +
+        '<div class="sprint-dot" style="background:'+(isDeferred?'rgba(74,69,88,0.8)':sp.color)+';color:white;font-size:'+(isDeferred?'9px':'11px')+'">'+sp.lbl+'</div>' +
+        '<div class="sprint-line"></div>' +
+        '<div class="sprint-lbl">'+marco+'</div>' +
+      '</div>' +
+      '<div class="sprint-body">' +
+        '<h4 style="color:'+(isDeferred?'#9ca3af':sp.color)+'">'+sp.title+'</h4>' +
+        '<ul>'+bullets+'</ul>' +
+        '<div style="margin-top:10px;font-size:10.5px;color:#94a3b8;display:flex;flex-wrap:wrap;gap:14px">' +
+          '<span><strong style="color:#ea580c">Agilean:</strong> Implementation Manager Agilean</span>' +
+          '<span><strong style="color:#94a3b8">Cliente:</strong> '+pontoFocal+'</span>' +
+        '</div>' +
+      '</div>' +
+    '</div>';
+  }).join('');
+
+  container.innerHTML =
+    '<div class="rep-sec-title">O que muda a partir da assinatura</div>' +
+    '<div style="font-size:12px;color:#94a3b8;margin-bottom:14px">Linha do tempo dos primeiros marcos de implementação, com responsáveis definidos de ambos os lados.</div>' +
+    marks;
+}
+
+// ── SEÇÃO 6: TERMOS & PRÓXIMO PASSO ─────────────────────────────────────────
+// Duração do contrato = prazo médio das obras do lead (S.prazoMedio) — decisão
+// validada com o usuário: o contrato acompanha o ciclo de vida típico das
+// obras do portfólio, não um prazo fixo genérico. As demais condições
+// (reajuste, validade da proposta) são PLACEHOLDER explícito aguardando
+// decisão de negócio (ver PLANO_PROPOSTA_COMERCIAL_REUNIAO2.md §4.3-4.4).
+function buildPropostaTermos(mode) {
+  var container = document.getElementById('prop-termos-container');
+  if (!container) return;
+
+  var prazoMeses = S.prazoMedio || 18;
+  var hoje = new Date();
+  var validade = new Date(hoje.getTime() + 15*24*60*60*1000);
+  var validadeFmt = validade.toLocaleDateString('pt-BR');
+
+  var termo = function(label, value) {
+    return '<div style="padding:14px 16px;background:#1a1c26;border:1px solid rgba(255,255,255,0.08);border-radius:8px">' +
+      '<div style="font-size:10px;color:#94a3b8;text-transform:uppercase;letter-spacing:0.08em;margin-bottom:6px">'+label+'</div>' +
+      '<div style="font-size:12.5px;color:#e2e8f0;line-height:1.55">'+value+'</div>' +
+    '</div>';
+  };
+
+  container.innerHTML =
+    '<div style="font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:0.12em;color:#ea580c;margin-bottom:14px">Termos & Próximo Passo</div>' +
+    '<div style="display:grid;grid-template-columns:repeat(2,1fr);gap:12px;margin-bottom:20px">' +
+      termo('Duração do contrato', 'Contrato com duração de <strong style="color:#f8fafc">'+prazoMeses+' meses</strong>, alinhado ao prazo médio das obras do portfólio da '+(S.empresa||'empresa')+' — renovação conforme necessidade de novas obras.') +
+      termo('Política de reajuste', '<em>[placeholder — a confirmar pelo time comercial]</em> Reajuste anual por IPCA (ou índice equivalente), a partir do 13º mês de vigência.') +
+      termo('Validade desta proposta', 'Válida por 15 dias a partir da data de emissão — até <strong style="color:#f8fafc">'+validadeFmt+'</strong>.') +
+      termo('Formalização', '<em>[placeholder — a confirmar pelo time comercial]</em> Aceite simples nesta primeira versão, sem assinatura eletrônica formal.') +
+    '</div>' +
+    // CTA de aceite — puramente visual neste protótipo. O gravamento do aceite
+    // no Supabase (registro de estágio de funil "Proposta aceita") é um
+    // next-step, fora do escopo desta rodada (ver PLANO_PROPOSTA_COMERCIAL_REUNIAO2.md §5).
+    '<div style="text-align:center;padding:22px;background:linear-gradient(135deg,rgba(234,88,12,0.14),rgba(234,88,12,0.04));border:1.5px solid rgba(234,88,12,0.4);border-radius:10px">' +
+      '<div style="font-size:13px;color:#e2e8f0;margin-bottom:14px">Pronto para destravar a produtividade da sua operação com o SIIGA?</div>' +
+      '<div style="display:inline-block;padding:13px 34px;background:#ea580c;color:white;border-radius:8px;font-family:Bai Jamjuree;font-weight:700;font-size:14px;letter-spacing:0.03em">✓ Aceitar Proposta</div>' +
+      '<div style="font-size:10px;color:#94a3b8;margin-top:12px">Botão ilustrativo neste protótipo — o registro de aceite no Supabase é o próximo passo de implementação.</div>' +
+    '</div>';
+}
+
+// Constrói todas as 6 seções da Proposta no DOM (#screen-proposta), segundo o
+// modo (resumido/detalhado) — chamado por generateProposta() antes da captura.
+function buildProposta(mode) {
+  buildPropostaCapa(mode);
+  buildPropostaEscopo(mode);
+  buildPropostaInvestimento(mode);
+  buildPropostaRetorno(mode);
+  buildPropostaTimeline(mode);
+  buildPropostaTermos(mode);
+}
+
+// Gera o PDF da Proposta Comercial — documento SEPARADO do Diagnóstico
+// (generatePDF), com nome de arquivo e conteúdo próprios. Reaproveita o
+// mesmo padrão de bin-packing por data-section + captura via html2canvas +
+// jsPDF já validado em generatePDF(), numa variante mais enxuta (sem os
+// ajustes específicos do Diagnóstico — radar, gráfico de perdas, toggles de
+// pdf-resumo-hide — porque aqui o conteúdo de cada modo já é gerado
+// diretamente por buildProposta(mode), sem precisar escondar/mostrar DOM).
+// Tema sempre "Executive Charcoal & Copper" escuro (mesma identidade visual
+// do Diagnóstico) — não há alternativa em fundo claro para a Proposta.
+function generateProposta(mode) {
+  var isResumido = (mode === 'resumido');
+
+  // Garante que S.mensalidade/S.captura/window._lastROIReal e o Executive
+  // Snapshot estão frescos (mesmo estado que o Diagnóstico usa) antes de a
+  // Proposta reaproveitar esses números.
+  buildReport();
+  buildProposta(mode);
+  showScreen('screen-proposta');
+
+  var loadDiv = document.createElement('div');
+  loadDiv.id = 'pdf-loading';
+  loadDiv.style.cssText = 'position:fixed;inset:0;background:rgba(15,16,21,0.95);z-index:1000;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:16px';
+  loadDiv.innerHTML = '<div style="width:48px;height:48px;border:3px solid rgba(255,255,255,0.1);border-top-color:#ea580c;border-radius:50%;animation:spin 0.8s linear infinite"></div>' +
+    '<div style="font-family:Bai Jamjuree;font-size:14px;color:white">Gerando Proposta '+(isResumido?'Resumida':'Detalhada')+'...</div>' +
+    '<div style="font-size:12px;color:var(--gray2)">Aguarde alguns segundos</div>';
+  document.body.appendChild(loadDiv);
+
+  if(!document.getElementById('spin-style')) {
+    var st = document.createElement('style');
+    st.id = 'spin-style';
+    st.textContent = '@keyframes spin{to{transform:rotate(360deg)}}';
+    document.head.appendChild(st);
+  }
+
+  setTimeout(function() {
+    var reportEl = document.getElementById('screen-proposta');
+    var wrapper = reportEl.querySelector(':scope > div');
+    var sections = wrapper ? Array.prototype.slice.call(wrapper.children).filter(function(el){
+      return !el.matches('.no-print, .btn-row');
+    }) : [];
+
+    if(sections.length === 0) {
+      document.body.removeChild(loadDiv);
+      alert('Erro ao gerar a Proposta: conteúdo não encontrado.');
+      return;
+    }
+
+    var CONTENT_PX_WIDTH = 920;
+    var jsPDFNS = window.jspdf ? window.jspdf.jsPDF : window.jsPDF;
+    var pdf = new jsPDFNS({ orientation: 'portrait', unit: 'mm', format: 'a4', compress: true });
+    var pageW = pdf.internal.pageSize.getWidth();
+    var pageH = pdf.internal.pageSize.getHeight();
+    var margin = 10;
+    var contentWMm = pageW - margin * 2;
+    var mmPerPx = contentWMm / CONTENT_PX_WIDTH;
+
+    var heightsPx = sections.map(function(s){ return s.getBoundingClientRect().height; });
+    var PAGE_SAFETY_MM = 6;
+
+    // Bin-packing por data-section (mesma regra de generatePDF, simplificada:
+    // aqui não há pares de seção liberados — cada uma das 6 seções da
+    // Proposta abre página nova, cards da MESMA seção podem ficar juntos).
+    var pageGroups = [];
+    var cur = [], curHMm = 0, curSection = null;
+    for(var i = 0; i < sections.length; i++) {
+      var hMm = heightsPx[i] * mmPerPx;
+      var availMm = (pageGroups.length === 0 ? (pageH - margin - 10) : (pageH - margin - margin)) - PAGE_SAFETY_MM;
+      var secId = sections[i].getAttribute('data-section') || ('__sec' + i);
+      var sameSection = (curSection !== null && secId === curSection);
+      var pageEmpty = (cur.length === 0);
+      var forceBreak = (cur.length > 0) && !sameSection;
+      var fitsHeight = (curHMm + hMm) <= availMm;
+
+      if(cur.length > 0 && (forceBreak || !fitsHeight)) {
+        pageGroups.push(cur);
+        cur = []; curHMm = 0; curSection = null;
+      }
+      cur.push(i);
+      curHMm += hMm;
+      curSection = secId;
+    }
+    if(cur.length > 0) pageGroups.push(cur);
+
+    var pageIdx = 0, globalPageNum = 0;
+
+    function finish() {
+      var empresa = (S.empresa || 'prospect').replace(/[^a-zA-Z0-9]/g, '_');
+      var data = (S.data || new Date().toISOString().split('T')[0]);
+      var suffix = isResumido ? '_RESUMIDO' : '_DETALHADO';
+      window.__LAST_PROPOSTA_PDF_DATA = pdf.output('datauristring');
+      pdf.save('SIIGA_Proposta_' + empresa + suffix + '_' + data + '.pdf');
+      document.body.removeChild(loadDiv);
+      showToast('Proposta ' + (isResumido ? 'Resumida ' : 'Detalhada ') + 'gerada com sucesso!');
+    }
+
+    function fail(err) {
+      document.body.removeChild(loadDiv);
+      console.error('Proposta PDF error:', err);
+      alert('Erro ao gerar a Proposta. Tente novamente.');
+    }
+
+    function drawPageFromCanvas(canvas, hMm, wMmOverride, xOffsetOverride) {
+      var wMm = wMmOverride || contentWMm;
+      var xOffset = xOffsetOverride || margin;
+      var imgData = canvas.toDataURL('image/png');
+
+      if(globalPageNum > 0) pdf.addPage();
+
+      pdf.setFillColor(15, 16, 21); // #0f1015 (Executive Charcoal)
+      pdf.rect(0, 0, pageW, pageH, 'F');
+      pdf.setFillColor(234, 88, 12); // #ea580c (Executive Copper)
+      pdf.rect(0, 0, pageW, globalPageNum === 0 ? 6 : 2.5, 'F');
+
+      var yPos = globalPageNum === 0 ? 10 : margin;
+      pdf.addImage(imgData, 'PNG', xOffset, yPos, wMm, hMm);
+
+      pdf.setFontSize(7);
+      pdf.setTextColor(148, 163, 184); // #94a3b8
+      pdf.text('SIIGA · Agilean · Proposta Comercial (Executive Dark)', margin, pageH - 4);
+      pdf.text('Página ' + (globalPageNum + 1), pageW - margin - 15, pageH - 4);
+
+      globalPageNum++;
+    }
+
+    function addImagePage(canvas) {
+      var imgW = canvas.width, imgH = canvas.height;
+      var wMm = contentWMm;
+      var hMm = (imgH / imgW) * wMm;
+      var maxHmm = pageH - margin * 2 - 6;
+
+      if(hMm <= maxHmm) {
+        drawPageFromCanvas(canvas, hMm);
+        return;
+      }
+
+      var OVERFLOW_TOLERANCE = 1.10;
+      if(hMm <= maxHmm * OVERFLOW_TOLERANCE) {
+        var scale = maxHmm / hMm;
+        var fitWMm = wMm * scale;
+        var fitXOffset = margin + (wMm - fitWMm) / 2;
+        drawPageFromCanvas(canvas, maxHmm, fitWMm, fitXOffset);
+        return;
+      }
+
+      var pxPerMm = imgH / hMm;
+      var maxSliceHpx = Math.floor(maxHmm * pxPerMm);
+      var numPages = Math.max(1, Math.ceil(imgH / maxSliceHpx));
+      var sliceHpx = Math.ceil(imgH / numPages);
+      var y = 0;
+      while(y < imgH) {
+        var thisHpx = Math.min(sliceHpx, imgH - y);
+        var sliceCanvas = document.createElement('canvas');
+        sliceCanvas.width = imgW;
+        sliceCanvas.height = thisHpx;
+        sliceCanvas.getContext('2d').drawImage(canvas, 0, y, imgW, thisHpx, 0, 0, imgW, thisHpx);
+        drawPageFromCanvas(sliceCanvas, thisHpx / pxPerMm);
+        y += thisHpx;
+      }
+    }
+
+    function renderPage() {
+      if(pageIdx >= pageGroups.length) { finish(); return; }
+
+      var idxList = pageGroups[pageIdx];
+      var temp = document.createElement('div');
+      temp.style.cssText = 'position:fixed;left:-99999px;top:0;width:' + CONTENT_PX_WIDTH + 'px;background:#0f1015;';
+      idxList.forEach(function(i){ temp.appendChild(sections[i].cloneNode(true)); });
+      document.body.appendChild(temp);
+
+      applyPdfDarkTheme(temp);
+
+      html2canvas(temp, {
+        scale: 2,
+        useCORS: true,
+        allowTaint: true,
+        backgroundColor: '#0f1015'
+      }).then(function(canvas) {
+        document.body.removeChild(temp);
+        addImagePage(canvas);
+        pageIdx++;
+        renderPage();
+      }).catch(function(err) {
+        if(temp.parentNode) document.body.removeChild(temp);
+        fail(err);
+      });
+    }
+
+    renderPage();
+  }, 400);
 }
 
 // Init

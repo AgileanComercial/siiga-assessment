@@ -124,6 +124,13 @@ h1,h2,h3,h4{font-family:'Bai Jamjuree',sans-serif}
 /* REPORT */
 #screen-report{background:var(--light);color:var(--black)}
 #screen-report .card{background:white;border:none;box-shadow:var(--shadow-sm)}
+
+/* PROPOSTA COMERCIAL (reunião 2) — mesmo padrão de fundo/card do Diagnóstico
+   (screen-report acima) na tela ao vivo; o tema "Executive Charcoal & Copper"
+   escuro só é aplicado no clone isolado durante a captura do PDF
+   (applyPdfDarkTheme, ver generateProposta() em script.js). */
+#screen-proposta{background:var(--light);color:var(--black)}
+#screen-proposta .card{background:white;border:none;box-shadow:var(--shadow-sm)}
 .rep-header{width:100%;max-width:920px;display:flex;justify-content:space-between;align-items:flex-end;margin-bottom:20px;padding-bottom:14px;border-bottom:3px solid var(--orange)}
 .rep-header img{height:26px}
 .rep-sec-title{font-family:'Bai Jamjuree';font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:0.12em;color:var(--orange);margin-bottom:14px;padding-bottom:6px;border-bottom:1px solid var(--light2)}
