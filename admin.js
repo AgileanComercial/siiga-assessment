@@ -322,6 +322,7 @@ function renderTable() {
           '<a onclick="handleAction(\'view\', ' + index + ')">📄 Detalhes</a>' +
           '<a onclick="handleAction(\'pdf-resumido\', ' + index + ')">🖨️ Gerar PDF Resumido</a>' +
           '<a onclick="handleAction(\'pdf-detalhado\', ' + index + ')">🖥️ Gerar PDF Detalhado</a>' +
+          '<a onclick="handleAction(\'export-questions\', ' + index + ')">📥 Exportar Perguntas (CSV)</a>' +
           '<a onclick="handleAction(\'edit\', ' + index + ')">✏️ Editar</a>' +
           '<a onclick="handleAction(\'delete\', ' + index + ')" style="color:var(--red);">🗑️ Excluir</a>' +
         '</div>' +
@@ -1271,6 +1272,12 @@ function handleAction(action, index) {
   } else if (action === 'pdf-detalhado') {
     var row = filteredData[index];
     if (row) window.open('/?admin_pdf=' + row.id + '&pdf_mode=detalhado', '_blank');
+  } else if (action === 'export-questions') {
+    var row = filteredData[index];
+    if (row) {
+      currentDetailRow = row;
+      exportLeadQuestionsCSV();
+    }
   } else if (action === 'edit') {
     openEditModal(index);
   } else if (action === 'delete') {
