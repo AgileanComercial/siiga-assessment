@@ -1587,12 +1587,10 @@ function renderPerdasComposicao(roi) {
   var box = document.getElementById('perdas-composicao-box');
   if (!box || !roi) return;
 
-  var portfolio = (S.numObras || 1) * (S.orcamentoMedio || 8000000);
   var perdaTotal = roi.totalPortfolio || 1;
-  var perdaPct = Math.round((perdaTotal / (portfolio || 1)) * 100);
 
   var pctEl = document.getElementById('perdas-pct-total');
-  if (pctEl) pctEl.textContent = perdaPct + '% do portfólio estimado em risco';
+  if (pctEl) pctEl.textContent = fmtNum(perdaTotal) + ' em risco no portfólio';
 
   var catColors = {
     mo: '#ea580c',
@@ -1626,45 +1624,34 @@ function renderPerdasComposicao(roi) {
 }
 
 // Preenche o card "Ganho Esperado com o SIIGA" — contraponto em chave de ganho da
-// página de Perdas Financeiras. Reaproveita os MESMOS cálculos já usados nas páginas
-// de Perdas (calculateROI) e de ROI Real (calcROIReal) em vez de inventar um número
-// novo: mostra a mesma oportunidade capturável no portfólio (roi.totalPortfolio) ao
-// lado do ganho líquido mensal real do cenário conservador — dois ângulos
-// complementares, sem repetir o mesmo valor duas vezes.
+// página de Perdas Financeiras. Reaproveita o MESMO cálculo já usado na página de
+// Perdas (calculateROI): mostra a oportunidade capturável no portfólio total
+// (roi.totalPortfolio). A visão mês a mês (ganho líquido recorrente) foi removida
+// deste card por decisão de produto — fica só a visão de portfólio total, para não
+// misturar recortes (portfólio vs. mensal) no mesmo card.
 function renderGanhoEsperado(roi) {
   var portfolioEl = document.getElementById('ganho-portfolio-valor');
-  var liquidoEl = document.getElementById('ganho-liquido-valor');
-  if (!portfolioEl || !liquidoEl || !roi) return;
+  if (!portfolioEl || !roi) return;
 
   portfolioEl.textContent = fmtNum(roi.totalPortfolio);
 
-  var rConservador = calcROIReal(0.5);
-  liquidoEl.textContent = fmtNum(rConservador.estrategica.ganhoLiquido);
-
-  // Memória de cálculo — demonstra, em linguagem analítica, de onde vêm os dois
-  // números de destaque acima. Não introduz valor novo: apenas decompõe
-  // roi.totalPortfolio (mitigação de perdas de obra) e o ganho líquido do cenário
-  // conservador (eficiência de engenharia & gestão) nas mesmas parcelas já
-  // usadas nas tabelas de Perdas Financeiras e ROI Real.
+  // Memória de cálculo — demonstra, em linguagem analítica, de onde vem o número
+  // de destaque acima. Não introduz valor novo: apenas decompõe roi.totalPortfolio
+  // (mitigação de perdas de obra) nas mesmas parcelas já usadas na tabela de
+  // Perdas Financeiras. Some inteira no PDF Resumido (classe pdf-resumo-hide no HTML).
   var memEl = document.getElementById('ganho-memoria-calculo');
   if (memEl) {
     var itemEstouro = (roi.items||[]).filter(function(it){ return /estouro|orçamento/i.test(it.label||''); })[0];
     var itemRetrabalho = (roi.items||[]).filter(function(it){ return /retrabalho/i.test(it.label||''); })[0];
     var mitigacaoObra = (itemEstouro ? itemEstouro.portfolio : 0) + (itemRetrabalho ? itemRetrabalho.portfolio : 0);
-    var eficienciaEngenharia = rConservador.estrategica.valorCapacidade + rConservador.estrategica.rec1;
 
     memEl.innerHTML =
       '<div style="font-size:9px;font-weight:700;text-transform:uppercase;letter-spacing:0.08em;color:#0d6b45;margin-bottom:6px">Memória de Cálculo — Composição do Ganho</div>' +
-      '<div style="display:grid;grid-template-columns:1fr 1fr;gap:12px">' +
-        '<div>' +
+      '<div style="display:flex;justify-content:center">' +
+        '<div style="max-width:420px;text-align:center">' +
           '<div style="font-size:10px;font-weight:700;color:#333;margin-bottom:2px">Mitigação de Perdas de Obra</div>' +
           '<div style="font-size:9.5px;color:#666;line-height:1.35">Redução de estouro de orçamento de MO + estancamento de retrabalho de portfólio.</div>' +
-          '<div style="font-family:tabular-nums;font-variant-numeric:tabular-nums;text-align:right;font-size:12px;font-weight:700;color:#0d6b45;margin-top:3px">'+fmtNum(mitigacaoObra)+'</div>' +
-        '</div>' +
-        '<div>' +
-          '<div style="font-size:10px;font-weight:700;color:#333;margin-bottom:2px">Eficiência de Engenharia &amp; Gestão</div>' +
-          '<div style="font-size:9.5px;color:#666;line-height:1.35">Horas técnicas recuperadas em rotinas de planejamento, medição e integração com ERP (cenário conservador).</div>' +
-          '<div style="font-family:tabular-nums;font-variant-numeric:tabular-nums;text-align:right;font-size:12px;font-weight:700;color:#0d6b45;margin-top:3px">'+fmtNum(eficienciaEngenharia)+'/mês</div>' +
+          '<div style="font-family:tabular-nums;font-variant-numeric:tabular-nums;text-align:center;font-size:12px;font-weight:700;color:#0d6b45;margin-top:3px">'+fmtNum(mitigacaoObra)+' no portfólio total</div>' +
         '</div>' +
       '</div>';
   }
@@ -1728,7 +1715,7 @@ function buildReport() {
   }
 
   var tGanhos = document.getElementById('rep-title-ganhos');
-  if (tGanhos) tGanhos.textContent = 'Ganhos para a ' + nomeEmpresa + ' — SIIGA com Agilean';
+  if (tGanhos) tGanhos.textContent = 'Ganhos para a ' + nomeEmpresa + ' — SIIGA';
 
   var subGanhos = document.getElementById('rep-sub-ganhos');
   if (subGanhos) {
@@ -1778,7 +1765,12 @@ function buildReport() {
       '<div class="rl">'+lv+'</div>' +
       '<div class="rt">'+ins+'</div></div>';
   });
-  document.getElementById('rep-ins').innerHTML = insHtml;
+  // Card duplicado removido da página 2 do relatório (item 8) — os 4 cards de fase
+  // com score/insight ficam consolidados só no rodapé da página do Radar (#ins-grid,
+  // preenchido em buildAndShowRadar()). insHtml continua calculado aqui só para
+  // acumular snapTotalScore/snapTotalMax abaixo.
+  var repInsEl = document.getElementById('rep-ins');
+  if (repInsEl) repInsEl.innerHTML = insHtml;
 
   // Section 2: opportunities
   var opps = generateOpportunities();
@@ -1886,6 +1878,12 @@ function buildReport() {
   // Update prazo in pressupostos
   var presPrazo = document.getElementById('pres-prazo');
   if(presPrazo) presPrazo.textContent = (S.prazoMedio||18) + ' meses';
+  // Pressupostos dinâmicos — vinculados às MESMAS constantes usadas em calculateROI()
+  // (retrBase e diasLib) para nunca mais divergir do texto estático se a fórmula mudar.
+  var presRetrab = document.getElementById('pres-retrab');
+  if(presRetrab) presRetrab.textContent = Math.round((roi.pctRetrabalho||0.10)*100) + '% do portfólio';
+  var presDiasLib = document.getElementById('pres-diaslib');
+  if(presDiasLib) presDiasLib.textContent = '~' + (Math.round((roi.diasLib||0)*100)/100).toLocaleString('pt-BR') + ' dias';
   // ROI real (Estratégica + Operacional), com dados coletados do cliente
   buildROIReal();
   // Road map
@@ -1928,10 +1926,15 @@ function buildROIReal() {
     '<span>'+pF('■')+' referência de mercado (Agilean/Lean Construction)</span>' +
     '<span>'+pS('■')+' fator do cenário escolhido</span>' +
   '</div>';
-  var roiCard = function(label, val) {
+  // sub: rótulo curto de recorte/escala (ex.: "por mês", "por obra", "no portfólio
+  // total") — feedback do CEO: com números em escalas muito diferentes na mesma
+  // página, deixar o recorte explícito evita a impressão de que os valores "não batem".
+  var roiCard = function(label, val, sub) {
     return '<div style="padding:12px 14px;background:var(--light);border-radius:var(--r3)">' +
       '<div style="font-size:10px;color:#999;text-transform:uppercase;letter-spacing:0.06em">'+label+'</div>' +
-      '<div style="font-family:Bai Jamjuree;font-size:18px;font-weight:700;margin-top:2px">'+val+'</div></div>';
+      '<div style="font-family:Bai Jamjuree;font-size:18px;font-weight:700;margin-top:2px">'+val+'</div>' +
+      (sub ? '<div style="font-size:9.5px;color:#999;margin-top:2px">'+sub+'</div>' : '') +
+    '</div>';
   };
 
   var cfgEl = document.getElementById('roi2-config');
@@ -1945,7 +1948,16 @@ function buildROIReal() {
 
   var sumEl = document.getElementById('roi2-summary');
   if(sumEl) {
-    sumEl.innerHTML = 'Mensalidade considerada: <strong style="color:#333">'+fmtNum(S.mensalidade)+'</strong> · Cenário: <strong style="color:#333">'+Math.round(S.captura*100)+'% ('+roiCapturaLabel(S.captura)+')</strong>';
+    // Peso relativo do investimento — deixa explícito, ao lado da mensalidade e do
+    // cenário, que a mensalidade é um recorte MUITO menor que o orçamento de uma obra
+    // (feedback do CEO: evitar que valores em escalas diferentes pareçam "não bater").
+    var orcamentoMedioAtual = S.orcamentoMedio || 8000000;
+    var pctMensalidadeOrcamento = orcamentoMedioAtual ? (S.mensalidade / orcamentoMedioAtual) * 100 : 0;
+    var pctFmt = pctMensalidadeOrcamento < 0.01
+      ? '< 0,01%'
+      : pctMensalidadeOrcamento.toLocaleString('pt-BR', {maximumFractionDigits: 2}) + '%';
+    sumEl.innerHTML = 'Mensalidade considerada: <strong style="color:#333">'+fmtNum(S.mensalidade)+'/mês</strong> · Cenário: <strong style="color:#333">'+Math.round(S.captura*100)+'% ('+roiCapturaLabel(S.captura)+')</strong>' +
+      '<br>Mensalidade representa <strong style="color:#333">'+pctFmt+'</strong> do orçamento médio de uma obra do portfólio — investimento pontual frente ao valor em risco.';
   }
 
   // Parâmetros base informados pelo cliente (alimentam as linhas de R$ abaixo)
@@ -1990,11 +2002,11 @@ function buildROIReal() {
   var estEl = document.getElementById('roi2-estrategica');
   if(estEl) {
     estEl.innerHTML =
-      '<div style="display:grid;grid-template-columns:repeat(3,1fr);gap:10px;margin-bottom:12px">' +
-        roiCard('ROI Mensal', Math.round(r.estrategica.roi*100)+'%') +
-        roiCard('Payback', isFinite(r.estrategica.payback) ? fmtNumBare(r.estrategica.payback)+' meses' : '—') +
-        roiCard('Ganho Líquido/mês', fmtNum(r.estrategica.ganhoLiquido)) +
+      '<div style="display:grid;grid-template-columns:repeat(2,1fr);gap:10px;margin-bottom:12px">' +
+        roiCard('ROI Mensal', Math.round(r.estrategica.roi*100)+'%', 'sobre a mensalidade, por mês') +
+        roiCard('Payback', isFinite(r.estrategica.payback) ? fmtNumBare(r.estrategica.payback)+' meses' : '—', 'meses até recuperar o investido') +
       '</div>' +
+      '<div class="pdf-resumo-hide">' +
       roiLegend +
       '<table class="roi-table"><thead><tr><th>Item</th><th>Como é calculado</th><th style="text-align:right">Valor</th></tr></thead><tbody>' +
         roiRow('Retrabalho administrativo liberado ('+fmtH(r.estrategica.horasAdmLib)+')',
@@ -2010,18 +2022,20 @@ function buildROIReal() {
         roiRow('Capacidade de gestão liberada ('+fmtH(r.estrategica.horasLib)+')',
           pC('Soma dos 8 fluxos informados')+' (quadro "De onde vêm as horas") × '+pS('fator do cenário')+' × '+pF('R$115/h'),
           fmtNum(r.estrategica.valorCapacidade)) +
-        roiRow('Investimento Agilean (mensalidade)', '<span style="color:#999">Valor definido pelo consultor</span>', '− '+fmtNum(S.mensalidade)) +
-      '</tbody></table>';
+        roiRow('Investimento Agilean (mensalidade)', '<span style="color:#999">Valor definido pelo consultor</span>', '− '+fmtNum(S.mensalidade)+'/mês') +
+      '</tbody></table>' +
+      '</div>';
   }
 
   var opEl = document.getElementById('roi2-operacional');
   if(opEl) {
     opEl.innerHTML =
       '<div style="display:grid;grid-template-columns:repeat(3,1fr);gap:10px;margin-bottom:12px">' +
-        roiCard('Horas recuperadas/mês', fmtH(r.operacional.hMes)) +
-        roiCard('Horas recuperadas/obra', fmtH(r.operacional.hObra)) +
-        roiCard('% da jornada liberada', (Math.round(r.operacional.pctJornada*1000)/10)+'%') +
+        roiCard('Horas recuperadas/mês', fmtH(r.operacional.hMes), 'no total da operação') +
+        roiCard('Horas recuperadas/obra', fmtH(r.operacional.hObra), 'por obra, no mês') +
+        roiCard('% da jornada liberada', (Math.round(r.operacional.pctJornada*1000)/10)+'%', 'da jornada individual do time técnico') +
       '</div>' +
+      '<div class="pdf-resumo-hide">' +
       roiLegend +
       '<table class="roi-table"><thead><tr><th>Item</th><th>Como é calculado</th><th style="text-align:right">Valor</th></tr></thead><tbody>' +
         roiRow('Economia nos fluxos de gestão',
@@ -2037,7 +2051,8 @@ function buildROIReal() {
           '<span style="color:#999">Soma bruta das linhas acima</span> × '+pF('15% de sobreposição'),
           '− '+fmtH(r.operacional.descBlocos)) +
         roiRow('<strong>Potencial pleno (antes do fator de captura)</strong>', '<span style="color:#999">Soma bruta − desconto de sobreposição</span>', '<strong>'+fmtH(r.operacional.potPleno)+'</strong>') +
-      '</tbody></table>';
+      '</tbody></table>' +
+      '</div>';
   }
 
   var cenTableEl = document.getElementById('roi2-cenarios-table');
@@ -2055,7 +2070,6 @@ function buildROIReal() {
         '<td>'+nomeCell+'</td>' +
         '<td style="text-align:center;color:#666">'+Math.round(c.fator*100)+'%</td>' +
         '<td style="text-align:right" class="roi-val">'+Math.round(rc.estrategica.roi*100)+'%</td>' +
-        '<td style="text-align:right" class="roi-val">'+fmtNum(rc.estrategica.ganhoLiquido)+'</td>' +
         '<td style="text-align:right" class="roi-val">'+fmtH(rc.operacional.hMes)+'</td>' +
         '</tr>';
     }).join('');
@@ -2063,8 +2077,7 @@ function buildROIReal() {
       '<thead><tr>' +
         '<th>Cenário</th><th style="text-align:center">Fator</th>' +
         '<th style="text-align:right">ROI Mensal</th>' +
-        '<th style="text-align:right">Ganho Líquido/mês</th>' +
-        '<th style="text-align:right">Horas/mês</th>' +
+        '<th style="text-align:right">Horas recuperadas/mês</th>' +
       '</tr></thead><tbody>' + cenRows + '</tbody>';
   }
 }
@@ -2160,6 +2173,8 @@ function calculateROI() {
   var ESTOURO_MO     = 0.15;
   var CAPTURA_MO     = 0.70;
   var CUSTO_ENG_DIA  = 800;
+  var PCT_RETRABALHO = 0.10; // retrabalho de mercado, referência usada em retrBase
+  var PCT_DESVIO_ERROS = 0.05; // desvio médio de folha/medição (planilhas), usado em erroBase
   var diasRotinas = [
     {atual:4, depois:1}, {atual:4, depois:0.5},
     {atual:5, depois:0.25}, {atual:3, depois:0.5}
@@ -2187,9 +2202,9 @@ function calculateROI() {
 
   // ── GANHOS BASE (potencial teórico por obra) ──────────────────────
   var engBase    = diasLib * CUSTO_ENG_DIA * prazo;
-  var retrBase   = orcamento * 0.10 * 0.40;
+  var retrBase   = orcamento * PCT_RETRABALHO * 0.40;
   var velocBase  = orcamento * 0.10 * 0.15;
-  var erroBase   = orcamento * PCT_MO * 0.02;
+  var erroBase   = orcamento * PCT_MO * PCT_DESVIO_ERROS;
 
   var moBase = 0;
   var moLabel = '', moBasis = '';
@@ -2235,7 +2250,7 @@ function calculateROI() {
     },
     {
       key:'erros', label:'Erros de medição e folha de produção',
-      basis: 'Orçamento × 45% (custo MO) × 2% (desvio médio)',
+      basis: 'Orçamento × 45% (custo MO) × ' + Math.round(PCT_DESVIO_ERROS*100) + '% (desvio médio)',
       fator: fatErros,
       porObra:   Math.round(erroBase * fatErros),
       portfolio: Math.round(erroBase * fatErros * obras),
@@ -2267,7 +2282,9 @@ function calculateROI() {
     total: totalPortfolio,
     totalBase: totalBase,
     overallFator: overallFator,
-    fatores: {time:fatTime, retrabalho:fatRetr, velocidade:fatVeloc, mo:fatMO, erros:fatErros}
+    fatores: {time:fatTime, retrabalho:fatRetr, velocidade:fatVeloc, mo:fatMO, erros:fatErros},
+    pctRetrabalho: PCT_RETRABALHO,
+    diasLib: diasLib
   };
 }
 
@@ -2974,12 +2991,17 @@ function applyPdfDarkTheme(root) {
   });
 }
 
-function generatePDF(fromAdmin, themeMode) {
+function generatePDF(fromAdmin, themeMode, mode) {
   // Design system "Executive Charcoal & Copper": o padrão de exportação agora é o
   // tema escuro executivo (applyPdfDarkTheme) — o relatório em PDF deixou de ser
   // convertido para fundo branco por padrão. themeMode:'light' continua disponível
   // como alternativa explícita (botão secundário), mas não é mais o caminho padrão.
   var isDark = (themeMode !== 'light');
+  // mode: 'resumido' (entrega ao cliente — esconde tabelas/pressupostos detalhados
+  // das seções de Perdas, Ganhos e ROI) ou 'detalhado' (default — mantém tudo,
+  // para o vendedor/consultor apresentar ao vivo). Default 'detalhado' para não
+  // quebrar quem já chama generatePDF() sem esse 3º argumento.
+  var isResumido = (mode === 'resumido');
 
   // Build report content first
   if(fromAdmin) {
@@ -3007,6 +3029,24 @@ function generatePDF(fromAdmin, themeMode) {
 
   // Wait for render then capture
   setTimeout(function() {
+    // PDF Resumido: esconde (display:none) todos os blocos marcados com a classe
+    // pdf-resumo-hide — tanto cards inteiros (ex.: tabela "Fonte de Ganho", card de
+    // "Faixa de Retorno por Cenário") quanto sub-blocos dentro de um card que
+    // permanece (ex.: quadro de Pressupostos dentro do card de Composição de
+    // Perdas, ou a "Memória de Cálculo" dentro do card de Ganho Esperado). Feito
+    // ANTES de medir a altura das seções (heightsPx abaixo) para que o
+    // bin-packing já reserve o espaço correto; restaurado em finish()/fail().
+    var hiddenEls = [];
+    if (isResumido) {
+      Array.prototype.forEach.call(document.querySelectorAll('.pdf-resumo-hide'), function(el){
+        hiddenEls.push({ el: el, prevDisplay: el.style.display });
+        el.style.display = 'none';
+      });
+    }
+    function restoreResumidoHidden() {
+      hiddenEls.forEach(function(h){ h.el.style.display = h.prevDisplay; });
+    }
+
     var reportEl = document.getElementById('screen-report');
     var wrapper = reportEl.querySelector(':scope > div');
     // Filtra fora do bin-packing os elementos que applyPdfDarkTheme/applyPdfLightTheme
@@ -3023,6 +3063,7 @@ function generatePDF(fromAdmin, themeMode) {
     }) : [];
 
     if(sections.length === 0) {
+      restoreResumidoHidden();
       document.body.removeChild(loadDiv);
       alert('Erro ao gerar PDF: conteúdo do relatório não encontrado.');
       return;
@@ -3122,16 +3163,18 @@ function generatePDF(fromAdmin, themeMode) {
     var globalPageNum = 0;
 
     function finish() {
+      restoreResumidoHidden();
       var empresa = (S.empresa || 'diagnostico').replace(/[^a-zA-Z0-9]/g, '_');
       var data = (S.data || new Date().toISOString().split('T')[0]);
-      var suffix = isDark ? '_DARK_MODE' : '';
+      var suffix = (isDark ? '_DARK_MODE' : '') + (isResumido ? '_RESUMIDO' : '_DETALHADO');
       window.__LAST_PDF_DATA = pdf.output('datauristring');
       pdf.save('SIIGA_Assessment_' + empresa + suffix + '_' + data + '.pdf');
       document.body.removeChild(loadDiv);
-      showToast('PDF ' + (isDark ? 'Dark Mode ' : '') + 'gerado com sucesso!');
+      showToast('PDF ' + (isResumido ? 'Resumido ' : 'Detalhado ') + (isDark ? 'Dark Mode ' : '') + 'gerado com sucesso!');
     }
 
     function fail(err) {
+      restoreResumidoHidden();
       document.body.removeChild(loadDiv);
       console.error('PDF error:', err);
       alert('Erro ao gerar PDF. Tente usar o botão Imprimir como alternativa.');
@@ -3309,13 +3352,13 @@ function generatePDF(fromAdmin, themeMode) {
   }, 400);
 }
 
-function generatePDFFromAdmin(id, themeMode) {
+function generatePDFFromAdmin(id, themeMode, mode) {
   var list = getAllDiagnosticos();
   var rec = list.find(function(r){ return r.id === id; });
   if(!rec) return;
   S = rec.state;
   if(!S.ferramentas) S.ferramentas = {planejamento:'',medicao:'',qualidade:'',contratos:'',folha:''};
-  generatePDF(true, themeMode);
+  generatePDF(true, themeMode, mode);
 }
 
 
@@ -3714,8 +3757,8 @@ var AHA_DETAILS = {
     title: 'Erros de Medição e Folha de Produção',
     icon: '📋',
     color: '#a78bfa',
-    desc: 'Erros de aferição, fórmulas inconsistentes e falta de segurança em planilhas geram desvios médios de 2% no custo de mão de obra. Com o SIIGA, o fechamento passa a ser baseado em evidência digital — eliminando esses desvios.',
-    formula: 'Orçamento × 45% (custo de MO) × 2% (desvio médio de planilhas)'
+    desc: 'Erros de aferição, fórmulas inconsistentes e falta de segurança em planilhas geram desvios médios de 5% no custo de mão de obra. Com o SIIGA, o fechamento passa a ser baseado em evidência digital — eliminando esses desvios.',
+    formula: 'Orçamento × 45% (custo de MO) × 5% (desvio médio de planilhas)'
   }
 };
 
@@ -4220,13 +4263,16 @@ async function checkAdminPdfRequest() {
   var params = new URLSearchParams(location.search);
   var id = params.get('admin_pdf');
   if(!id) return false;
+  // pdf_mode: 'resumido' ou 'detalhado' (default), passado pelo admin (admin.js) —
+  // mesma distinção Resumido/Detalhado disponível no fluxo normal do diagnóstico.
+  var pdfMode = params.get('pdf_mode') === 'resumido' ? 'resumido' : 'detalhado';
   if(!sbClient) { alert('Não foi possível conectar ao Supabase para carregar o diagnóstico.'); return true; }
   try {
     var result = await sbClient.from('assessments').select('*').eq('id', id).single();
     if(result.error || !result.data) { alert('Diagnóstico não encontrado (id ' + id + ').'); return true; }
     S = result.data.state;
     if(!S.ferramentas) S.ferramentas = {planejamento:'',medicao:'',qualidade:'',contratos:'',folha:''};
-    generatePDF(true);
+    generatePDF(true, null, pdfMode);
   } catch(err) {
     alert('Erro ao carregar diagnóstico: ' + err.message);
   }
