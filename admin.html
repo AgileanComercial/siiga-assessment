@@ -304,10 +304,11 @@
       font-weight: 600;
       font-family: var(--font-display);
     }
-    .nivel-reativo { background: rgba(248,113,113,0.15); color: var(--red); border: 1px solid rgba(248,113,113,0.3); }
-    .nivel-construcao { background: rgba(251,191,36,0.15); color: var(--yellow); border: 1px solid rgba(251,191,36,0.3); }
-    .nivel-estruturado { background: rgba(96,165,250,0.15); color: var(--blue); border: 1px solid rgba(96,165,250,0.3); }
-    .nivel-referencia { background: rgba(52,211,153,0.15); color: var(--green); border: 1px solid rgba(52,211,153,0.3); }
+    .nivel-reativo, .nivel-critico { background: rgba(239,68,68,0.15); color: #ef4444; border: 1px solid rgba(239,68,68,0.3); }
+    .nivel-construcao, .nivel-artesanal { background: rgba(249,115,22,0.15); color: #f97316; border: 1px solid rgba(249,115,22,0.3); }
+    .nivel-parcial { background: rgba(234,179,8,0.15); color: #eab308; border: 1px solid rgba(234,179,8,0.3); }
+    .nivel-estruturado { background: rgba(59,130,246,0.15); color: #3b82f6; border: 1px solid rgba(59,130,246,0.3); }
+    .nivel-referencia { background: rgba(16,185,129,0.15); color: #10b981; border: 1px solid rgba(16,185,129,0.3); }
 
     /* Slide-over panel styles */
     #details-modal {
@@ -492,10 +493,11 @@
         <label class="filter-label">Nível</label>
         <select class="filter-input" id="filter-nivel" onchange="applyFilters()">
           <option value="">Todos</option>
-          <option value="Reativo">Reativo</option>
-          <option value="Em Construção">Em Construção</option>
-          <option value="Estruturado">Estruturado</option>
-          <option value="Referência SIIGA">Referência</option>
+          <option value="Crítico / Vulnerável">Crítico / Vulnerável</option>
+          <option value="Operação Artesanal / Risco de Desvio">Operação Artesanal</option>
+          <option value="Parcialmente Estruturado (Gargalos de Escala)">Parcialmente Estruturado</option>
+          <option value="Estruturado com Perdas Ocultas">Estruturado com Perdas Ocultas</option>
+          <option value="Referência SIIGA / Alta Performance">Referência SIIGA</option>
         </select>
       </div>
       <div class="filter-group">
@@ -546,9 +548,15 @@
           <h2 id="modal-title" style="font-family: var(--font-display); font-weight: 700; font-size: 22px; color: var(--orange);">Nome da Empresa</h2>
           <p id="modal-subtitle" style="font-size: 13px; color: var(--gray); margin-top: 4px;">Detalhes completos do diagnóstico e lead scoring</p>
         </div>
-        <button class="close-btn" onclick="closeModal()">&times;</button>
+        <div style="display:flex; align-items:center; gap:14px;">
+          <button onclick="if(currentDetailRow) window.open('/?admin_pdf=' + currentDetailRow.id + '&pdf_mode=resumido', '_blank')" style="background:var(--surface); border:1px solid var(--border); color:var(--orange); font-family:var(--font-display); font-size:12px; font-weight:600; padding:8px 14px; border-radius:8px; cursor:pointer;">🖨️ PDF Resumido</button>
+          <button onclick="if(currentDetailRow) window.open('/?admin_pdf=' + currentDetailRow.id + '&pdf_mode=detalhado', '_blank')" style="background:var(--surface); border:1px solid var(--border); color:var(--orange); font-family:var(--font-display); font-size:12px; font-weight:600; padding:8px 14px; border-radius:8px; cursor:pointer;">🖥️ PDF Detalhado</button>
+          <button onclick="exportLeadQuestionsCSV()" style="background:var(--surface); border:1px solid var(--border); color:var(--orange); font-family:var(--font-display); font-size:12px; font-weight:600; padding:8px 14px; border-radius:8px; cursor:pointer;">📥 Exportar Perguntas (CSV)</button>
+          <button class="close-btn" onclick="closeModal()">&times;</button>
+        </div>
       </div>
-      <div class="modal-body" id="modal-summary">
+      <div class="modal-body">
+        <div id="modal-summary"></div>
       </div>
     </div>
   </div>

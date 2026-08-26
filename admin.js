@@ -9,6 +9,7 @@ const supabaseClient = window.supabase ? window.supabase.createClient(SUPABASE_U
 let allData = [];
 let filteredData = [];
 let selectedIds = [];
+let currentDetailRow = null;
 
 // ═══════════════════════════════════════════
 //  LOGIN
@@ -102,9 +103,11 @@ function getNivel(row) { return row.nivel || '—'; }
 
 function getNivelBadgeHTML(nivel) {
   if (!nivel || nivel === '—') return '<span class="badge-nivel" style="color:var(--gray)">—</span>';
-  if (nivel === 'Reativo') return '<span class="badge-nivel nivel-reativo">Reativo</span>';
-  if (nivel === 'Em Construção') return '<span class="badge-nivel nivel-construcao">Em Construção</span>';
-  if (nivel === 'Estruturado') return '<span class="badge-nivel nivel-estruturado">Estruturado</span>';
+  // Nomenclatura antiga (registros salvos antes da recalibração) mapeada para os novos níveis.
+  if (nivel === 'Reativo' || nivel.indexOf('Crítico') >= 0 || nivel.indexOf('Critico') >= 0) return '<span class="badge-nivel nivel-critico">Crítico / Vulnerável</span>';
+  if (nivel === 'Em Construção' || nivel.indexOf('Operação Artesanal') >= 0 || nivel.indexOf('Operacao Artesanal') >= 0) return '<span class="badge-nivel nivel-artesanal">Operação Artesanal</span>';
+  if (nivel.indexOf('Parcialmente Estruturado') >= 0) return '<span class="badge-nivel nivel-parcial">Parcialmente Estruturado</span>';
+  if (nivel === 'Estruturado' || nivel.indexOf('Perdas Ocultas') >= 0) return '<span class="badge-nivel nivel-estruturado">Estruturado</span>';
   if (nivel.indexOf('Referência') >= 0 || nivel.indexOf('Referencia') >= 0) return '<span class="badge-nivel nivel-referencia">Referência</span>';
   return '<span class="badge-nivel" style="color:var(--gray)">' + nivel + '</span>';
 }
@@ -129,22 +132,14 @@ function getField(row, directKey, stateKey) {
 //  PHASE DEFINITIONS (for display)
 // ═══════════════════════════════════════════
 var PHASES = {
-  f1: {
-    label: 'Fase 1 · Planejamento Estratégico', color: '#60a5fa', max: 21, qCount: 7,
-    questions: ['Planejamento formal', 'Técnica de planejamento', 'Dimensionamento de duração', 'Integração orçamento × plano', 'Análise da Curva S', 'Cronograma bancário', 'Integração com suprimentos']
-  },
-  f2: {
-    label: 'Fase 2 · Proteção da Execução', color: '#2dd4bf', max: 12, qCount: 4,
-    questions: ['Lookahead / rotina de médio prazo', 'Antecedência de riscos', 'Confirmação de equipes', 'Reprogramação formal']
-  },
-  f3: {
-    label: 'Fase 3 · Gestão da Produção', color: '#34d399', max: 18, qCount: 6,
-    questions: ['Programação semanal', 'Check-in / Check-out diário', 'Registro de causas de desvio', 'Frequência coleta avanço', 'Vínculo qualidade × pagamento', 'Análise intermediária']
-  },
-  f4: {
-    label: 'Fase 4 · Controle e Performance', color: '#9ca3af', max: 12, qCount: 4,
-    questions: ['Reunião de fechamento técnico', 'Reunião executiva com diretoria', 'Painel integrado de indicadores', 'Fechamento financeiro rastreável']
-  }
+  f1: { label: 'Fase 1 · Planejamento Estratégico', color: '#60a5fa', max: 21, qCount: 7,
+    questions: ['Planejamento formal', 'Técnica de planejamento', 'Dimensionamento de duração', 'Integração orçamento × plano', 'Análise da Curva S', 'Cronograma bancário', 'Integração com suprimentos'] },
+  f2: { label: 'Fase 2 · Proteção da Execução', color: '#2dd4bf', max: 9, qCount: 3,
+    questions: ['Lookahead / antecipação de restrições', 'Confirmação de equipes', 'Reprogramação formal'] },
+  f3: { label: 'Fase 3 · Gestão da Produção', color: '#34d399', max: 15, qCount: 5,
+    questions: ['Programação semanal', 'Check-in / Check-out e causa raiz', 'Frequência coleta avanço', 'Qualidade × avanço físico', 'Análise intermediária de PPC'] },
+  f4: { label: 'Fase 4 · Controle e Performance', color: '#9ca3af', max: 12, qCount: 4,
+    questions: ['Reunião de fechamento técnico', 'Reunião executiva com diretoria', 'Painel integrado de indicadores', 'Governança financeira (ERP)'] }
 };
 
 function getPhaseScores(row) {
@@ -163,17 +158,19 @@ function sumArray(arr) {
 }
 
 function levelFromPct(p) {
-  if (p < 0.35) return 'Reativo';
-  if (p < 0.6) return 'Em Construção';
-  if (p < 0.85) return 'Estruturado';
-  return 'Referência SIIGA';
+  if (p < 0.40) return 'Crítico / Vulnerável';
+  if (p < 0.60) return 'Operação Artesanal / Risco de Desvio';
+  if (p < 0.75) return 'Parcialmente Estruturado (Gargalos de Escala)';
+  if (p < 0.90) return 'Estruturado com Perdas Ocultas';
+  return 'Referência SIIGA / Alta Performance';
 }
 
 function colorFromPct(p) {
-  if (p < 0.35) return '#f87171';
-  if (p < 0.6) return '#fbbf24';
-  if (p < 0.85) return '#60a5fa';
-  return '#34d399';
+  if (p < 0.40) return '#ef4444';
+  if (p < 0.60) return '#f97316';
+  if (p < 0.75) return '#eab308';
+  if (p < 0.90) return '#3b82f6';
+  return '#10b981';
 }
 
 // ═══════════════════════════════════════════
@@ -267,7 +264,12 @@ function applyFilters() {
     }
     if (nivelFilter) {
       var rn = row._nivel || '';
-      if (nivelFilter === 'Referência SIIGA') { if (rn.indexOf('Referência') < 0 && rn.indexOf('Referencia') < 0) return false; }
+      // Compatível com registros salvos antes da recalibração (nomenclatura antiga de nível).
+      if (nivelFilter.indexOf('Referência') >= 0) { if (rn.indexOf('Referência') < 0 && rn.indexOf('Referencia') < 0) return false; }
+      else if (nivelFilter.indexOf('Crítico') >= 0) { if (rn !== 'Reativo' && rn.indexOf('Crítico') < 0 && rn.indexOf('Critico') < 0) return false; }
+      else if (nivelFilter.indexOf('Operação Artesanal') >= 0) { if (rn !== 'Em Construção' && rn.indexOf('Operação Artesanal') < 0 && rn.indexOf('Operacao Artesanal') < 0) return false; }
+      else if (nivelFilter.indexOf('Parcialmente Estruturado') >= 0) { if (rn.indexOf('Parcialmente Estruturado') < 0) return false; }
+      else if (nivelFilter.indexOf('Perdas Ocultas') >= 0) { if (rn !== 'Estruturado' && rn.indexOf('Perdas Ocultas') < 0) return false; }
       else { if (rn !== nivelFilter) return false; }
     }
     if (consultorFilter) {
@@ -315,12 +317,15 @@ function renderTable() {
       '<td>' + telefone + '</td>' +
       '<td>' + getNivelBadgeHTML(row._nivel) + '</td>' +
       '<td style="position:relative; text-align:center;" onclick="event.stopPropagation();">' +
-      '<button onclick="toggleActionMenu(event, ' + index + ')" style="background:none; border:none; color:var(--gray); cursor:pointer; font-size:18px; padding:4px 8px; font-weight:bold; outline:none;">⋮</button>' +
-      '<div id="action-menu-' + index + '" class="action-dropdown">' +
-      '<a onclick="handleAction(\'view\', ' + index + ')">📄 Detalhes</a>' +
-      '<a onclick="handleAction(\'edit\', ' + index + ')">✏️ Editar</a>' +
-      '<a onclick="handleAction(\'delete\', ' + index + ')" style="color:var(--red);">🗑️ Excluir</a>' +
-      '</div>' +
+        '<button onclick="toggleActionMenu(event, ' + index + ')" style="background:none; border:none; color:var(--gray); cursor:pointer; font-size:18px; padding:4px 8px; font-weight:bold; outline:none;">⋮</button>' +
+        '<div id="action-menu-' + index + '" class="action-dropdown">' +
+          '<a onclick="handleAction(\'view\', ' + index + ')">📄 Detalhes</a>' +
+          '<a onclick="handleAction(\'pdf-resumido\', ' + index + ')">🖨️ Gerar PDF Resumido</a>' +
+          '<a onclick="handleAction(\'pdf-detalhado\', ' + index + ')">🖥️ Gerar PDF Detalhado</a>' +
+          '<a onclick="handleAction(\'export-questions\', ' + index + ')">📥 Exportar Perguntas (CSV)</a>' +
+          '<a onclick="handleAction(\'edit\', ' + index + ')">✏️ Editar</a>' +
+          '<a onclick="handleAction(\'delete\', ' + index + ')" style="color:var(--red);">🗑️ Excluir</a>' +
+        '</div>' +
       '</td>';
     tbody.appendChild(tr);
   });
@@ -340,7 +345,7 @@ function calculateLeadROI(row) {
   var prazo = parseInt((state && state.prazoMedio) || 18);
   var mo = (state && state.modeloMO) || '';
 
-  var maxes = { f1: 21, f2: 12, f3: 18, f4: 12 };
+  var maxes = { f1: 21, f2: 9, f3: 15, f4: 12 };
 
   function getAvgPct(key) {
     var arr = scores[key];
@@ -458,9 +463,79 @@ function generateLeadOpportunities(row) {
   return opps.slice(0, 5);
 }
 
+// ═══════════════════════════════════════════
+//  CSV DE PERGUNTAS DO LEAD (exportação individual)
+// ═══════════════════════════════════════════
+var MO_QUESTION_LABELS = {
+  'MO.1': 'Transparência de metas de ganho',
+  'MO.2': 'Visibilidade de improdutividade',
+  'MO.3': 'Processo de verba extra',
+  'MO.4': 'Tempo de fechamento de folha',
+  'MO.5': 'Metas de empreiteiros',
+  'MO.6': 'Comunicação de bloqueios',
+  'MO.7': 'Tempo de medição'
+};
+
+function csvField(v) {
+  return '"' + String(v == null ? '' : v).replace(/"/g, '""') + '"';
+}
+
+function exportLeadQuestionsCSV() {
+  var row = currentDetailRow;
+  if (!row) { alert('Abra os Detalhes de um diagnóstico antes de exportar.'); return; }
+
+  var state = getState(row);
+  var scores = getPhaseScores(row);
+  var empresa = getField(row, 'empresa', 'empresa') || 'Diagnóstico';
+  var contato = getField(row, 'contato', 'contato') || '—';
+  var cargo = getField(row, 'cargo', 'cargo') || '—';
+  var consultor = getField(row, 'consultor', 'consultor') || '—';
+  var rawDate = row.created_at || new Date().toISOString();
+  var d = new Date(rawDate);
+  var dateStr = d.getDate().toString().padStart(2,'0') + '/' + (d.getMonth()+1).toString().padStart(2,'0') + '/' + d.getFullYear();
+
+  var lines = [];
+  lines.push([csvField('Empresa'), csvField(empresa)].join(';'));
+  lines.push([csvField('Contato'), csvField(contato + (cargo && cargo !== '—' ? ' (' + cargo + ')' : ''))].join(';'));
+  lines.push([csvField('Consultor'), csvField(consultor)].join(';'));
+  lines.push([csvField('Data do diagnóstico'), csvField(dateStr)].join(';'));
+  lines.push('');
+  lines.push([csvField('Fase'), csvField('Pergunta'), csvField('Score'), csvField('Score Máximo')].join(';'));
+
+  ['f1', 'f2', 'f3', 'f4'].forEach(function(key) {
+    var phase = PHASES[key];
+    var phaseScores = scores[key];
+    if (!Array.isArray(phaseScores)) return;
+    phaseScores.forEach(function(qScore, qi) {
+      var qLabel = phase.questions[qi] || ('Pergunta ' + (qi + 1));
+      lines.push([csvField(phase.label), csvField(qLabel), csvField(qScore != null ? qScore : ''), csvField(3)].join(';'));
+    });
+  });
+
+  if (scores.mo && typeof scores.mo === 'object') {
+    Object.keys(scores.mo).forEach(function(k) {
+      var qLabel = MO_QUESTION_LABELS[k] || k;
+      lines.push([csvField('Bloco MO · Gestão de Mão de Obra'), csvField(qLabel), csvField(scores.mo[k] != null ? scores.mo[k] : ''), csvField(3)].join(';'));
+    });
+  }
+
+  var csvContent = '﻿' + lines.join('\n');
+  var blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+  var url = URL.createObjectURL(blob);
+
+  var link = document.createElement('a');
+  link.setAttribute('href', url);
+  link.setAttribute('download', 'diagnostico_' + empresa.replace(/[^a-z0-9]+/gi, '_') + '.csv');
+  link.style.visibility = 'hidden';
+  document.body.appendChild(link);
+  link.click();
+  document.body.removeChild(link);
+}
+
 function openDetails(index) {
   var row = filteredData[index];
   if (!row) return;
+  currentDetailRow = row;
 
   var state = getState(row);
   var scores = getPhaseScores(row);
@@ -476,7 +551,7 @@ function openDetails(index) {
   var modeloMO = (state && state.modeloMO) || '—';
   var momento = (state && state.momento) || '—';
   var totalScore = row.total_score || 0;
-  var totalMax = row.total_max || 66;
+  var totalMax = row.total_max || 60;
   var totalPct = totalMax > 0 ? totalScore / totalMax : 0;
 
   var rawDate = row.created_at || new Date().toISOString();
@@ -593,7 +668,6 @@ function openDetails(index) {
   html += detailItem('Orçamento Médio', fmtOrcamento(orcamento));
   html += detailItem('Prazo Médio', (state && state.prazoMedio ? state.prazoMedio + ' meses' : '—'));
   html += detailItem('Estrutura de Time (B0.3)', (scores.b03 !== undefined ? scores.b03 + '/3' : '—'));
-  html += detailItem('Estrutura do Orçamento (B0.6)', (scores.b06 !== undefined ? scores.b06 + '/3' : '—'));
   html += '</div></div>';
 
   html += '<div style="background:rgba(255,255,255,0.01);border:1px solid var(--border);border-radius:12px;padding:20px;margin-bottom:20px;">';
@@ -720,7 +794,7 @@ function openDetails(index) {
         },
         {
           label: 'Média de mercado',
-          data: [45, 38, 35, 30],
+          data: [70, 62, 55, 58],
           borderColor: 'rgba(255,255,255,0.25)',
           backgroundColor: 'rgba(255,255,255,0.03)',
           borderWidth: 1.5,
@@ -729,7 +803,7 @@ function openDetails(index) {
         },
         {
           label: 'Referência SIIGA',
-          data: [90, 85, 88, 82],
+          data: [92, 88, 90, 85],
           borderColor: '#34d399',
           backgroundColor: 'rgba(52,211,153,0.05)',
           borderWidth: 1.5,
@@ -873,14 +947,14 @@ async function insertTestRecords() {
       modelo_mo: 'mista',
       num_obras: 12,
       orcamento_medio: 15000000,
-      total_score: 42,
-      total_max: 66,
-      nivel: 'Estruturado',
+      total_score: 34,
+      total_max: 60,
+      nivel: 'Operação Artesanal / Risco de Desvio',
       scores: {
-        b03: 2, b06: 3,
+        b03: 2,
         f1: [2, 2, 1, 2, 2, 1, 2],
-        f2: [2, 2, 2, 2],
-        f3: [2, 1, 1, 2, 1, 1],
+        f2: [2, 2, 2],
+        f3: [2, 1, 2, 1, 1],
         f4: [2, 2, 1, 2],
         mo: { 'MO.1': 2, 'MO.2': 1, 'MO.3': 2, 'MO.4': 1, 'MO.5': 2, 'MO.6': 1, 'MO.7': 2 }
       },
@@ -889,7 +963,7 @@ async function insertTestRecords() {
         cargo: 'Diretor de Engenharia', email: 'roberto.silva@mrv.com.br', telefone: '(85) 99999-1234',
         data: '2026-05-29', numObras: 12, orcamentoMedio: 15000000, prazoMedio: 24,
         tipologia: 'vert', modeloMO: 'mista', momento: 'crescimento',
-        scores: { b03: 2, b06: 3, f1: [2, 2, 1, 2, 2, 1, 2], f2: [2, 2, 2, 2], f3: [2, 1, 1, 2, 1, 1], f4: [2, 2, 1, 2], mo: { 'MO.1': 2, 'MO.2': 1, 'MO.3': 2, 'MO.4': 1, 'MO.5': 2, 'MO.6': 1, 'MO.7': 2 } },
+        scores: { b03: 2, f1: [2,2,1,2,2,1,2], f2: [2,2,2], f3: [2,1,2,1,1], f4: [2,2,1,2], mo: { 'MO.1':2,'MO.2':1,'MO.3':2,'MO.4':1,'MO.5':2,'MO.6':1,'MO.7':2 } },
         showMO: true
       }
     },
@@ -906,14 +980,14 @@ async function insertTestRecords() {
       modelo_mo: 'terceirizada',
       num_obras: 6,
       orcamento_medio: 8000000,
-      total_score: 22,
-      total_max: 66,
-      nivel: 'Em Construção',
+      total_score: 13,
+      total_max: 60,
+      nivel: 'Crítico / Vulnerável',
       scores: {
-        b03: 1, b06: 1,
+        b03: 1,
         f1: [1, 1, 0, 1, 0, 0, 1],
-        f2: [1, 1, 1, 1],
-        f3: [1, 0, 0, 1, 0, 0],
+        f2: [1, 1, 1],
+        f3: [1, 0, 1, 0, 0],
         f4: [1, 1, 0, 1],
         mo: { 'MO.5': 1, 'MO.6': 0, 'MO.7': 1 }
       },
@@ -922,7 +996,7 @@ async function insertTestRecords() {
         cargo: 'Gerente de Projetos', email: 'carlos@galpoesnordeste.com.br', telefone: '(81) 98888-5678',
         data: '2026-05-28', numObras: 6, orcamentoMedio: 8000000, prazoMedio: 14,
         tipologia: 'com', modeloMO: 'terceirizada', momento: 'consolidacao',
-        scores: { b03: 1, b06: 1, f1: [1, 1, 0, 1, 0, 0, 1], f2: [1, 1, 1, 1], f3: [1, 0, 0, 1, 0, 0], f4: [1, 1, 0, 1], mo: { 'MO.5': 1, 'MO.6': 0, 'MO.7': 1 } },
+        scores: { b03: 1, f1: [1,1,0,1,0,0,1], f2: [1,1,1], f3: [1,0,1,0,0], f4: [1,1,0,1], mo: { 'MO.5':1,'MO.6':0,'MO.7':1 } },
         showMO: true
       }
     },
@@ -939,14 +1013,14 @@ async function insertTestRecords() {
       modelo_mo: 'propria',
       num_obras: 3,
       orcamento_medio: 4000000,
-      total_score: 12,
-      total_max: 66,
-      nivel: 'Reativo',
+      total_score: 2,
+      total_max: 60,
+      nivel: 'Crítico / Vulnerável',
       scores: {
-        b03: 0, b06: 0,
+        b03: 0,
         f1: [0, 0, 0, 0, 1, 0, 0],
-        f2: [0, 0, 1, 0],
-        f3: [0, 0, 0, 1, 0, 0],
+        f2: [0, 0, 0],
+        f3: [0, 0, 1, 0, 0],
         f4: [0, 0, 0, 0],
         mo: { 'MO.1': 0, 'MO.2': 0, 'MO.3': 1, 'MO.4': 0 }
       },
@@ -955,7 +1029,7 @@ async function insertTestRecords() {
         cargo: 'Engenheiro de Obra', email: 'joao@alfa.eng.br', telefone: '(11) 97777-4321',
         data: '2026-05-27', numObras: 3, orcamentoMedio: 4000000, prazoMedio: 12,
         tipologia: 'horiz', modeloMO: 'propria', momento: 'estavel',
-        scores: { b03: 0, b06: 0, f1: [0, 0, 0, 0, 1, 0, 0], f2: [0, 0, 1, 0], f3: [0, 0, 0, 1, 0, 0], f4: [0, 0, 0, 0], mo: { 'MO.1': 0, 'MO.2': 0, 'MO.3': 1, 'MO.4': 0 } },
+        scores: { b03: 0, f1: [0,0,0,0,1,0,0], f2: [0,0,0], f3: [0,0,1,0,0], f4: [0,0,0,0], mo: { 'MO.1':0,'MO.2':0,'MO.3':1,'MO.4':0 } },
         showMO: true
       }
     }
@@ -1075,7 +1149,7 @@ function exportSelectedCSV() {
   exportRows.forEach(function (row) {
     var state = getState(row);
     var totalScore = row.total_score || 0;
-    var totalMax = row.total_max || 66;
+    var totalMax = row.total_max || 60;
     var totalPct = totalMax > 0 ? (totalScore / totalMax) : 0;
     var maturityPct = Math.round(totalPct * 100) + '%';
 
@@ -1199,6 +1273,18 @@ function handleAction(action, index) {
   closeAllActionMenus();
   if (action === 'view') {
     openDetails(index);
+  } else if (action === 'pdf-resumido') {
+    var row = filteredData[index];
+    if (row) window.open('/?admin_pdf=' + row.id + '&pdf_mode=resumido', '_blank');
+  } else if (action === 'pdf-detalhado') {
+    var row = filteredData[index];
+    if (row) window.open('/?admin_pdf=' + row.id + '&pdf_mode=detalhado', '_blank');
+  } else if (action === 'export-questions') {
+    var row = filteredData[index];
+    if (row) {
+      currentDetailRow = row;
+      exportLeadQuestionsCSV();
+    }
   } else if (action === 'edit') {
     openEditModal(index);
   } else if (action === 'delete') {
@@ -1287,7 +1373,7 @@ async function saveEdit() {
   row._leadScore = calcLeadScore(row);
 
   var totalScore = row.total_score || 0;
-  var totalMax = row.total_max || 66;
+  var totalMax = row.total_max || 60;
   row.nivel = levelFromPct(totalScore / totalMax);
   row._nivel = row.nivel;
 

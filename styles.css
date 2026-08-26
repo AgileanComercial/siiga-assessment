@@ -58,6 +58,18 @@ h1,h2,h3,h4{font-family:'Bai Jamjuree',sans-serif}
 .anchor{margin-top:20px;padding:14px 18px;background:rgba(255,95,31,0.06);border-left:2.5px solid var(--orange);border-radius:0 var(--r3) var(--r3) 0;font-size:12px;color:var(--gray2);line-height:1.65;font-style:italic}
 .anchor strong{color:var(--orange);font-style:normal}
 
+/* Rodada 2 · SMART DIAGNOSTIC — combo screens (varias perguntas, scores independentes) */
+.combo-sub{margin-bottom:4px}
+.combo-sub-label{font-family:'Bai Jamjuree';font-size:13px;font-weight:700;color:var(--white);margin-bottom:4px;display:flex;align-items:center;gap:8px}
+.combo-sub-code{font-size:9px;color:var(--gray2);text-transform:uppercase;letter-spacing:0.1em;font-weight:600;background:rgba(255,255,255,0.05);padding:2px 7px;border-radius:10px}
+.combo-sub-text{font-size:12.5px;color:rgba(255,255,255,0.82);line-height:1.45;margin-bottom:10px}
+.combo-divider{height:1px;background:rgba(255,255,255,0.08);margin:18px 0}
+.options-compact{gap:6px}
+.options-compact .opt{padding:9px 12px;gap:10px;font-size:12px}
+.options-compact .opt-dot{min-width:20px;height:20px;font-size:9px}
+.options-compact .opt-score{font-size:9px}
+.options-compact .opt-sub{display:none}
+
 .text-input{width:100%;padding:11px 14px;background:rgba(255,255,255,0.02);border:1.5px solid rgba(255,255,255,0.12);border-radius:var(--r3);color:var(--white);font-family:'Manrope';font-size:14px;outline:none;transition:all 0.2s;box-shadow:inset 0 2px 4px rgba(0,0,0,0.1)}
 .text-input:focus{background:rgba(255,255,255,0.05);border-color:var(--orange);box-shadow:0 0 0 3px rgba(255,95,31,0.2)}
 .text-input::placeholder{color:var(--gray2)}
@@ -77,11 +89,12 @@ select.text-input option:disabled{color:#999}
 .score-bar{height:5px;border-radius:3px;background:rgba(255,255,255,0.07);margin:10px 0}
 .score-fill{height:100%;border-radius:3px;transition:width 0.9s ease}
 
-.radar-grid{display:grid;grid-template-columns:1.1fr 0.9fr;gap:28px;align-items:start;margin-top:8px}
-.legend-item{display:flex;align-items:flex-start;gap:10px;margin-bottom:14px}
-.legend-dot{width:10px;height:10px;border-radius:50%;margin-top:4px;flex-shrink:0}
-.legend-label strong{display:block;font-family:'Bai Jamjuree';font-size:14px}
-.legend-label span{font-size:11px;color:var(--gray2)}
+#screen-radar .card{padding:42px}
+.radar-grid{display:grid;grid-template-columns:1.1fr 0.9fr;gap:40px;align-items:start;margin-top:14px}
+.legend-item{display:flex;align-items:flex-start;gap:12px;margin-bottom:18px}
+.legend-dot{width:11px;height:11px;border-radius:50%;margin-top:4px;flex-shrink:0}
+.legend-label strong{display:block;font-family:'Bai Jamjuree';font-size:15px}
+.legend-label span{font-size:12px;color:var(--gray2)}
 
 .insights-grid{display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-top:20px}
 .ins-card{padding:16px;border-radius:var(--r3);border:1px solid rgba(255,255,255,0.06);background:rgba(255,255,255,0.02);transition:all 0.25s}
@@ -114,6 +127,13 @@ select.text-input option:disabled{color:#999}
 /* REPORT */
 #screen-report{background:var(--light);color:var(--black)}
 #screen-report .card{background:white;border:none;box-shadow:var(--shadow-sm)}
+
+/* PROPOSTA COMERCIAL (reunião 2) — mesmo padrão de fundo/card do Diagnóstico
+   (screen-report acima) na tela ao vivo; o tema "Executive Charcoal & Copper"
+   escuro só é aplicado no clone isolado durante a captura do PDF
+   (applyPdfDarkTheme, ver generateProposta() em script.js). */
+#screen-proposta{background:var(--light);color:var(--black)}
+#screen-proposta .card{background:white;border:none;box-shadow:var(--shadow-sm)}
 .rep-header{width:100%;max-width:920px;display:flex;justify-content:space-between;align-items:flex-end;margin-bottom:20px;padding-bottom:14px;border-bottom:3px solid var(--orange)}
 .rep-header img{height:26px}
 .rep-sec-title{font-family:'Bai Jamjuree';font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:0.12em;color:var(--orange);margin-bottom:14px;padding-bottom:6px;border-bottom:1px solid var(--light2)}
@@ -129,22 +149,31 @@ select.text-input option:disabled{color:#999}
 .opp-table tr:last-child td{border-bottom:none}
 .gap-tag{padding:2px 8px;border-radius:20px;font-size:10px;font-weight:700}
 .roi-table{width:100%;border-collapse:collapse}
-.roi-table th{text-align:left;padding:9px 10px;font-size:10px;text-transform:uppercase;letter-spacing:0.08em;color:#999;border-bottom:1px solid var(--light2)}
-.roi-table td{padding:11px 10px;font-size:12px;border-bottom:1px solid var(--light2);color:#333}
-.roi-table tr.roi-total td{font-family:'Bai Jamjuree';font-size:14px;font-weight:700;background:rgba(255,95,31,0.05);border-top:2px solid rgba(255,95,31,0.2);border-bottom:none}
-.roi-val{color:var(--orange);font-weight:600}
+.roi-table th{text-align:left;padding:6px 9px;font-size:9.5px;text-transform:uppercase;letter-spacing:0.08em;color:#999;border-bottom:1px solid var(--light2)}
+.roi-table td{padding:7px 9px;font-size:11px;border-bottom:1px solid var(--light2);color:#333}
+.roi-table tr.roi-total td{font-family:'Bai Jamjuree';font-size:13px;font-weight:700;background:rgba(255,95,31,0.05);border-top:2px solid rgba(255,95,31,0.2);border-bottom:none}
+/* ROI page (data-section="roi") — tabelas mais espaçosas para ocupar melhor a
+   página; escopado por atributo para não afetar a tabela de rotina (mesma
+   classe .roi-table) usada na página de Ganhos, que já fica densa. */
+[data-section="roi"] .roi-table th{padding:9px 11px;font-size:10.5px}
+[data-section="roi"] .roi-table td{padding:10px 11px;font-size:11.5px}
+[data-section="roi"] .roi-table tr.roi-total td{font-size:14px}
+.roi-val{color:var(--orange);font-weight:600;font-variant-numeric:tabular-nums}
+.roi-table td.roi-val,.roi-table td[style*="text-align:right"]{font-variant-numeric:tabular-nums}
+#roi2-config .text-input{background:#fff;border-color:#ddd;color:#1a1a1a}
+#roi2-config .input-group label{color:#888}
 .roadmap-tl{display:flex;flex-direction:column;gap:0}
-.sprint{display:grid;grid-template-columns:120px 1fr;gap:0}
-.sprint-marker{display:flex;flex-direction:column;align-items:center;padding-right:20px}
-.sprint-dot{width:34px;height:34px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:10px;font-weight:700;flex-shrink:0;z-index:1}
-.sprint-line{width:2px;flex:1;background:rgba(0,0,0,0.08);margin:0 auto;min-height:36px}
-.sprint-lbl{font-size:9px;text-transform:uppercase;letter-spacing:0.08em;color:#888;margin-top:4px;text-align:center}
-.sprint-body{padding:0 0 28px 0}
-.sprint-body h4{font-family:'Bai Jamjuree';font-size:15px;margin-bottom:7px}
-.sprint-body ul{list-style:none;display:flex;flex-direction:column;gap:3px}
-.sprint-body ul li{font-size:12px;color:#555;display:flex;align-items:flex-start;gap:7px}
+.sprint{display:grid;grid-template-columns:132px 1fr;gap:0}
+.sprint-marker{display:flex;flex-direction:column;align-items:center;padding-right:22px}
+.sprint-dot{width:44px;height:44px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:11.5px;font-weight:700;flex-shrink:0;z-index:1}
+.sprint-line{width:2.5px;flex:1;background:rgba(0,0,0,0.08);margin:0 auto;min-height:50px}
+.sprint-lbl{font-size:10px;text-transform:uppercase;letter-spacing:0.08em;color:#888;margin-top:6px;text-align:center}
+.sprint-body{padding:0 0 36px 0}
+.sprint-body h4{font-family:'Bai Jamjuree';font-size:17px;margin-bottom:11px}
+.sprint-body ul{list-style:none;display:flex;flex-direction:column;gap:6px}
+.sprint-body ul li{font-size:13px;color:#555;line-height:1.35;display:flex;align-items:flex-start;gap:8px}
 .sprint-body ul li::before{content:"→";color:var(--orange);flex-shrink:0;font-weight:700}
-.prod-tag{display:inline-block;margin-top:8px;padding:3px 10px;border-radius:20px;background:rgba(255,95,31,0.08);color:var(--orange);font-size:10px;font-weight:700}
+.prod-tag{display:inline-block;margin-top:10px;padding:4px 12px;border-radius:20px;background:rgba(255,95,31,0.08);color:var(--orange);font-size:10.5px;font-weight:700}
 .rep-mb{margin-bottom:18px}
 .focus-card{border-radius:8px;border:1px solid rgba(255,255,255,0.08);background:rgba(255,255,255,0.02);overflow:hidden;transition:border-color 0.2s}
 .focus-card.selected{border-color:var(--orange);background:rgba(255,95,31,0.06)}
