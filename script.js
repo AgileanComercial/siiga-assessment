@@ -19,7 +19,7 @@ var S = {
   empresa:'', consultor:'', contato:'', cargo:'', email:'', telefone:'', data:'',
   numObras:5, orcamentoMedio:8000000, prazoMedio:18, numObrasRange:'', orcamentoRange:'',
   tipologia:'', modeloMO:'', momento:'',
-  ferramentas:{ planejamento:'', medicao:'', qualidade:'', contratos:'', folha:'' },
+  ferramentas:{ planejamento:'', medicao:'', qualidade:'', contratos:'', folha:'', erp:'', erpOutro:'' },
   scores:{ b03:0, f1:[0,0,0,0,0,0,0,0], f2:[0,0,0,0], f3:[0,0,0,0,0,0], mo:{}, f4:[0,0,0,0,0] },
   showMO: false,
   // Dados para o cálculo de ROI real (calculadora-roi-agilean) — coletados dentro das fases relacionadas
@@ -139,7 +139,17 @@ var B0Q = [
       {key:'medicao', label:'Ferramenta de Medição', placeholder:'Ex: Excel, planilha própria...'},
       {key:'qualidade', label:'Ferramenta de Qualidade (FVS)', placeholder:'Ex: Checklist em papel, Excel...'},
       {key:'contratos', label:'Ferramenta de Controle de Contratos', placeholder:'Ex: ERP, Excel...'},
-      {key:'folha', label:'Ferramenta de Elaboração da Folha de Produção', placeholder:'Ex: Excel, sistema de RH...'}
+      {key:'folha', label:'Ferramenta de Elaboração da Folha de Produção', placeholder:'Ex: Excel, sistema de RH...'},
+      {key:'erp', label:'ERP utilizado pela empresa', type:'select', options:[
+        {v:'', l:'Selecione...'},
+        {v:'sienge', l:'Sienge'},
+        {v:'totvs', l:'TOTVS'},
+        {v:'informakon', l:'Informakon'},
+        {v:'mega', l:'Mega'},
+        {v:'uau', l:'UAU'},
+        {v:'outro', l:'Outro ERP'},
+        {v:'nenhum', l:'Não utilizamos ERP'}
+      ]}
     ]
   }
 ];
@@ -377,6 +387,17 @@ function colorFromPct(p) {
   return '#10b981';
 }
 
+// Paleta de status sóbria do relatório (identidade "Agilean SIIGA Assessment"
+// — ver referência anexada pelo usuário): só 3 tons (vermelho/âmbar/verde),
+// nunca o arco-íris de colorFromPct (azul/amarelo/verde/laranja/vermelho)
+// usado nas telas do diagnóstico ao vivo. Usada exclusivamente no conteúdo
+// do relatório/PDF (radar, exec snapshot), nunca nas telas de pergunta.
+function reportStatusColor(p) {
+  if(p<0.40) return '#dc2626';
+  if(p<0.90) return '#c2680d';
+  return '#15803d';
+}
+
 function fmtNum(n) {
   if(!n || isNaN(n)) return '—';
   if(n>=1000000) return 'R$ '+(n/1000000).toFixed(1).replace('.',',')+'M';
@@ -504,6 +525,15 @@ function startAssessment() {
 // ═══════════════════════════════════════════
 //  BLOCO 0
 // ═══════════════════════════════════════════
+// Mostra/esconde o campo de texto "Qual?" ao lado de um <select> de tela
+// 'ferramentas' (usado pelo campo ERP, key='erp') — só aparece quando a opção
+// selecionada for 'outro'.
+function toggleFerrOutro(key) {
+  var sel = document.getElementById('ferr-'+key);
+  var outroEl = document.getElementById('ferr-'+key+'Outro');
+  if (sel && outroEl) outroEl.style.display = (sel.value === 'outro') ? '' : 'none';
+}
+
 function renderB0() {
   var q = B0Q[currentQIdx];
   var card = document.getElementById('b0-card');
@@ -531,6 +561,16 @@ function renderB0() {
 
   if(q.type === 'ferramentas') {
     var ferrFieldsHtml = q.fields.map(function(f) {
+      if (f.type === 'select') {
+        var savedSel = S.ferramentas[f.key] || '';
+        var optsHtml = f.options.map(function(o) {
+          return '<option value="'+o.v+'"'+(o.v===savedSel?' selected':'')+'>'+o.l+'</option>';
+        }).join('');
+        var savedOutro = S.ferramentas[f.key+'Outro'] || '';
+        return '<div class="input-group"><label>'+f.label+'</label>' +
+          '<select class="text-input" id="ferr-'+f.key+'" onchange="toggleFerrOutro(\''+f.key+'\')">'+optsHtml+'</select>' +
+          '<input class="text-input" id="ferr-'+f.key+'Outro" type="text" placeholder="Qual?" value="'+savedOutro+'" style="margin-top:6px;'+(savedSel==='outro'?'':'display:none')+'"></div>';
+      }
       var savedVal = S.ferramentas[f.key];
       return '<div class="input-group"><label>'+f.label+'</label>' +
         '<input class="text-input" id="ferr-'+f.key+'" type="text" placeholder="'+f.placeholder+'" value="'+(savedVal||'')+'"></div>';
@@ -824,6 +864,10 @@ function nextQ() {
       q.fields.forEach(function(f) {
         var el = document.getElementById('ferr-'+f.key);
         if(el) S.ferramentas[f.key] = el.value.trim();
+        if (f.type === 'select') {
+          var outroEl = document.getElementById('ferr-'+f.key+'Outro');
+          if(outroEl) S.ferramentas[f.key+'Outro'] = outroEl.value.trim();
+        }
       });
     }
     if(currentQIdx < B0Q.length - 1) {
@@ -1387,7 +1431,9 @@ function buildAndShowRadar() {
   // Show ROI teaser (total only, no breakdown)
   var roiTeaser = calculateROI();
   var teaserEl = document.getElementById('roi-teaser');
-  if(teaserEl) teaserEl.textContent = fmtNum(roiTeaser.totalPortfolio || roiTeaser.total);
+  // Perda bruta (sem fator de captura) — mesma decisão aplicada em
+  // Exposição em Risco / Composição da Perda / Fonte da Perda.
+  if(teaserEl) teaserEl.textContent = fmtNum(roiTeaser.totalBase * (S.numObras||5));
 
   // Ponto 3a: eixo com maior gap vs. referência SIIGA — destacado e com rótulo de distância
   var gaps = clientPct.map(function(p,i){ return reference[i]-p; });
@@ -1403,8 +1449,10 @@ function buildAndShowRadar() {
   if(radarChartInst) radarChartInst.destroy();
   radarChartInst = drawRadarChart(document.getElementById('radarChart'), RADAR_STATE, false);
 
-  // Insights grid
-  var colors = {f1:'#60a5fa',f2:'#2dd4bf',f3:'#34d399',f4:'#9ca3af'};
+  // Insights grid (os 4 "balões" de pilar) — pedido do usuário: só o gráfico
+  // do radar em si fica colorido (ver drawRadarChart), estes cards ficam
+  // neutros, com cor só na classificação (vermelho/âmbar/verde via
+  // reportStatusColor), igual ao resto do relatório.
   var lnames = {f1:'Planejamento Estratégico',f2:'Proteção da Execução',f3:'Gestão da Produção',f4:'Controle e Performance'};
   var insHtml = '';
   phases.forEach(function(k) {
@@ -1412,11 +1460,12 @@ function buildAndShowRadar() {
     var sum = Array.isArray(arr) ? arr.reduce(function(a,b){return a+(b||0);},0) : 0;
     var p = sum/(maxes[k]||1);
     var lv = levelFromPct(p);
+    var stColor = reportStatusColor(p);
     var ins = PQ[k].insight(p);
-    insHtml += '<div class="ins-card" style="border-color:'+colors[k]+'33">' +
-      '<div class="in" style="color:'+colors[k]+'">'+lnames[k]+'</div>' +
-      '<div class="iv" style="color:'+colors[k]+'">'+sum+'<span style="font-size:13px;color:var(--gray2)">/'+maxes[k]+'</span></div>' +
-      '<div class="il" style="color:'+colors[k]+'">'+lv+'</div>' +
+    insHtml += '<div class="ins-card">' +
+      '<div class="in">'+lnames[k]+'</div>' +
+      '<div class="iv">'+sum+'<span style="font-size:13px;color:var(--gray2)">/'+maxes[k]+'</span></div>' +
+      '<div class="il" style="color:'+stColor+'">'+lv+'</div>' +
       '<p>'+ins.substring(0,120)+'...</p></div>';
   });
   document.getElementById('ins-grid').innerHTML = insHtml;
@@ -1520,7 +1569,7 @@ function renderNextSteps() {
 
   container.innerHTML =
     '<div>' +
-      '<div style="font-size:10.5px;font-weight:700;text-transform:uppercase;letter-spacing:0.12em;color:#ea580c;margin-bottom:8px">Plano de Ação Executivo</div>' +
+      '<div class="rep-sec-title" style="margin-bottom:8px"><span class="rep-sec-num">09</span>Plano de Ação Executivo</div>' +
       '<div style="font-family:\'Bai Jamjuree\';font-size:17px;font-weight:700;color:#ffffff;margin-bottom:14px">Apresentação do Projeto de Solução para a ' + empresa + '</div>' +
       '<p style="font-size:13px;color:#cbd5e1;line-height:1.75;margin-bottom:20px">' +
         'Com base no diagnóstico da <strong>' + empresa + '</strong> (' + obras + ' obra(s) no perfil <em>' + tipologiaLabel + '</em> com <em>' + moLabel + '</em>), estruturamos uma demonstração executiva focada nos 3 atos de transformação operacional:' +
@@ -1552,12 +1601,57 @@ function renderRotinaComparativa() {
   var f = S.ferramentas || {};
   var naoInformado = 'Não informado no diagnóstico';
 
+  // Linha "ERP / Sistema de Gestão": texto de Gargalo/Potencial muda conforme
+  // o ERP informado em B0.6 (q.fields, key='erp') pertencer ou não à lista de
+  // ERPs com integração nativa Agilean (mesma lista das logos exibidas na
+  // última página do relatório — Sienge/TOTVS/Informakon/Mega/UAU).
+  var ERP_INTEGRADO_LABELS = { sienge:'Sienge', totvs:'TOTVS', informakon:'Informakon', mega:'Mega', uau:'UAU' };
+  var erpVal = f.erp || '';
+  var erpIntegradoLabel = ERP_INTEGRADO_LABELS[erpVal];
+  var erpFerramentaLabel, erpGargalo, erpPotencial;
+  if (erpIntegradoLabel) {
+    erpFerramentaLabel = erpIntegradoLabel;
+    erpGargalo = 'ERP tem integração nativa disponível, mas hoje funciona isolado do canteiro. Dados só sobem no fechamento.';
+    erpPotencial = 'Integração nativa Agilean com ' + erpIntegradoLabel + ': orçamento, medição e folha sincronizados automaticamente, sem digitação duplicada.';
+  } else if (erpVal === 'outro') {
+    erpFerramentaLabel = (f.erpOutro && f.erpOutro.trim()) ? f.erpOutro.trim() : naoInformado;
+    erpGargalo = 'Sistema de gestão sem integração automática com o canteiro. Dados são lançados manualmente.';
+    erpPotencial = 'Conector via API ou exportação estruturada sincroniza o sistema com a execução da obra, sem digitação manual.';
+  } else if (erpVal === 'nenhum') {
+    erpFerramentaLabel = 'Nenhum';
+    erpGargalo = 'Sem sistema de gestão integrado. Controle disperso em planilhas soltas, sem rastreabilidade entre obras.';
+    erpPotencial = 'SIIGA centraliza orçamento, execução e fechamento num único fluxo, funcionando como hub de gestão operacional.';
+  } else {
+    erpFerramentaLabel = naoInformado;
+    erpGargalo = 'Sem sistema de gestão integrado. Controle disperso em planilhas soltas, sem rastreabilidade entre obras.';
+    erpPotencial = 'SIIGA centraliza orçamento, execução e fechamento num único fluxo, funcionando como hub de gestão operacional.';
+  }
+
+  // Caso especial Prevision + Sienge: Prevision (ferramenta de planejamento,
+  // concorrente da Agilean) já é integrado nativamente ao Sienge — então o
+  // gap de "planejamento desconectado do orçamento" não existe nesse caso.
+  // O gap real passa a ser a falta de fluxo ponta a ponta: só o Agilean reúne
+  // Planejamento + Qualidade + Mão de obra numa única plataforma; Prevision
+  // cobre só o planejamento. Detecção por texto livre (campo de planejamento
+  // não é dropdown) — verifica se "prevision" aparece no que foi digitado.
+  // Mesmo texto é usado nas duas linhas afetadas (Planejamento e ERP) — o gap
+  // é o mesmo (falta de fluxo ponta a ponta), só visto de ângulos diferentes.
+  var isPrevisionSienge = /prevision/i.test(f.planejamento || '') && erpVal === 'sienge';
+  var planejamentoGargalo = 'Alimentação manual, desconectada do orçamento e da EAP';
+  var planejamentoPotencial = 'Linha de Balanço dinâmica com Copilotos de IA ajustando prazos e orçamento em minutos.';
+  if (isPrevisionSienge) {
+    planejamentoGargalo = 'Planejamento e Medição estão conectados, mas não há a integração nativa com os demais fluxos: Qualidade e Mão de Obra.';
+    planejamentoPotencial = 'Agilean reúne planejamento, qualidade e mão de obra numa única plataforma integrada ao Sienge, fechando o fluxo ponta a ponta que o Prevision não cobre.';
+    erpGargalo = 'Sienge está integrado com o Prevision, mas falta integrar os fluxos de Qualidade e Gestão da Mão de Obra ao planejamento e controle.';
+    erpPotencial = 'Integração nativa do planejamento também com Qualidade e Mão de Obra, fechando o que hoje fica fora do escopo Prevision-Sienge.';
+  }
+
   var rows = [
     {
       rotina: 'Planejamento & Reprogramação',
       ferramenta: f.planejamento,
-      gargalo: 'Alimentação manual, desconectada do orçamento e da EAP',
-      siiga: 'Linha de Balanço dinâmica com Copilotos de IA ajustando prazos e orçamento em minutos.'
+      gargalo: planejamentoGargalo,
+      siiga: planejamentoPotencial
     },
     {
       rotina: 'Medição de Avanço Físico',
@@ -1582,6 +1676,12 @@ function renderRotinaComparativa() {
       ferramenta: f.folha,
       gargalo: 'Fechamento manual e lento; produtividade por equipe sem rastreabilidade',
       siiga: 'Fechamento de folha e produtividade por HH em horas, com integração nativa ao ERP.'
+    },
+    {
+      rotina: 'ERP / Sistema de Gestão',
+      ferramenta: erpFerramentaLabel,
+      gargalo: erpGargalo,
+      siiga: erpPotencial
     }
   ];
 
@@ -1596,76 +1696,41 @@ function renderRotinaComparativa() {
   }).join('');
 }
 
+// Composição da Perda: tabela com barra de participação inline (identidade
+// "Agilean SIIGA Assessment" — ver referência anexada pelo usuário), no lugar
+// do gráfico de colunas anterior (Chart.js). Mesmos dados (roi.items),
+// só a apresentação muda — ordenados por valor decrescente, como na
+// referência.
 function renderPerdasComposicao(roi) {
   var box = document.getElementById('perdas-composicao-box');
   if (!box || !roi) return;
 
-  var perdaTotal = roi.totalPortfolio || 1;
+  // Valor bruto (baseValue × obras, sem fator de captura) — "em risco" é
+  // linguagem de perda, não de ganho capturável (ver mesma decisão na tabela
+  // "Fonte da Perda", seção Perdas Financeiras). Cada item pode ter um fator
+  // de captura diferente (por fase do diagnóstico), então a composição %
+  // aqui reflete a perda bruta de cada fonte, não a fatia já capturada.
+  var obrasComp = S.numObras || 5;
+  var perdaTotal = (roi.totalBase * obrasComp) || 1;
 
   var pctEl = document.getElementById('perdas-pct-total');
-  if (pctEl) pctEl.textContent = fmtNum(perdaTotal) + ' em risco no portfólio';
+  if (pctEl) pctEl.textContent = fmtNum(perdaTotal) + ' em risco';
 
-  // Paleta tonal cobre/laranja (variações de #ea580c, claro → escuro) para
-  // harmonizar as colunas com a identidade visual "Executive Charcoal &
-  // Copper" do resto do relatório, em vez de cores genéricas saturadas
-  // (azul/vermelho/verde/roxo) que destoavam do tema.
-  var catColors = {
-    mo: '#9a3412',
-    retrabalho: '#c2410c',
-    time: '#fdba74',
-    velocidade: '#fb923c',
-    erros: '#ea580c'
-  };
+  var sorted = roi.items.slice().sort(function(a, b) { return (b.baseValue||0) - (a.baseValue||0); });
 
-  // Nomes curtos para o eixo X do gráfico de colunas (categorias estreitas não
-  // comportam os labels completos legivelmente). O nome completo continua
-  // aparecendo no grid de cards de texto logo abaixo do gráfico (gridHtml).
-  var catShortLabels = {
-    mo: 'Mão de obra',
-    retrabalho: 'Retrabalhos',
-    time: 'Time de gestão',
-    velocidade: 'Velocidade',
-    erros: 'Erros de medição'
-  };
-
-  var gridHtml = '';
-  var labels = [];
-  var values = [];
-  var colors = [];
-  var pcts = [];
-
-  roi.items.forEach(function(item) {
-    var val = item.portfolio || 0;
+  var rowsHtml = sorted.map(function(item) {
+    var val = (item.baseValue || 0) * obrasComp;
     var pct = Math.round((val / perdaTotal) * 100);
-    var col = catColors[item.key] || '#64748b';
+    return '<tr>' +
+      '<td>' + item.label + '</td>' +
+      '<td><div class="rep-bar-track"><div class="rep-bar-fill" style="width:' + pct + '%"></div></div></td>' +
+      '<td style="text-align:right;font-weight:700;white-space:nowrap">' + fmtNum(val) + '</td>' +
+      '<td style="text-align:right;color:var(--rep-text-mut,#94a3b8)">' + pct + '%</td>' +
+    '</tr>';
+  }).join('');
 
-    labels.push(catShortLabels[item.key] || item.label);
-    values.push(val);
-    colors.push(col);
-    pcts.push(pct);
-
-    gridHtml += '<div style="padding:8px 10px;background:#181a24;border-radius:6px;border-left:2.5px solid ' + col + '">' +
-      '<div style="font-size:10px;color:#94a3b8;font-weight:600;margin-bottom:2px">' + item.label + '</div>' +
-      '<div style="font-family:\'Bai Jamjuree\';font-size:12px;font-weight:700;color:#ffffff">' + fmtNum(val) + ' <span style="font-size:10px;font-weight:500;color:#94a3b8">(' + pct + '%)</span></div>' +
-    '</div>';
-  });
-
-  var gridEl = document.getElementById('perdas-categorias-grid');
-  if (gridEl) gridEl.innerHTML = gridHtml;
-
-  // Guarda os dados já calculados para o gráfico ser REDESENHADO (não só
-  // "printscreenado") no momento da exportação do PDF — ver uso em
-  // generatePdfFromReport()/renderPage(), que precisa de um desenho com
-  // cores de texto/eixo apropriadas para o card escuro do PDF (ver comentário
-  // em drawPerdasChart sobre o card #perdas-composicao-box ser sempre branco
-  // na tela, mas virar escuro no PDF via applyPdfDarkTheme).
-  window.__LAST_PERDAS_CHART = { labels: labels, values: values, colors: colors, pcts: pcts };
-
-  var chartCanvas = document.getElementById('perdas-chart-canvas');
-  if (chartCanvas && typeof Chart !== 'undefined') {
-    if (perdasChartInst) { perdasChartInst.destroy(); perdasChartInst = null; }
-    perdasChartInst = drawPerdasChart(chartCanvas, labels, values, colors, pcts, false);
-  }
+  var bodyEl = document.getElementById('perdas-bar-body');
+  if (bodyEl) bodyEl.innerHTML = rowsHtml;
 }
 
 // Desenha o gráfico de colunas de "Composição da Perda Identificada vs.
@@ -1767,11 +1832,58 @@ function renderPerdasFonteSimplificada(roi) {
       '</tr>';
   });
   html += '<tr class="roi-total" style="background:#f4f4f6;border-top:2px solid #ddd">' +
-    '<td style="font-weight:700;padding:10px 12px">PERDA FINANCEIRA NO PORTFÓLIO</td>' +
+    '<td style="font-weight:700;padding:10px 12px">GANHO CAPTURÁVEL NO PORTFÓLIO</td>' +
     '<td style="text-align:right;color:#555;font-weight:600;white-space:nowrap;padding:10px 12px">'+fmtNum(roi.totalPorObra)+' / obra</td>' +
     '<td style="text-align:right;color:var(--orange);font-weight:700;white-space:nowrap;padding:10px 12px">'+fmtNum(roi.totalPortfolio)+'</td>' +
     '</tr></tbody>';
   el.innerHTML = html;
+}
+
+// Tabela "Fonte de Ganho" completa (Detalhado, Card F no index.html) — mesma
+// estrutura da tabela simplificada do Resumido (renderPerdasFonteSimplificada,
+// acima), mas com a coluna Fator exposta. Usa item.porObra/item.portfolio
+// (valor JÁ com o fator de captura aplicado) — diferente da tabela "Fonte da
+// Perda" (roi-table-el), que é o valor bruto sem fator. Preenche também o
+// card de pressupostos próprio desta tabela (#pres-formulas-ganho): só a
+// explicação do Fator, sem repetir as fórmulas do valor bruto (essas ficam
+// no pressupostos da tabela de Perda).
+function renderPerdasFonteGanho(roi) {
+  var el = document.getElementById('roi-table-ganho-el');
+  if (el && roi) {
+    var html = '<thead><tr>' +
+      '<th>Fonte de Ganho</th>' +
+      '<th style="text-align:center">Fator</th>' +
+      '<th style="text-align:right">Por obra</th>' +
+      '<th style="text-align:right">Portfólio</th>' +
+      '</tr></thead><tbody>';
+    roi.items.forEach(function(item) {
+      var fp = Math.round((item.fator||1)*100);
+      html += '<tr>' +
+        '<td>'+item.label+'</td>' +
+        '<td style="text-align:center;font-weight:700;font-size:12px">'+fp+'%</td>' +
+        '<td style="text-align:right" class="roi-val">'+fmtNum(item.porObra)+'</td>' +
+        '<td style="text-align:right;font-weight:600" class="roi-val">'+fmtNum(item.portfolio)+'</td>' +
+        '</tr>';
+    });
+    html += '<tr class="roi-total" style="background:#f4f4f6;border-top:2px solid #ddd">' +
+      '<td colspan="2" style="font-weight:700;padding:10px 12px">GANHO CAPTURÁVEL NO PORTFÓLIO</td>' +
+      '<td style="text-align:right;color:#555;font-weight:600;white-space:nowrap;padding:10px 12px">'+fmtNum(roi.totalPorObra)+' / obra</td>' +
+      '<td style="text-align:right;color:var(--orange);font-weight:700;white-space:nowrap;padding:10px 12px">'+fmtNum(roi.totalPortfolio)+'</td>' +
+      '</tr></tbody>';
+    el.innerHTML = html;
+  }
+
+  var presGanhoEl = document.getElementById('pres-formulas-ganho');
+  if (presGanhoEl && roi) {
+    presGanhoEl.innerHTML =
+      '<div style="font-size:11px;color:#666;line-height:1.5;margin-bottom:8px">• <strong style="color:#333">Fator:</strong> % da perda bruta de cada fonte que é realista capturar, dado o nível de maturidade do cliente nas fases do diagnóstico mais ligadas àquele ganho — quanto menor a maturidade hoje, maior o fator (mais espaço para captura); quanto maior a maturidade, menor o fator. Varia de 20% a 100% por fonte, calculado individualmente para cada uma.</div>' +
+      '<div style="font-size:9.5px;font-weight:700;text-transform:uppercase;letter-spacing:0.06em;color:#999;margin-bottom:6px">Como o fator é aplicado por fonte</div>' +
+      roi.items.map(function(item) {
+        var fp = Math.round((item.fator||1)*100);
+        return '<div style="font-size:10px;color:#666;line-height:1.5">• <strong style="color:#333">'+item.label+':</strong> '+fmtNum(item.baseValue)+' (perda bruta/obra) × '+fp+'% = '+fmtNum(item.porObra)+' (ganho capturável/obra)</div>';
+      }).join('') +
+      '<div style="margin-top:10px;font-size:11px;color:#888;font-style:italic">Valores baseados nas planilhas de ROI Agilean e em benchmarks de Lean Construction. Estimativa conservadora — não representa garantia contratual.</div>';
+  }
 }
 
 // Preenche o card "Ganho Esperado com o SIIGA" — contraponto em chave de ganho da
@@ -1802,20 +1914,21 @@ function renderExecutiveSnapshot(totalScore, totalMax, roi, rEstrategica) {
   var pct = totalMax ? totalScore/totalMax : 0;
   var nivel = levelFromPct(pct);
 
-  var kpi = function(label, value, sub) {
-    return '<div style="padding:16px 18px;background:#151720;border:1px solid rgba(255,255,255,0.06);border-radius:10px">' +
-      '<div style="font-size:9.5px;font-weight:700;text-transform:uppercase;letter-spacing:0.1em;color:#94a3b8;margin-bottom:8px">'+label+'</div>' +
-      '<div style="font-family:tabular-nums;font-variant-numeric:tabular-nums;font-family:Bai Jamjuree,sans-serif;font-size:24px;font-weight:700;color:#f8fafc">'+value+'</div>' +
-      (sub ? '<div style="font-size:10.5px;color:#cbd5e1;margin-top:4px">'+sub+'</div>' : '') +
+  var kpi = function(label, value, sub, barPct, subColor) {
+    return '<div style="padding:16px 18px;background:var(--rep-card-bg,#151720);border:1px solid var(--rep-border,rgba(255,255,255,0.08));border-radius:10px">' +
+      '<div style="font-size:9.5px;font-weight:700;text-transform:uppercase;letter-spacing:0.1em;color:var(--rep-text-mut,#94a3b8);margin-bottom:8px">'+label+'</div>' +
+      '<div style="font-family:tabular-nums;font-variant-numeric:tabular-nums;font-family:Bai Jamjuree,sans-serif;font-size:24px;font-weight:700;color:var(--rep-text-strong,#f8fafc)">'+value+'</div>' +
+      (sub ? '<div style="font-size:10.5px;margin-top:4px;'+(subColor ? 'color:'+subColor+';font-weight:600' : 'color:var(--rep-text-mut,#cbd5e1)')+'">'+sub+'</div>' : '') +
+      (barPct !== undefined ? '<div class="rep-score-bar"><div style="width:'+Math.round(barPct*100)+'%"></div></div>' : '') +
     '</div>';
   };
 
   el.innerHTML =
-    '<div style="font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:0.12em;color:#ea580c;margin-bottom:4px">Executive Snapshot</div>' +
-    '<div style="font-size:12px;color:#94a3b8;margin-bottom:14px">Síntese de diretoria — os indicadores que definem a urgência e o retorno da decisão.</div>' +
+    '<div class="rep-sec-title"><span class="rep-sec-num">01</span>Síntese Executiva</div>' +
+    '<div style="font-size:12px;color:var(--rep-text-mut,#94a3b8);margin-bottom:14px">Síntese de diretoria — os indicadores que definem a urgência e o retorno da decisão.</div>' +
     '<div style="display:grid;grid-template-columns:repeat(2,1fr);gap:14px">' +
-      kpi('Score de Maturidade', totalScore+'/'+totalMax, nivel) +
-      kpi('Exposição em Risco', fmtNum(roi ? roi.totalPortfolio : 0), 'Perda estimada no portfólio, sem intervenção') +
+      kpi('Score de Maturidade', totalScore+'/'+totalMax, nivel, pct, reportStatusColor(pct)) +
+      kpi('Exposição em Risco', fmtNum(roi ? roi.totalBase*(S.numObras||5) : 0), 'Perda estimada no portfólio, sem intervenção') +
     '</div>';
 }
 
@@ -1837,6 +1950,19 @@ function getMaturityScoreSummary() {
 }
 
 function buildReport() {
+  // Guarda uma cópia pristina do HTML de #screen-report (nenhum tema aplicado
+  // ainda) na 1ª chamada — usada por changeReportTheme() para restaurar o
+  // relatório a um estado limpo antes de trocar de tema. Sem isso, estilos
+  // inline que applyPdfDarkTheme/applyPdfLightTheme escrevem em elementos que
+  // buildReport() NÃO recria (containers estáticos do index.html, só o
+  // conteúdo interno é re-renderizado) ficam "presos" de uma passada de tema
+  // para a próxima — ex.: um <div> que o tema escuro escureceu explicitamente
+  // e o tema claro nunca tinha motivo pra saber que precisava clarear de volta.
+  if (!window.__reportPristineHtml) {
+    var reportElInit = document.getElementById('screen-report');
+    if (reportElInit) window.__reportPristineHtml = reportElInit.innerHTML;
+  }
+  setReportPdfTheme(window.reportPdfTheme || 'dark');
   renderQualitativeGains();
   renderNextSteps();
   renderRotinaComparativa();
@@ -1848,10 +1974,10 @@ function buildReport() {
   if (tDiag) tDiag.textContent = 'Diagnóstico SIIGA da ' + nomeEmpresa;
 
   var tGaps = document.getElementById('rep-title-gaps');
-  if (tGaps) tGaps.textContent = 'Gaps do Processo atual da ' + nomeEmpresa;
+  if (tGaps) tGaps.innerHTML = '<span class="rep-sec-num">02</span>Gaps do Processo atual da ' + nomeEmpresa;
 
   var tGanhos = document.getElementById('rep-title-ganhos');
-  if (tGanhos) tGanhos.textContent = 'Plano de Ganho de Maturidade Lean — Escopo SIIGA para ' + nomeEmpresa;
+  if (tGanhos) tGanhos.innerHTML = '<span class="rep-sec-num">06</span>Plano de Ganho de Maturidade Lean — Escopo SIIGA para ' + nomeEmpresa;
 
   var subGanhos = document.getElementById('rep-sub-ganhos');
   if (subGanhos) {
@@ -1906,8 +2032,8 @@ function buildReport() {
   // Section 2: opportunities
   var opps = generateOpportunities();
   var SEVERITY_INFO = {
-    critico: { label: 'Crítico', bg: 'rgba(239,68,68,0.15)', fg: '#dc2626' },
-    oportunidade: { label: 'Oportunidade', bg: 'rgba(249,115,22,0.15)', fg: '#c2680d' }
+    critico: { label: 'Crítico', fg: '#dc2626' },
+    oportunidade: { label: 'Oportunidade', fg: '#c2680d' }
   };
   var oppTableCard = document.getElementById('opp-table-card');
   if(opps.length === 0) {
@@ -1920,18 +2046,18 @@ function buildReport() {
     }
   } else {
     var oppHtml = '';
-    opps.forEach(function(r) {
+    opps.forEach(function(r, idx) {
       var sevInfo = SEVERITY_INFO[r.severity] || SEVERITY_INFO.oportunidade;
-      oppHtml += '<tr><td>'+r.gap+'</td>' +
-        '<td><span class="gap-tag" style="background:'+sevInfo.bg+';color:'+sevInfo.fg+'">'+sevInfo.label+'</span></td>' +
-        '<td><span class="gap-tag" style="background:'+r.color+'22;color:'+r.color+'">'+r.phase+'</span></td>' +
+      oppHtml += '<tr><td style="color:var(--rep-text-mut, #999)">'+String(idx+1).padStart(2,'0')+'</td><td>'+r.gap+'</td>' +
+        '<td style="color:'+sevInfo.fg+';font-weight:600">'+sevInfo.label+'</td>' +
+        '<td style="color:var(--rep-text-mut, #999)">'+r.phase+'</td>' +
         '<td>'+r.impact+'</td></tr>';
     });
     // Recria a tabela sempre (idempotente) — buildReport() pode rodar mais de
     // uma vez na mesma sessão e um render anterior sem gaps pode ter
     // substituído este card pela mensagem curta acima.
     if(oppTableCard) {
-      oppTableCard.innerHTML = '<table class="opp-table" id="opp-table-el"><thead><tr><th>Gap Identificado</th><th>Severidade</th><th>Fase</th><th>Impacto</th></tr></thead><tbody id="opp-body">'+oppHtml+'</tbody></table>';
+      oppTableCard.innerHTML = '<div class="rep-sec-title"><span class="rep-sec-num">04</span>Gaps Identificados</div><table class="opp-table" id="opp-table-el"><thead><tr><th>#</th><th>Gap Identificado</th><th>Severidade</th><th>Fase</th><th>Impacto</th></tr></thead><tbody id="opp-body">'+oppHtml+'</tbody></table>';
     }
   }
 
@@ -1982,30 +2108,32 @@ function buildReport() {
   renderPerdasComposicao(roi);
   renderPerdasFonteSimplificada(roi);
   renderGanhoEsperado(roi);
+  // Tabela "Fonte da Perda" (Detalhado): valor bruto/teórico (item.baseValue),
+  // SEM o fator de captura — perda é o total, sem desconto nenhum. A versão
+  // COM fator (item.porObra/item.portfolio) tem tabela própria — "Fonte de
+  // Ganho" (renderPerdasFonteGanho(), Card F/G no index.html) — e não entra
+  // mais nesta tabela nem coluna aqui. Os dois números NÃO são iguais: Ganho
+  // é sempre ≤ Perda, exatamente pela aplicação do fator.
   var roiHtml = '<thead><tr>' +
-    '<th>Fonte de Ganho</th>' +
-    '<th>Pressuposto</th>' +
-    '<th style="text-align:center">Fator</th>' +
+    '<th>Fonte da Perda</th>' +
     '<th style="text-align:right">Por obra</th>' +
     '<th style="text-align:right">Portfólio</th>' +
     '</tr></thead><tbody>';
-  roi.items.forEach(function(item, i) {
-    var fp = Math.round((item.fator||1)*100);
-    var fc = fp >= 80 ? '#ef4444' : fp >= 50 ? '#f97316' : '#22c55e';
-    roiHtml += '<tr style="'+(i%2===0?'background:var(--light)':'')+'">' +
+  var obrasAtual = S.numObras || 5;
+  roi.items.forEach(function(item) {
+    roiHtml += '<tr>' +
       '<td>'+item.label+'</td>' +
-      '<td style="color:#777;font-size:11px">'+item.basis+'</td>' +
-      '<td style="text-align:center;font-weight:700;color:'+fc+';font-size:12px">'+fp+'%</td>' +
-      '<td style="text-align:right" class="roi-val">'+fmtNum(item.porObra)+'</td>' +
-      '<td style="text-align:right;font-weight:600" class="roi-val">'+fmtNum(item.portfolio)+'</td>' +
+      '<td style="text-align:right" class="roi-val">'+fmtNum(item.baseValue)+'</td>' +
+      '<td style="text-align:right;font-weight:600" class="roi-val">'+fmtNum(item.baseValue*obrasAtual)+'</td>' +
       '</tr>';
   });
   roiHtml += '<tr class="roi-total" style="background:#f4f4f6;border-top:2px solid #ddd">' +
-    '<td colspan="3" style="font-weight:700;padding:10px 12px">PERDA FINANCEIRA NO PORTFÓLIO</td>' +
-    '<td style="text-align:right;color:#555;font-weight:600;white-space:nowrap;padding:10px 12px">'+fmtNum(roi.totalPorObra)+' / obra</td>' +
-    '<td style="text-align:right;color:var(--orange);font-weight:700;white-space:nowrap;padding:10px 12px">'+fmtNum(roi.totalPortfolio)+'</td>' +
+    '<td style="font-weight:700;padding:10px 12px">PERDA FINANCEIRA NO PORTFÓLIO</td>' +
+    '<td style="text-align:right;color:#555;font-weight:600;white-space:nowrap;padding:10px 12px">'+fmtNum(roi.totalBase)+' / obra</td>' +
+    '<td style="text-align:right;color:var(--orange);font-weight:700;white-space:nowrap;padding:10px 12px">'+fmtNum(roi.totalBase*obrasAtual)+'</td>' +
     '</tr></tbody>';
   document.getElementById('roi-table-el').innerHTML = roiHtml;
+  renderPerdasFonteGanho(roi);
 
   // Update prazo in pressupostos
   var presPrazo = document.getElementById('pres-prazo');
@@ -2016,6 +2144,18 @@ function buildReport() {
   if(presRetrab) presRetrab.textContent = Math.round((roi.pctRetrabalho||0.10)*100) + '% do portfólio';
   var presDiasLib = document.getElementById('pres-diaslib');
   if(presDiasLib) presDiasLib.textContent = '~' + (Math.round((roi.diasLib||0)*100)/100).toLocaleString('pt-BR') + ' dias';
+  // Fórmulas de como o valor BRUTO de cada fonte de perda (item.baseValue) é
+  // calculado — mesma memória de cálculo da tabela "Fonte da Perda" acima.
+  // A explicação do Fator vive em renderPerdasFonteGanho() (#pres-formulas-ganho),
+  // card de pressupostos próprio da tabela "Fonte de Ganho".
+  var presFormulasEl = document.getElementById('pres-formulas');
+  if(presFormulasEl) {
+    presFormulasEl.innerHTML =
+      '<div style="font-size:9.5px;font-weight:700;text-transform:uppercase;letter-spacing:0.06em;color:#999;margin-bottom:6px">Como é calculado — fonte da perda</div>' +
+      roi.items.map(function(item) {
+        return '<div style="font-size:10px;color:#666;line-height:1.5">• <strong style="color:#333">'+item.label+':</strong> '+item.basis+'</div>';
+      }).join('');
+  }
   // ROI real (Estratégica + Operacional), com dados coletados do cliente
   buildROIReal();
   // Road map
@@ -2023,6 +2163,10 @@ function buildReport() {
   // Executive Snapshot — reaproveita o score já somado acima e o ROI real
   // (calcROIReal) guardado em window._lastROIReal por buildROIReal().
   renderExecutiveSnapshot(snapTotalScore, snapTotalMax, roi, window._lastROIReal);
+
+  // Aplica na tela o tema (claro/escuro) selecionado no toggle — feito por
+  // último, depois de todo o conteúdo (inclusive dinâmico) já estar no DOM.
+  applyLiveReportVisualTheme();
 }
 
 // Motor de precificação — Plano Maestria, coluna "Tabela" (maior valor),
@@ -2087,12 +2231,14 @@ function buildROIReal() {
   var r = calcROIReal(S.captura);
   window._lastROIReal = r; // usado por renderExecutiveSnapshot() no fim de buildReport()
   var fmtH = function(n){ return (n||0).toLocaleString('pt-BR',{maximumFractionDigits:1}) + ' h'; };
-  // Código de cores usado na coluna "Como é calculado": distingue o que é dado
-  // informado pelo cliente, o que é referência fixa de mercado, e o que é o
-  // fator do cenário escolhido — em vez de apontar "ver acima/abaixo".
-  var pC = function(t){ return '<strong style="color:#1B4F8A">'+t+'</strong>'; };
-  var pF = function(t){ return '<span style="color:#888">'+t+'</span>'; };
-  var pS = function(t){ return '<strong style="color:var(--orange)">'+t+'</strong>'; };
+  // pC/pF/pS: antes coloriam (e pC também negritava) a coluna "Como é
+  // calculado" por tipo de dado (informado/mercado/cenário) — removido
+  // (paleta sóbria da identidade "Agilean SIIGA Assessment", ver referência
+  // anexada pelo usuário): as 3 viram texto plano, só o rótulo (label, fora
+  // daqui, em formulaItem) continua em negrito.
+  var pC = function(t){ return t; };
+  var pF = function(t){ return t; };
+  var pS = function(t){ return t; };
   // roiRow: linha de tabela só com Item + Valor — a coluna "Como é calculado"
   // (2º argumento antigo) foi removida por pedido do usuário (Correções.docx,
   // página 6) para simplificar a leitura; as fórmulas foram migradas para o
@@ -2160,9 +2306,8 @@ function buildROIReal() {
 
   // Parâmetros base informados pelo cliente (alimentam as linhas de R$ abaixo)
   var diasFechamento = getDiasFechamentoAtual();
-  var paramItem = function(label, val, isMarket) {
-    var color = isMarket ? '#888' : '#1B4F8A';
-    return '<div style="font-size:10.5px;color:#666">• '+label+': <strong style="color:'+color+'">'+val+'</strong></div>';
+  var paramItem = function(label, val) {
+    return '<div style="font-size:10.5px;color:var(--rep-text-mut,#666)">• '+label+': <strong style="color:var(--rep-text-strong,#333)">'+val+'</strong></div>';
   };
   // Fórmulas de cálculo — migradas para cá (rodapé "Pressupostos do Cálculo")
   // das colunas "Como é calculado" que existiam nas tabelas de Visão Estratégica
@@ -2175,10 +2320,9 @@ function buildROIReal() {
   var paramsEl = document.getElementById('roi2-params-box');
   if(paramsEl) {
     paramsEl.innerHTML =
-      '<div style="font-size:10px;color:#888;margin-bottom:8px">'+pC('■')+' dado informado nesta operação &nbsp; '+pF('■')+' referência de mercado &nbsp; '+pS('■')+' fator do cenário escolhido</div>' +
       '<div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:10px">' +
         paramItem('Folha de MO própria/mês', fmtNum(S.roi2.folha||0)) +
-        paramItem('Custo hora técnica', 'R$ '+ROI_REAL_K.CUSTO_HORA_TECNICA+'/h', true) +
+        paramItem('Custo hora técnica', 'R$ '+ROI_REAL_K.CUSTO_HORA_TECNICA+'/h') +
         paramItem('Dias p/ fechar medição/folha hoje', fmtNumBare(diasFechamento)+' dias <span style="color:#999;font-weight:400">(resposta do Bloco MO)</span>') +
         paramItem('Horas/dia dedicadas a esse fechamento', fmtH(S.roi2.hDiaAtual)) +
         paramItem('Horas/semana conferindo qualidade', fmtH(S.roi2.hSemQualidade)) +
@@ -3014,19 +3158,53 @@ function fmtOrcamento(input) {
 // Aplica o tema claro / texto escuro (mesma lógica de antes) diretamente sobre
 // um container REAL (não um clone de iframe do html2canvas) — usado pela
 // captura seção-por-seção do generatePDF.
-function applyPdfLightTheme(root) {
-  root.style.background = 'white';
-  root.style.color = '#1a1a1a';
-
-  root.querySelectorAll('.no-print,.btn-row,.top-nav,#progress-bar').forEach(function(b){
-    b.style.display = 'none';
-  });
+function applyPdfLightTheme(root, liveMode) {
+  // liveMode: aplicado direto na tela (#screen-report), não num clone
+  // descartável para captura — fundo/cor do root já resolvidos pelas
+  // variáveis CSS de #screen-report[data-report-theme], e não pode esconder
+  // a barra de botões/nav real.
+  if (!liveMode) {
+    root.style.background = 'white';
+    root.style.color = '#1a1a1a';
+    root.querySelectorAll('.no-print,.btn-row,.top-nav,#progress-bar').forEach(function(b){
+      b.style.display = 'none';
+    });
+  }
 
   root.querySelectorAll('.card,.card-wide').forEach(function(c){
     c.style.background = 'white';
     c.style.border = '1px solid #e0e0e0';
     c.style.boxShadow = '0 1px 4px rgba(0,0,0,0.08)';
     c.style.color = '#1a1a1a';
+  });
+
+  // Identidade "Agilean SIIGA Assessment" (referência anexada pelo usuário):
+  // no tema claro, NENHUM bloco do relatório fica escuro — nem os cards
+  // "intencionalmente escuros" que o app nativo (sempre dark) usa por padrão
+  // (KPIs, pilares, depoimentos, "o que o SIIGA garante" etc.). Antes esses
+  // blocos sobreviviam como "balões pretos" sobre a página branca porque só
+  // .card/.card-wide eram resetados — os <div> internos com fundo hex
+  // literal (#14141b, #151720, #161824...) continuavam escuros. Converte
+  // qualquer fundo hex sólido escuro (luminância baixa) para branco — exceto
+  // dentro da barra de botões/nav (.no-print/.btn-row), que não é conteúdo
+  // do relatório e deve manter sua cor de marca mesmo no modo claro.
+  // Nota: el.style.background NÃO preserva o literal "#161822" do atributo —
+  // o navegador normaliza para "rgb(22, 24, 34)" ao ler de volta via CSSOM
+  // (mesmo problema documentado abaixo em hasDarkAncestorBg). Por isso o
+  // filtro de seleção usa o atributo bruto ([style*="background:#"], só para
+  // não iterar o documento inteiro) mas a decisão de converter usa
+  // getComputedStyle, que sempre devolve rgb()/rgba().
+  root.querySelectorAll('[style*="background:#"], [style*="background: #"], [style*="background:#"]').forEach(function(el){
+    if (el.closest('.no-print, .btn-row, .top-nav')) return;
+    var bg = window.getComputedStyle(el).backgroundColor;
+    var m = bg && bg.match(/^rgba?\((\d+),\s*(\d+),\s*(\d+)/);
+    if (!m) return;
+    var r = +m[1], g = +m[2], b = +m[3];
+    var lum = 0.299*r + 0.587*g + 0.114*b;
+    if (lum < 55) {
+      el.style.background = '#ffffff';
+      el.style.borderColor = '#e5e0d8';
+    }
   });
 
   // Detecta se o elemento está dentro de um bloco com fundo intencionalmente escuro
@@ -3081,7 +3259,18 @@ function applyPdfLightTheme(root) {
       var m = col.match(/^rgb\((\d+),\s*(\d+),\s*(\d+)\)$/);
       if(m) {
         var r = +m[1], g = +m[2], b = +m[3];
-        if(Math.abs(r-g) < 12 && Math.abs(g-b) < 12 && r > 60 && r < 220) {
+        // Spread (max-min entre os 3 canais) em vez de comparar pares com limiar
+        // apertado: pega também os cinza-azulados ("slate", ex.: #94a3b8, #64748b)
+        // usados em todo o relatório como texto secundário pensado pro tema escuro
+        // — com o limiar antigo (<12 por par) eles escapavam da conversão e
+        // ficavam ilegíveis (cinza-azul claro sobre fundo branco no tema claro).
+        // Sem limite superior de r: pega também os quase-brancos (#f8fafc,
+        // #f1f5f9 — títulos/números "brancos" usados o tempo todo no app
+        // nativo, sempre escuro) que ficavam ilegíveis (quase-branco sobre
+        // branco) antes desta correção. Segue restrito a cores de marca
+        // (laranja/azul/verde/teal têm spread bem acima de 40) para não
+        // descolorir acentos intencionais.
+        if((Math.max(r,g,b) - Math.min(r,g,b)) < 40 && r > 60) {
           el.style.color = fontSize >= 11 ? '#1a1a1a' : '#444444';
           darkened = true;
         }
@@ -3139,13 +3328,22 @@ function applyPdfLightTheme(root) {
   });
 }
 
-function applyPdfDarkTheme(root) {
-  root.style.background = '#0f1015';
-  root.style.color = '#ffffff';
+function applyPdfDarkTheme(root, liveMode) {
+  // liveMode: true quando aplicado direto no #screen-report ao vivo (ver
+  // applyLiveReportVisualTheme) — usa a mesma lógica de recoloração de
+  // conteúdo do clone de captura do PDF, mas sem esconder a UI real
+  // (barra de botões, nav, toasts) nem mexer no root.style de fundo/cor
+  // (isso já é resolvido pelas variáveis CSS de #screen-report[data-report-theme]).
+  if (!liveMode) {
+    root.style.background = '#0f1015';
+    root.style.color = '#ffffff';
+  }
 
-  root.querySelectorAll('.no-print,.btn-row,.top-nav,#progress-bar,#pdf-loading,#modal-save,#modal-import,#api-modal,.toast,#modal-overlay').forEach(function(b){
-    b.style.display = 'none';
-  });
+  if (!liveMode) {
+    root.querySelectorAll('.no-print,.btn-row,.top-nav,#progress-bar,#pdf-loading,#modal-save,#modal-import,#api-modal,.toast,#modal-overlay').forEach(function(b){
+      b.style.display = 'none';
+    });
+  }
 
   root.querySelectorAll('.card,.card-wide').forEach(function(c){
     c.style.background = '#151720';
@@ -3204,19 +3402,6 @@ function applyPdfDarkTheme(root) {
     td.style.borderBottom = 'none';
   });
 
-  // Perdas Composição box
-  root.querySelectorAll('#perdas-composicao-box').forEach(function(box){
-    box.style.background = '#151720';
-    box.style.border = '1px solid rgba(255,255,255,0.06)';
-  });
-  root.querySelectorAll('#perdas-barra-comparativa').forEach(function(b){
-    b.style.background = '#252836';
-  });
-  root.querySelectorAll('#perdas-categorias-grid > div').forEach(function(d){
-    d.style.background = '#1a1c26';
-    d.style.border = '1px solid rgba(255,255,255,0.06)';
-    d.style.color = '#e2e8f0';
-  });
 
   // Light/Gray styled boxes turned dark. Inclui var(--light) (#f4f1fc) — usado nas
   // linhas "zebra" das tabelas roi-table (ex.: Perdas Financeiras) — que sem esta
@@ -3286,6 +3471,54 @@ function applyPdfDarkTheme(root) {
   root.querySelectorAll('.roi-val, [style*="text-align:right"]').forEach(function(el){
     el.style.fontVariantNumeric = 'tabular-nums';
   });
+}
+
+// Tema do PDF escolhido pelo vendedor no seletor da tela de relatório
+// (index.html, #pdf-theme-toggle) — lido pelos botões "Gerar PDF Resumido/
+// Detalhado" via window.reportPdfTheme em vez de um tema fixo por botão.
+// Escuro é o padrão (design system "Executive Charcoal & Copper").
+window.reportPdfTheme = 'dark';
+function setReportPdfTheme(mode) {
+  window.reportPdfTheme = (mode === 'light') ? 'light' : 'dark';
+  var darkBtn = document.getElementById('pdf-theme-btn-dark');
+  var lightBtn = document.getElementById('pdf-theme-btn-light');
+  if (darkBtn) darkBtn.classList.toggle('active', window.reportPdfTheme === 'dark');
+  if (lightBtn) lightBtn.classList.toggle('active', window.reportPdfTheme === 'light');
+  var reportEl = document.getElementById('screen-report');
+  if (reportEl) reportEl.setAttribute('data-report-theme', window.reportPdfTheme);
+}
+
+// Aplica na TELA (não num clone de captura) a mesma recoloração de conteúdo
+// usada na exportação do PDF (applyPdfDarkTheme/applyPdfLightTheme,
+// liveMode=true) — assim o vendedor já vê no navegador o tema que vai sair
+// no PDF. Chamada no fim de buildReport(), que sempre re-renderiza o
+// conteúdo do zero a partir de S (nunca aplicada duas vezes em cima do
+// resultado anterior), então não há acúmulo de mutações entre trocas de
+// tema — cada chamada parte sempre da mesma base "clara" gerada pelos
+// templates de script.js.
+function applyLiveReportVisualTheme() {
+  var reportEl = document.getElementById('screen-report');
+  if (!reportEl) return;
+  if (window.reportPdfTheme === 'light') {
+    applyPdfLightTheme(reportEl, true);
+  } else {
+    applyPdfDarkTheme(reportEl, true);
+  }
+}
+
+// Chamada pelo clique nos botões do seletor (index.html) — troca o tema e
+// reconstrói o relatório (buildReport já termina aplicando
+// applyLiveReportVisualTheme() com o novo window.reportPdfTheme).
+function changeReportTheme(mode) {
+  window.reportPdfTheme = (mode === 'light') ? 'light' : 'dark';
+  // Restaura o HTML pristino (ver comentário em buildReport()) antes de
+  // reconstruir — garante que a troca de tema nunca acumula estilos inline
+  // de uma passada anterior.
+  var reportEl = document.getElementById('screen-report');
+  if (reportEl && window.__reportPristineHtml) {
+    reportEl.innerHTML = window.__reportPristineHtml;
+  }
+  buildReport();
 }
 
 function generatePDF(fromAdmin, themeMode, mode) {
@@ -3761,6 +3994,7 @@ function generatePDF(fromAdmin, themeMode, mode) {
       var temp = document.createElement('div');
       var bgCol = isDark ? '#0f1015' : 'white';
       temp.style.cssText = 'position:fixed;left:-99999px;top:0;width:' + CONTENT_PX_WIDTH + 'px;background:' + bgCol + ';';
+      temp.setAttribute('data-report-theme', isDark ? 'dark' : 'light');
       idxList.forEach(function(i){ temp.appendChild(sections[i].cloneNode(true)); });
       document.body.appendChild(temp);
 
@@ -3826,6 +4060,7 @@ function generatePDF(fromAdmin, themeMode, mode) {
         var temp = document.createElement('div');
         var bgCol = isDark ? '#0f1015' : 'white';
         temp.style.cssText = 'position:fixed;left:-99999px;top:0;width:' + CONTENT_PX_WIDTH + 'px;background:' + bgCol + ';';
+        temp.setAttribute('data-report-theme', isDark ? 'dark' : 'light');
         var clone = radarCard.cloneNode(true);
         temp.appendChild(clone);
         document.body.appendChild(temp);
@@ -3834,8 +4069,11 @@ function generatePDF(fromAdmin, themeMode, mode) {
         var tempChart = null;
         if(clonedCanvas) {
           clonedCanvas.removeAttribute('style');
-          clonedCanvas.width = 360;
-          clonedCanvas.height = 360;
+          // Pedido do usuário: radar maior no PDF — antes desenhado a 360x360
+          // (bem menor que os 470x470 já usados ao vivo na mesma coluna de
+          // grid), agora casado com o tamanho ao vivo.
+          clonedCanvas.width = 470;
+          clonedCanvas.height = 470;
           tempChart = drawRadarChart(clonedCanvas, RADAR_STATE, isDark ? 'darkPdf' : true);
         }
 

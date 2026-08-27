@@ -329,7 +329,7 @@ function maskPhone(input){var d=input.value.replace(/\D/g,'');if(d.length>11)d=d
       </div>
       <div>
         <div class="legend-item"><div class="legend-dot" style="background:var(--orange)"></div><div class="legend-label"><strong>Sua empresa</strong><span>Posição atual — diagnóstico</span></div></div>
-        <div class="legend-item"><div class="legend-dot" style="background:rgba(255,255,255,0.25)"></div><div class="legend-label"><strong>Média de mercado</strong><span>Construtoras de porte similar</span></div></div>
+        <div class="legend-item"><div class="legend-dot" style="background:#9ca3af"></div><div class="legend-label"><strong>Média de mercado</strong><span>Construtoras de porte similar</span></div></div>
         <div class="legend-item"><div class="legend-dot" style="background:#34d399"></div><div class="legend-label"><strong>Referência SIIGA</strong><span>Maturidade plena do método</span></div></div>
         <div style="margin-top:26px;padding:18px;background:rgba(255,255,255,0.03);border-radius:var(--r3);border:1px solid rgba(255,255,255,0.06)">
           <div style="font-size:11px;text-transform:uppercase;letter-spacing:0.1em;color:var(--gray2);margin-bottom:8px">Score geral</div>
@@ -365,7 +365,7 @@ function maskPhone(input){var d=input.value.replace(/\D/g,'');if(d.length>11)d=d
          Estimado" foi removido por pedido do usuário (Correções.docx, página 2).
          Preenchido por renderExecutiveSnapshot() em script.js, reaproveitando os
          mesmos cálculos usados no restante do relatório. -->
-    <div class="card card-wide rep-mb" id="exec-snapshot" data-section="gaps" style="background:#151720;border:1px solid rgba(255,255,255,0.06)"></div>
+    <div class="card card-wide rep-mb" id="exec-snapshot" data-section="gaps"></div>
 
     <!-- Card A: título + resumo executivo dos gaps. Separado da tabela (Card B)
          para o bin-packing do PDF (generatePDF/html2canvas) ter unidades menores
@@ -373,7 +373,7 @@ function maskPhone(input){var d=input.value.replace(/\D/g,'');if(d.length>11)d=d
          mesmo padrão já aplicado à Página de Ganhos (ver nota mais abaixo, no
          bloco SIIGA — Sistema Integrado, sobre a mesma classe de problema). -->
     <div class="card card-wide rep-mb" data-keep-group="gaps" data-section="gaps">
-      <div class="rep-sec-title" id="rep-title-gaps">Gaps do Processo Atual</div>
+      <div class="rep-sec-title" id="rep-title-gaps"><span class="rep-sec-num">02</span>Gaps do Processo Atual</div>
       <p style="font-size:12px;color:#666;margin-bottom:8px">Gaps identificados no diagnóstico e seu impacto na operação atual.</p>
       <!-- Chamada bi-focal removida por pedido do usuário (Correções.docx, página 2):
            o texto "Visão Estratégica: ... | Visão Operacional: ..." que ficava aqui,
@@ -387,7 +387,8 @@ function maskPhone(input){var d=input.value.replace(/\D/g,'');if(d.length>11)d=d
          deste card (via #opp-table-card) por uma mensagem curta em vez de deixar
          a tabela cheia (cabeçalho) reservando espaço vazio até o rodapé. -->
     <div class="card card-wide rep-mb" id="opp-table-card" data-keep-group="gaps" data-section="gaps">
-      <table class="opp-table" id="opp-table-el"><thead><tr><th>Gap Identificado</th><th>Severidade</th><th>Fase</th><th>Impacto</th></tr></thead><tbody id="opp-body"></tbody></table>
+      <div class="rep-sec-title"><span class="rep-sec-num">04</span>Gaps Identificados</div>
+      <table class="opp-table" id="opp-table-el"><thead><tr><th>#</th><th>Gap Identificado</th><th>Severidade</th><th>Fase</th><th>Impacto</th></tr></thead><tbody id="opp-body"></tbody></table>
     </div>
 
     <!-- Card C: Perdas Financeiras — cálculo principal (título + inputs + tabela de ROI).
@@ -396,7 +397,7 @@ function maskPhone(input){var d=input.value.replace(/\D/g,'');if(d.length>11)d=d
          bloco de Gaps acima: dar ao bin-packing granularidade suficiente para
          encaixar cada pedaço no espaço livre remanescente de cada página. -->
     <div class="card card-wide rep-mb pdf-resumo-hide" data-keep-group="perdas" data-section="perdas">
-      <div class="rep-sec-title">Perdas Financeiras na Operação</div>
+      <div class="rep-sec-title"><span class="rep-sec-num">05</span>Perdas Financeiras na Operação</div>
       <p style="font-size:12px;color:#666;margin-bottom:14px">Estimativa conservadora com base nos gaps identificados e nos pressupostos documentados abaixo. Valores indicativos da perda atual e do potencial de captura com o SIIGA.</p>
       <div id="roi-inputs" style="display:grid;grid-template-columns:repeat(3,1fr);gap:10px;margin-bottom:16px"></div>
       <table class="roi-table" id="roi-table-el"></table>
@@ -422,6 +423,17 @@ function maskPhone(input){var d=input.value.replace(/\D/g,'');if(d.length>11)d=d
           <div style="font-size:11px;color:#666">• Dias liberados/mês por obra: <strong style="color:#333" id="pres-diaslib">— dias</strong></div>
           <div style="font-size:11px;color:#666">• Prazo médio informado: <strong style="color:#333" id="pres-prazo">— meses</strong></div>
         </div>
+        <!-- Fórmulas de como cada fonte de PERDA (valor bruto, sem fator) é
+             calculada (id="pres-formulas") — só a memória de cálculo do valor
+             bruto exibido na tabela "Fonte da Perda" (Card C, roi-table-el)
+             acima. A explicação do Fator/captura NÃO fica mais aqui — vive no
+             card de pressupostos próprio da tabela "Fonte de Ganho" (Card G,
+             na página de Ganhos, junto do banner "Ganho Esperado com o
+             SIIGA"), por pedido do usuário: cada bloco de pressupostos só
+             deve conter o que é de fato usado no cálculo da tabela a que
+             pertence.
+             Preenchido por buildReport() em script.js. -->
+        <div id="pres-formulas" style="margin-top:10px;padding-top:10px;border-top:1px dashed #ddd"></div>
         <div style="margin-top:10px;font-size:11px;color:#888;font-style:italic">Valores baseados nas planilhas de ROI Agilean e em benchmarks de Lean Construction. Estimativa conservadora — não representa garantia contratual.</div>
       </div>
     </div>
@@ -432,13 +444,16 @@ function maskPhone(input){var d=input.value.replace(/\D/g,'');if(d.length>11)d=d
          generatePDF() (script.js), tanto no modo Resumido (já existente) quanto
          no Detalhado (novo). -->
     <div class="card card-wide rep-mb" id="perdas-composicao-card" data-keep-group="perdas" data-section="perdas">
-      <div style="padding:14px 16px;background:#fff;border-radius:8px;border:1px solid #e2e8f0" id="perdas-composicao-box">
-        <div style="font-family:'Bai Jamjuree';font-size:12px;font-weight:700;color:#14141b;margin-bottom:10px;display:flex;justify-content:space-between;align-items:center">
-          <span>📊 Composição da Perda Identificada vs. Portfólio</span>
-          <span id="perdas-pct-total" style="color:var(--orange);font-size:11px;font-weight:700"></span>
+      <div id="perdas-composicao-box">
+        <div class="rep-sec-title">
+          <span class="rep-sec-num">03</span>
+          <span style="flex:1">Composição da Perda Identificada vs. Portfólio</span>
+          <span id="perdas-pct-total" style="color:var(--orange);text-transform:none;letter-spacing:0"></span>
         </div>
-        <div style="width:100%;height:240px;margin-bottom:12px"><canvas id="perdas-chart-canvas"></canvas></div>
-        <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:8px" id="perdas-categorias-grid"></div>
+        <table class="rep-bar-table" id="perdas-bar-table">
+          <thead><tr><th>Fonte</th><th style="width:38%">Participação</th><th style="text-align:right">Valor</th><th style="text-align:right">%</th></tr></thead>
+          <tbody id="perdas-bar-body"></tbody>
+        </table>
       </div>
     </div>
 
@@ -452,15 +467,10 @@ function maskPhone(input){var d=input.value.replace(/\D/g,'');if(d.length>11)d=d
          tamanho varia pouco e ela sozinha já é a unidade certa para completar o
          espaço livre de uma página vizinha. -->
     <div class="card card-wide rep-mb" id="qualitative-section" data-keep-group="ganhos" data-section="ganhos" style="padding:22px 26px;margin-bottom:6px">
-      <div class="rep-sec-title" id="rep-title-ganhos">Plano de Ganho de Maturidade Lean — Escopo SIIGA para Empresa</div>
+      <div class="rep-sec-title" id="rep-title-ganhos"><span class="rep-sec-num">06</span>Plano de Ganho de Maturidade Lean — Escopo SIIGA para Empresa</div>
       <p style="font-size:12px;color:#666;margin-bottom:8px" id="rep-sub-ganhos">
         Com base nos gaps identificados, o plano de aumento da maturidade Lean contempla os seguintes ajustes em seus processos, estruturando o método SIIGA e a tecnologia Agilean para estancar perdas e destravar a produtividade da sua operação:
       </p>
-      <div style="font-size:10.5px;color:var(--gray2);line-height:1.5">
-        <strong style="color:#333">Visão Estratégica:</strong> "Previsibilidade de entrega e blindagem de margem."
-        <span style="color:#ccc;margin:0 6px">|</span>
-        <strong style="color:#333">Visão Operacional:</strong> "Eliminação de planilhas manuais e reuniões de estresse no fim do mês."
-      </div>
     </div>
 
     <!-- Card A2: Tabela de Transformação da Rotina Operacional. id="ganhos-rotina-card"
@@ -481,14 +491,6 @@ function maskPhone(input){var d=input.value.replace(/\D/g,'');if(d.length>11)d=d
         </thead>
         <tbody id="rotina-comparativa-body"></tbody>
       </table>
-      <div style="margin-top:8px;padding:7px 12px;background:#fff7ed;border-left:3px solid var(--orange);border-radius:4px;font-size:10.5px;color:var(--gray2);line-height:1.45">
-        <strong style="color:#333">Sobre a trava de qualidade (FVS):</strong>
-        <span style="display:block;margin-top:2px">
-          <strong style="color:#333">Visão Estratégica:</strong> "Nenhum centavo liberado sem lastro físico."
-          <span style="color:#e0c4a8;margin:0 6px">|</span>
-          <strong style="color:#333">Visão Operacional:</strong> "Blindagem técnica do CPF do engenheiro contra cobranças indevidas."
-        </span>
-      </div>
     </div>
 
     <!-- Card B: Smart Grid 2x2 de Balões de Ganhos (2 Fixos + 2 Dinâmicos) + badges de resultado.
@@ -515,15 +517,48 @@ function maskPhone(input){var d=input.value.replace(/\D/g,'');if(d.length>11)d=d
          intro (classe pdf-resumo-hide abaixo), sobrando só o miolo (sub-card
          branco com o número). No Detalhado e na tela nada muda: continua com
          título, intro e moldura verde completos. -->
-    <div class="card card-wide rep-mb" id="ganho-esperado-card" data-keep-group="ganhos" data-section="ganhos" style="background:linear-gradient(135deg,#f0fdf9,#ffffff);border-color:rgba(16,185,129,0.3);padding:14px 18px;margin-bottom:8px">
-      <div class="rep-sec-title pdf-resumo-hide" style="color:#0d6b45;border-bottom-color:rgba(16,185,129,0.3);margin-bottom:7px">Ganho Esperado com o SIIGA</div>
-      <p class="pdf-resumo-hide" style="font-size:11.5px;color:#666;margin-bottom:7px">A mesma oportunidade identificada nos gaps deste diagnóstico — agora na chave de ganho, no portfólio total sob gestão:</p>
-      <div style="display:flex;justify-content:center;margin-bottom:0">
-        <div style="padding:10px 24px;background:#fff;border-radius:10px;border:1px solid rgba(16,185,129,0.25);display:flex;flex-direction:column;align-items:center;text-align:center;max-width:420px">
-          <div style="font-size:9.5px;color:#999;text-transform:uppercase;letter-spacing:0.08em;margin-bottom:4px">Capturável no portfólio total</div>
-          <div id="ganho-portfolio-valor" style="font-family:'Bai Jamjuree';font-size:26px;font-weight:700;color:#0d6b45;font-variant-numeric:tabular-nums;line-height:1.15">—</div>
-          <div style="font-size:10px;color:#777;margin-top:3px;line-height:1.35">Estancamento das perdas identificadas nos gaps de maturidade, ao longo da implantação do SIIGA</div>
+    <div class="card card-wide rep-mb" id="ganho-esperado-card" data-keep-group="ganhos" data-section="ganhos" style="padding:14px 18px;margin-bottom:8px">
+      <div class="rep-banner">
+        <div>
+          <div style="font-size:9.5px;font-weight:700;text-transform:uppercase;letter-spacing:0.08em;color:var(--orange);margin-bottom:4px">Ganho Esperado com o SIIGA · Capturável no Portfólio Total</div>
+          <div style="font-size:11px;color:var(--rep-text-mut,#666);max-width:520px">A mesma oportunidade identificada nos gaps deste diagnóstico — agora na chave de ganho, no portfólio total sob gestão. Estancamento das perdas ao longo da implantação do SIIGA.</div>
         </div>
+        <div id="ganho-portfolio-valor" class="rep-banner-val">—</div>
+      </div>
+    </div>
+
+    <!-- Card F: tabela "Fonte de Ganho" (Detalhado) — mesma estrutura da tabela
+         simplificada usada no Resumido (Card id="roi-table-simplificada-card",
+         logo abaixo), mas com a coluna Fator exposta, já que aqui o objetivo é
+         justamente mostrar a memória de cálculo completa. Usa item.porObra/
+         item.portfolio (valor JÁ com o fator de captura aplicado) — diferente
+         da tabela "Fonte da Perda" (Card C, página de Perdas), que é o valor
+         bruto sem fator. Posicionada aqui, logo após o banner "Ganho Esperado
+         com o SIIGA" (id="ganho-esperado-card" acima) — pedido do usuário:
+         a memória de cálculo do ganho capturável fica junto do número
+         consolidado, na página de Ganhos, não na página de Perdas. Some no
+         PDF Resumido (pdf-resumo-hide) porque o Resumido já tem sua própria
+         versão simplificada (sem Fator) logo abaixo (Card
+         id="roi-table-simplificada-card"). Preenchida por
+         renderPerdasFonteGanho() em script.js. -->
+    <div class="card card-wide rep-mb pdf-resumo-hide" id="roi-table-ganho-card" data-keep-group="ganhos" data-section="ganhos">
+      <div style="font-family:'Bai Jamjuree';font-size:13px;font-weight:700;color:#14141b;margin-bottom:4px">Fonte de Ganho — Potencial Capturável com o SIIGA</div>
+      <p style="font-size:11px;color:#666;margin-bottom:10px">Mesmas fontes de perda identificadas no diagnóstico, agora com o Fator de captura aplicado: a fração da perda bruta que é realista capturar dado o nível de maturidade atual do cliente.</p>
+      <table class="roi-table" id="roi-table-ganho-el"></table>
+    </div>
+
+    <!-- Card G: pressupostos do cálculo do GANHO (Fator) — separado dos
+         pressupostos da PERDA (página de Perdas) por pedido do usuário: cada
+         bloco de pressupostos deve conter só o que é usado no cálculo da
+         tabela a que pertence. Aqui só entra a explicação do Fator (como é
+         calculado e aplicado por fonte) — as fórmulas do valor bruto ficam na
+         página de Perdas. Some no PDF Resumido (pdf-resumo-hide), junto com o
+         Card F acima. Preenchido por renderPerdasFonteGanho() em script.js
+         (#pres-formulas-ganho). -->
+    <div class="card card-wide rep-mb pdf-resumo-hide" data-keep-group="ganhos" data-section="ganhos">
+      <div style="padding:14px 16px;background:#f8f8f8;border-radius:var(--r3);border:1px solid #e8e8e8">
+        <div style="font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:0.08em;color:#999;margin-bottom:8px">Pressupostos do cálculo — Fonte de Ganho</div>
+        <div id="pres-formulas-ganho"></div>
       </div>
     </div>
 
@@ -554,7 +589,7 @@ function maskPhone(input){var d=input.value.replace(/\D/g,'');if(d.length>11)d=d
          página anterior (Ganho Esperado com o SIIGA), que sozinha ficava com
          ~50% de página em branco. -->
     <div class="card card-wide rep-mb" id="rep-title-roi" data-keep-group="roi" data-section="roi" style="padding:14px 20px;margin-bottom:6px">
-      <div class="rep-sec-title" style="margin-bottom:7px">ROI Real Estimado — Dados da Operação do Cliente</div>
+      <div class="rep-sec-title" style="margin-bottom:7px"><span class="rep-sec-num">07</span>ROI Real Estimado — Dados da Operação do Cliente</div>
       <!-- Frase de abertura do card de ROI: texto completo (2 frases) é o padrão
            de tela/Detalhado, com a 2ª frase ("Ajuste a mensalidade...") sendo
            instrução interna pro consultor — só faz sentido no Detalhado (o
@@ -630,7 +665,7 @@ function maskPhone(input){var d=input.value.replace(/\D/g,'');if(d.length>11)d=d
          de vez do Diagnóstico (fica só na ferramenta externa de proposta do
          usuário), então este card agora vem logo após ROI Real. -->
     <div class="card card-wide rep-mb" data-keep-group="metodo" data-section="metodo">
-      <div style="font-family:'Bai Jamjuree';font-size:13px;font-weight:700;color:#14141b;margin-bottom:12px">SIIGA — Sistema Integrado e Inteligente de Gestão Agilean</div>
+      <div class="rep-sec-title" style="margin-bottom:12px"><span class="rep-sec-num">08</span>SIIGA — Sistema Integrado e Inteligente de Gestão Agilean</div>
       <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px">
         <div style="padding:12px 14px;background:#f8f8f8;border-radius:8px;border:1px solid #e8e8e8">
           <div style="font-size:9.5px;font-weight:700;text-transform:uppercase;letter-spacing:0.08em;color:var(--orange);margin-bottom:8px">Origem do Método</div>
@@ -926,14 +961,23 @@ function maskPhone(input){var d=input.value.replace(/\D/g,'');if(d.length>11)d=d
       </div>
     </div>
 
-    <div class="btn-row no-print" style="max-width:920px;justify-content:space-between">
+    <div class="btn-row no-print" style="max-width:920px;justify-content:space-between;flex-wrap:wrap;gap:12px">
       <button class="btn btn-s" onclick="showScreen('screen-radar')">← Voltar ao Radar</button>
-      <div style="display:flex;gap:10px;flex-wrap:wrap;justify-content:flex-end">
+      <div style="display:flex;gap:10px;flex-wrap:wrap;justify-content:flex-end;align-items:center">
+        <!-- Seletor de tema do PDF: o vendedor escolhe Escuro/Claro antes de gerar —
+             generatePDF() lê o valor selecionado (window.reportPdfTheme) em vez de
+             um tema fixo por botão. Escuro é o padrão (design system "Executive
+             Charcoal & Copper"); Claro é a alternativa explícita, agora disponível
+             para os dois modos (Resumido/Detalhado), não só o Detalhado. -->
+        <div id="pdf-theme-toggle" style="display:flex;align-items:center;gap:6px;background:rgba(255,255,255,0.03);border:1px solid rgba(255,255,255,0.1);border-radius:8px;padding:4px;margin-right:2px">
+          <span style="font-size:10px;color:#888;padding:0 4px 0 6px;text-transform:uppercase;letter-spacing:0.05em">Tema do PDF</span>
+          <button type="button" id="pdf-theme-btn-dark" class="pdf-theme-opt" onclick="changeReportTheme('dark')" style="padding:6px 12px;border-radius:6px;border:none;cursor:pointer;font-family:'Bai Jamjuree';font-size:11.5px;font-weight:700">🌙 Escuro</button>
+          <button type="button" id="pdf-theme-btn-light" class="pdf-theme-opt" onclick="changeReportTheme('light')" style="padding:6px 12px;border-radius:6px;border:none;cursor:pointer;font-family:'Bai Jamjuree';font-size:11.5px;font-weight:700">☀️ Claro</button>
+        </div>
         <button class="btn btn-p" onclick="openApiModal()" style="background:linear-gradient(135deg,#ff5f1f,#e03d00);font-size:13px">🤖 Gerar Análise Consultiva</button>
         <button class="btn btn-s" onclick="window.print()">🖨 Imprimir</button>
-        <button class="btn btn-p" onclick="generatePDF(false, null, 'resumido')" style="background:#14161f;border:1.5px solid #ff5f1f;color:#ff5f1f;box-shadow:0 0 14px rgba(255,95,31,0.25)" title="Versão enxuta, para entregar ao cliente">📄 Gerar PDF Resumido</button>
-        <button class="btn btn-p" onclick="generatePDF(false, null, 'detalhado')" style="background:#14161f;border:1.5px solid #1B4F8A;color:#7fb0ff;box-shadow:0 0 14px rgba(27,79,138,0.25)" title="Versão completa, com tabelas e pressupostos, para apresentação ao vivo">🖥️ Gerar PDF Detalhado</button>
-        <button class="btn btn-s" onclick="generatePDF(false, 'light', 'detalhado')" style="font-size:11px" title="Versão alternativa em fundo claro (detalhado)">PDF em fundo claro</button>
+        <button class="btn btn-p" onclick="generatePDF(false, window.reportPdfTheme, 'resumido')" style="background:#14161f;border:1.5px solid #ff5f1f;color:#ff5f1f;box-shadow:0 0 14px rgba(255,95,31,0.25)" title="Versão enxuta, para entregar ao cliente">📄 Gerar PDF Resumido</button>
+        <button class="btn btn-p" onclick="generatePDF(false, window.reportPdfTheme, 'detalhado')" style="background:#14161f;border:1.5px solid #1B4F8A;color:#7fb0ff;box-shadow:0 0 14px rgba(27,79,138,0.25)" title="Versão completa, com tabelas e pressupostos, para apresentação ao vivo">🖥️ Gerar PDF Detalhado</button>
         <button class="btn btn-p" onclick="generateProposta('resumido')" style="background:#14161f;border:1.5px solid #10b981;color:#34d399;box-shadow:0 0 14px rgba(16,185,129,0.2)" title="Proposta Comercial (reunião 2) — versão enxuta">📝 Gerar Proposta Resumida</button>
         <button class="btn btn-p" onclick="generateProposta('detalhado')" style="background:#14161f;border:1.5px solid #10b981;color:#34d399;box-shadow:0 0 14px rgba(16,185,129,0.2)" title="Proposta Comercial (reunião 2) — versão completa">📝 Gerar Proposta Detalhada</button>
         <button class="btn btn-p" onclick="restartAssessment()">Novo Diagnóstico</button>

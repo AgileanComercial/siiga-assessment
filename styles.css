@@ -125,8 +125,76 @@ select.text-input option:disabled{color:#999}
 .meta-grid label{font-size:10px;text-transform:uppercase;letter-spacing:0.1em;color:var(--gray2);display:block;margin-bottom:4px}
 
 /* REPORT */
-#screen-report{background:var(--light);color:var(--black)}
-#screen-report .card{background:white;border:none;box-shadow:var(--shadow-sm)}
+/* Identidade visual "Agilean SIIGA Assessment" — ver referência anexada pelo
+   usuário (Opção Visual para o Relatório SIIGA[.]Claro.pdf). Escuro é o tema
+   padrão da tela ao vivo (consistente com o padrão já adotado no PDF); o
+   seletor de tema (#pdf-theme-toggle) alterna o atributo data-report-theme,
+   que troca só estas variáveis — o conteúdo em si (script.js) continua usando
+   applyPdfDarkTheme/applyPdfLightTheme (agora também em modo "live", sem
+   esconder a barra de botões) para recolorir o que já é gerado com cores
+   fixas inline. Ver setReportPdfTheme()/applyLiveReportVisualTheme() em
+   script.js.
+   Novos, criados para essa identidade — sem inline embutido — porque nascem
+   direto no data-theme certo, sem depender do transform de DOM: o cabeçalho
+   de seção numerado (.rep-sec-title), a barra de score, a tabela de
+   composição de perdas e a faixa de ganho esperado. */
+:root{
+  --rep-bg:#0f1015; --rep-card-bg:#151720; --rep-border:rgba(255,255,255,0.08);
+  --rep-title-bg:#1c1f2b; --rep-title-color:#f8fafc;
+  --rep-text:#e2e8f0; --rep-text-mut:#94a3b8; --rep-text-strong:#f8fafc;
+  --rep-track:rgba(255,255,255,0.08);
+}
+#screen-report{background:var(--rep-bg);color:var(--rep-text)}
+/* Seletor de atributo puro (não escopado a #screen-report): o clone isolado
+   usado pela captura do PDF (generatePDF() em script.js) fica fora de
+   #screen-report — recebe o mesmo atributo data-report-theme antes do
+   html2canvas (ver renderPage()/captureRadarPage()) para herdar estas
+   mesmas variáveis. */
+[data-report-theme="light"]{
+  --rep-bg:#faf9f7; --rep-card-bg:#ffffff; --rep-border:#e5e0d8;
+  --rep-title-bg:#f2ede4; --rep-title-color:#14141b;
+  --rep-text:#333333; --rep-text-mut:#8a8577; --rep-text-strong:#14141b;
+  --rep-track:#e9e4da;
+}
+#screen-report .card{background:var(--rep-card-bg);border:1px solid var(--rep-border);box-shadow:var(--shadow-sm);color:var(--rep-text)}
+
+/* Cabeçalho de seção numerado — "01 SÍNTESE EXECUTIVA" etc. Substitui o texto
+   com sublinhado simples que existia antes (pedido do usuário: "roupagem" da
+   opção visual anexada). Global (não escopado a #screen-report) porque o
+   card do Radar (#screen-radar, capturado como 1ª página do PDF) também usa
+   o mesmo componente — herda os tokens --rep-* de :root (sempre escuro lá,
+   não há seletor de tema fora do relatório). secTitle() em script.js gera o
+   mesmo HTML para os títulos criados dinamicamente. */
+.rep-sec-title{
+  display:flex;align-items:center;gap:10px;
+  background:var(--rep-title-bg);border-left:3px solid var(--orange);
+  border-radius:4px;padding:8px 14px;margin-bottom:14px;
+  font-family:'Bai Jamjuree';font-size:11px;font-weight:700;
+  text-transform:uppercase;letter-spacing:0.1em;color:var(--rep-title-color);
+}
+.rep-sec-num{
+  font-family:'Bai Jamjuree';font-size:10px;font-weight:700;color:var(--orange);
+  background:rgba(234,88,12,0.14);padding:2px 7px;border-radius:3px;
+  letter-spacing:0;flex-shrink:0;
+}
+
+/* Barra de progresso sob o Score de Maturidade (card Síntese Executiva). */
+.rep-score-bar{height:5px;border-radius:3px;background:var(--rep-track);margin-top:8px;overflow:hidden}
+.rep-score-bar > div{height:100%;border-radius:3px;background:linear-gradient(90deg,#b91c1c,#ea580c)}
+
+/* Tabela "Composição da Perda" com barra inline por linha — substitui o
+   gráfico de colunas anterior. */
+.rep-bar-table{width:100%;border-collapse:collapse}
+.rep-bar-table th{text-align:left;padding:7px 10px;font-size:9.5px;text-transform:uppercase;letter-spacing:0.06em;color:var(--rep-text-mut);border-bottom:1px solid var(--rep-border)}
+.rep-bar-table td{padding:10px;font-size:12px;color:var(--rep-text);border-bottom:1px solid var(--rep-border);vertical-align:middle}
+.rep-bar-table tr:last-child td{border-bottom:none}
+.rep-bar-track{width:100%;height:9px;border-radius:5px;background:var(--rep-track);overflow:hidden}
+.rep-bar-fill{height:100%;border-radius:5px;background:var(--orange)}
+
+/* Faixa horizontal "Ganho Esperado com o SIIGA" — substitui a caixa
+   centralizada anterior. */
+.rep-banner{display:flex;align-items:center;justify-content:space-between;gap:16px;background:rgba(234,88,12,0.08);border:1px solid rgba(234,88,12,0.25);border-radius:8px;padding:14px 18px}
+.rep-banner .rep-banner-val{font-family:'Bai Jamjuree';font-size:26px;font-weight:700;color:var(--orange);white-space:nowrap}
 
 /* PROPOSTA COMERCIAL (reunião 2) — mesmo padrão de fundo/card do Diagnóstico
    (screen-report acima) na tela ao vivo; o tema "Executive Charcoal & Copper"
@@ -195,6 +263,8 @@ select.text-input option:disabled{color:#999}
 .priority-item{display:flex;align-items:center;gap:10px;padding:8px 12px;background:rgba(255,95,31,0.08);border:1px solid rgba(255,95,31,0.2);border-radius:6px;cursor:grab;user-select:none}
 .priority-item .pnum{width:20px;height:20px;border-radius:50%;background:var(--orange);color:white;font-size:10px;font-weight:700;display:flex;align-items:center;justify-content:center;flex-shrink:0}
 .logo-png{mix-blend-mode:normal;background:transparent}
+.pdf-theme-opt{background:none;color:var(--gray2);transition:all 0.15s}
+.pdf-theme-opt.active{background:var(--orange);color:white}
 .admin-tab{background:none;border:none;border-bottom:2px solid transparent;color:var(--gray2);padding:10px 16px;font-family:'Bai Jamjuree';font-size:12px;cursor:pointer;transition:all 0.2s;margin-bottom:-1px;font-weight:600;letter-spacing:0.03em}
 .admin-tab:hover{color:white}
 .admin-tab.active{color:var(--orange);border-bottom-color:var(--orange)}

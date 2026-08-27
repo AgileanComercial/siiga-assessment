@@ -151,6 +151,13 @@
       background-position: right 12px center;
       padding-right: 32px;
     }
+    /* O dropdown nativo do <select> não herda o fundo escuro do .filter-input
+       (é renderizado pelo SO/navegador) — sem isso, o texto branco herdado
+       fica branco sobre o fundo branco padrão do dropdown, invisível. */
+    select.filter-input option {
+      background: var(--surface2);
+      color: var(--text);
+    }
     .filter-label {
       font-size: 11px;
       text-transform: uppercase;
