@@ -137,6 +137,10 @@ jobs:
           MAIL_USERNAME: ${{ secrets.MAIL_USERNAME }}
           MAIL_PASSWORD: ${{ secrets.MAIL_PASSWORD }}
           MAIL_SERVER: ${{ vars.MAIL_SERVER || 'smtps://smtp.gmail.com:465' }}
+          # Remetente separado do usuário SMTP: em serviços como SendGrid o usuário
+          # é a string literal "apikey", que não é endereço de e-mail e faria o
+          # servidor recusar o envelope.
+          MAIL_FROM: ${{ vars.MAIL_FROM || secrets.MAIL_USERNAME }}
           DESTINO: israel.chacon@agilean.com.br
           RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
         run: |
@@ -146,7 +150,7 @@ jobs:
           fi
 
           cat > /tmp/alerta.txt <<EMAIL
-          From: SIIGA Assessment <${MAIL_USERNAME}>
+          From: SIIGA Assessment <${MAIL_FROM}>
           To: ${DESTINO}
           Subject: [SIIGA] Backup falhou - verifique o Supabase
           Date: $(date -R)
@@ -180,7 +184,7 @@ jobs:
           curl --silent --show-error --ssl-reqd \
             --url "$MAIL_SERVER" \
             --user "${MAIL_USERNAME}:${MAIL_PASSWORD}" \
-            --mail-from "${MAIL_USERNAME}" \
+            --mail-from "${MAIL_FROM}" \
             --mail-rcpt "${DESTINO}" \
             --upload-file /tmp/alerta.txt
 
