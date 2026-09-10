@@ -25,6 +25,7 @@ on:
 
 permissions:
   contents: write
+  issues: write
 
 jobs:
   backup:
@@ -125,69 +126,57 @@ jobs:
           git commit -m "backup: assessments ($TOTAL registros)"
           git push
 
-      # O que transformou a pausa de set/2026 em uma semana de prejuízo não foi a
-      # pausa: foi ninguém ficar sabendo. O keep-alive falhou três vezes seguidas e
-      # o único sinal foi um X vermelho na aba Actions, que ninguém abre.
+      # Alerta sem servico externo: o GitHub manda e-mail para quem e assignee de
+      # uma issue, entao abrir a issue ja entrega o aviso na caixa de entrada.
+      # Evita SMTP, senha de app e politica de tenant do Microsoft 365.
       #
-      # SMTP via curl em vez de action de terceiros: uma action com acesso a este
-      # job veria os secrets do Supabase e a senha do backup.
-      - name: Avisar por e-mail se algo falhou
+      # Comenta numa issue ja aberta em vez de criar outra: uma falha que persiste
+      # nao deve virar uma issue por dia.
+      - name: Abrir issue e notificar se algo falhou
         if: failure()
         env:
-          MAIL_USERNAME: ${{ secrets.MAIL_USERNAME }}
-          MAIL_PASSWORD: ${{ secrets.MAIL_PASSWORD }}
-          MAIL_SERVER: ${{ vars.MAIL_SERVER || 'smtps://smtp.gmail.com:465' }}
-          # Remetente separado do usuário SMTP: em serviços como SendGrid o usuário
-          # é a string literal "apikey", que não é endereço de e-mail e faria o
-          # servidor recusar o envelope.
-          MAIL_FROM: ${{ vars.MAIL_FROM || secrets.MAIL_USERNAME }}
-          DESTINO: israel.chacon@agilean.com.br
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
         run: |
-          if [ -z "${MAIL_USERNAME:-}" ] || [ -z "${MAIL_PASSWORD:-}" ]; then
-            echo "::error::Backup falhou E o alerta não pôde ser enviado: secrets MAIL_USERNAME/MAIL_PASSWORD ausentes."
-            exit 1
+          gh label create backup-falhou --color d73a4a             --description "Falha no backup diario dos diagnosticos" 2>/dev/null || true
+
+          cat > /tmp/corpo.md <<'CORPO_FIM'
+          O backup diario da tabela `assessments` falhou.
+
+          **A causa mais provavel e o projeto Supabase ter sido pausado de novo** —
+          foi assim que os diagnosticos pararam de aparecer no painel entre 03/09 e
+          10/09 de 2026.
+
+          ### O que verificar
+
+          1. Abrir o projeto na dashboard da Supabase. Se estiver `Paused`, clicar em
+             **Restore** — leva ~2 min e **nao perde dados**.
+          2. Conferir o log da execucao que falhou (link abaixo).
+
+          ### Enquanto estiver fora
+
+          Os diagnosticos continuam sendo salvos no dispositivo de cada consultor.
+          Quando o painel voltar, cada um deve abrir o admin e usar **Reenviar todos**
+          na faixa vermelha.
+
+          ---
+          CORPO_FIM
+
+          {
+            echo ""
+            echo "Execucao: ${RUN_URL}"
+            echo ""
+            echo "_Aberta automaticamente pelo workflow de backup. Feche esta issue quando resolver._"
+          } >> /tmp/corpo.md
+
+          ABERTA=$(gh issue list --label backup-falhou --state open --limit 1 --json number --jq '.[0].number // empty')
+
+          if [ -n "$ABERTA" ]; then
+            gh issue comment "$ABERTA" --body-file /tmp/corpo.md
+            echo "Falha recorrente: comentado na issue #${ABERTA}."
+          else
+            gh issue create               --title "[SIIGA] Backup falhou - verifique o Supabase"               --label backup-falhou               --assignee israelchacon29-ux               --body-file /tmp/corpo.md
           fi
 
-          cat > /tmp/alerta.txt <<EMAIL
-          From: SIIGA Assessment <${MAIL_FROM}>
-          To: ${DESTINO}
-          Subject: [SIIGA] Backup falhou - verifique o Supabase
-          Date: $(date -R)
-          Content-Type: text/plain; charset=UTF-8
-
-          O backup diário da tabela assessments falhou.
-
-          A causa mais provável é o projeto Supabase ter sido pausado de novo -
-          foi exatamente assim que os diagnósticos pararam de aparecer no painel
-          entre 03/09 e 10/09 de 2026.
-
-          O que verificar, nesta ordem:
-
-          1. https://supabase.com/dashboard/project/ghtdfhupjoddfwiqzdpa
-             Se estiver "Paused", clicar em Restore. Os dados nao se perdem.
-
-          2. O log da execucao que falhou:
-             ${RUN_URL}
-
-          Enquanto o Supabase estiver fora, os diagnosticos continuam sendo salvos
-          no dispositivo de cada consultor. Quando voltar, cada um deve abrir a
-          lista de diagnosticos e usar o botao "Reenviar todos".
-
-          --
-          Enviado automaticamente pelo workflow de backup.
-          EMAIL
-
-          # SMTP exige CRLF; o heredoc gera LF puro.
-          sed -i 's/$/\r/' /tmp/alerta.txt
-
-          curl --silent --show-error --ssl-reqd \
-            --url "$MAIL_SERVER" \
-            --user "${MAIL_USERNAME}:${MAIL_PASSWORD}" \
-            --mail-from "${MAIL_FROM}" \
-            --mail-rcpt "${DESTINO}" \
-            --upload-file /tmp/alerta.txt
-
-          echo "Alerta enviado para ${DESTINO}."
-          # Mantém o job vermelho: o alerta avisa, não conserta.
+          # Mantem o job vermelho: o alerta avisa, nao conserta.
           exit 1
