@@ -21,7 +21,12 @@ name: Backup assessments
 on:
   schedule:
     - cron: '0 6 * * *'
-  workflow_dispatch: {}
+  workflow_dispatch:
+    inputs:
+      simular_falha:
+        description: 'Forcar uma falha para testar o alerta (nao toca no backup)'
+        type: boolean
+        default: false
 
 permissions:
   contents: write
@@ -32,6 +37,15 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+
+      # Permite testar o caminho do alerta sob demanda, sem precisar apagar secret
+      # nem esperar o Supabase cair. Um alerta que nunca foi disparado de verdade
+      # e so uma suposicao.
+      - name: Simular falha (teste do alerta)
+        if: inputs.simular_falha
+        run: |
+          echo "::error::Falha simulada de proposito para testar o alerta."
+          exit 1
 
       - name: Exportar assessments do Supabase
         env:
