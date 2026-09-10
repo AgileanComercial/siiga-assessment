@@ -203,10 +203,118 @@ async function fetchData() {
     populateConsultorFilter();
     updateStats();
     applyFilters();
+    renderPendingLocal();
   } catch (err) {
     console.error('Error fetching data:', err);
     tbody.innerHTML = '<tr><td colspan="9" style="text-align:center;color:#ff4444">Erro ao carregar dados: ' + err.message + '</td></tr>';
   }
+}
+
+// ═══════════════════════════════════════════
+//  DIAGNÓSTICOS PRESOS NESTE DISPOSITIVO
+// ═══════════════════════════════════════════
+// Quando o Supabase está fora do ar, o diagnóstico é salvo no localStorage do
+// navegador do consultor e nunca chega ao painel. Foi o que aconteceu entre
+// 03/09 e 10/09 de 2026: a recuperação exigiu colar script no console, o que não
+// se pode pedir a um vendedor em campo.
+//
+// admin.html e index.html são a mesma origem, então o painel enxerga o
+// localStorage gravado pela ferramenta de diagnóstico.
+
+var LOCAL_KEY = 'siiga_diagnosticos';
+
+function getLocalDiagnosticos() {
+  try { return JSON.parse(localStorage.getItem(LOCAL_KEY) || '[]'); }
+  catch (e) { return []; }
+}
+
+// Mesmo mapeamento local -> colunas usado pelo script.js. Mantenha os dois iguais.
+function localToRow(rec) {
+  return {
+    id: rec.id,
+    nome: rec.nome,
+    empresa: rec.empresa,
+    consultor: rec.consultor,
+    contato: rec.contato,
+    cargo: rec.cargo || '',
+    email: rec.email || '',
+    telefone: rec.telefone || '',
+    data: rec.data,
+    modelo_mo: rec.modeloMO,
+    num_obras: rec.numObras,
+    orcamento_medio: rec.orcamentoMedio,
+    total_score: rec.totalScore,
+    total_max: rec.totalMax,
+    nivel: rec.nivel,
+    scores: rec.scores,
+    state: rec.state
+  };
+}
+
+function getPendingLocal() {
+  var remotos = {};
+  allData.forEach(function (r) { remotos[r.id] = true; });
+  return getLocalDiagnosticos().filter(function (r) { return !remotos[r.id]; });
+}
+
+function renderPendingLocal() {
+  var box = document.getElementById('pending-local');
+  if (!box) return;
+  var pendentes = getPendingLocal();
+  if (!pendentes.length) { box.innerHTML = ''; return; }
+
+  var itens = pendentes.map(function (r) {
+    var rotulo = (r.empresa || r.nome || 'sem nome') + ' · ' + (r.consultor || 'sem consultor');
+    return '<div style="display:flex;align-items:center;gap:12px;padding:8px 0;border-top:1px solid rgba(248,113,113,0.2)">' +
+      '<div style="flex:1;min-width:0;font-size:13px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">' + rotulo + '</div>' +
+      '<button class="btn btn-sm" onclick="resendLocal(' + r.id + ')" style="background:#f87171;color:#14141b;border:none;font-weight:700;flex-shrink:0">Reenviar</button>' +
+    '</div>';
+  }).join('');
+
+  box.innerHTML =
+    '<div style="background:rgba(248,113,113,0.08);border:1px solid rgba(248,113,113,0.35);border-radius:8px;padding:16px 20px;margin-bottom:20px">' +
+      '<div style="display:flex;align-items:center;gap:16px;flex-wrap:wrap;margin-bottom:6px">' +
+        '<div style="flex:1;min-width:220px">' +
+          '<div style="font-size:15px;font-weight:700;color:#f87171">' +
+            pendentes.length + ' diagnóstico(s) neste dispositivo não estão no painel' +
+          '</div>' +
+          '<div style="font-size:12px;color:var(--gray);margin-top:2px">' +
+            'Foram feitos neste computador enquanto o painel estava fora do ar. O restante do time não os enxerga.' +
+          '</div>' +
+        '</div>' +
+        '<button class="btn btn-sm" onclick="resendAllLocal()" style="background:#f87171;color:#14141b;border:none;font-weight:700;flex-shrink:0">Reenviar todos</button>' +
+      '</div>' +
+      itens +
+    '</div>';
+}
+
+async function resendLocal(id) {
+  if (!supabaseClient) { alert('Supabase não inicializado.'); return; }
+  var rec = getLocalDiagnosticos().find(function (r) { return r.id === id; });
+  if (!rec) return;
+  // upsert para ser seguro de repetir: se já estiver lá, atualiza em vez de
+  // estourar erro de chave duplicada.
+  var res = await supabaseClient.from('assessments').upsert([localToRow(rec)]);
+  if (res.error) {
+    console.error('Reenvio falhou:', res.error);
+    alert('Não foi possível reenviar: ' + res.error.message);
+    return;
+  }
+  fetchData();
+}
+
+async function resendAllLocal() {
+  if (!supabaseClient) { alert('Supabase não inicializado.'); return; }
+  var pendentes = getPendingLocal();
+  if (!pendentes.length) return;
+  var ok = 0, falhas = 0;
+  for (var i = 0; i < pendentes.length; i++) {
+    var res = await supabaseClient.from('assessments').upsert([localToRow(pendentes[i])]);
+    if (res.error) { falhas++; console.error('Reenvio falhou:', pendentes[i].empresa, res.error); }
+    else { ok++; }
+  }
+  if (falhas) alert(ok + ' enviado(s), ' + falhas + ' com falha. Veja o console para o motivo.');
+  fetchData();
 }
 
 function populateConsultorFilter() {
