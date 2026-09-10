@@ -124,3 +124,66 @@ jobs:
           git add backups/
           git commit -m "backup: assessments ($TOTAL registros)"
           git push
+
+      # O que transformou a pausa de set/2026 em uma semana de prejuízo não foi a
+      # pausa: foi ninguém ficar sabendo. O keep-alive falhou três vezes seguidas e
+      # o único sinal foi um X vermelho na aba Actions, que ninguém abre.
+      #
+      # SMTP via curl em vez de action de terceiros: uma action com acesso a este
+      # job veria os secrets do Supabase e a senha do backup.
+      - name: Avisar por e-mail se algo falhou
+        if: failure()
+        env:
+          MAIL_USERNAME: ${{ secrets.MAIL_USERNAME }}
+          MAIL_PASSWORD: ${{ secrets.MAIL_PASSWORD }}
+          MAIL_SERVER: ${{ vars.MAIL_SERVER || 'smtps://smtp.gmail.com:465' }}
+          DESTINO: israel.chacon@agilean.com.br
+          RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+        run: |
+          if [ -z "${MAIL_USERNAME:-}" ] || [ -z "${MAIL_PASSWORD:-}" ]; then
+            echo "::error::Backup falhou E o alerta não pôde ser enviado: secrets MAIL_USERNAME/MAIL_PASSWORD ausentes."
+            exit 1
+          fi
+
+          cat > /tmp/alerta.txt <<EMAIL
+          From: SIIGA Assessment <${MAIL_USERNAME}>
+          To: ${DESTINO}
+          Subject: [SIIGA] Backup falhou - verifique o Supabase
+          Date: $(date -R)
+          Content-Type: text/plain; charset=UTF-8
+
+          O backup diário da tabela assessments falhou.
+
+          A causa mais provável é o projeto Supabase ter sido pausado de novo -
+          foi exatamente assim que os diagnósticos pararam de aparecer no painel
+          entre 03/09 e 10/09 de 2026.
+
+          O que verificar, nesta ordem:
+
+          1. https://supabase.com/dashboard/project/ghtdfhupjoddfwiqzdpa
+             Se estiver "Paused", clicar em Restore. Os dados nao se perdem.
+
+          2. O log da execucao que falhou:
+             ${RUN_URL}
+
+          Enquanto o Supabase estiver fora, os diagnosticos continuam sendo salvos
+          no dispositivo de cada consultor. Quando voltar, cada um deve abrir a
+          lista de diagnosticos e usar o botao "Reenviar todos".
+
+          --
+          Enviado automaticamente pelo workflow de backup.
+          EMAIL
+
+          # SMTP exige CRLF; o heredoc gera LF puro.
+          sed -i 's/$/\r/' /tmp/alerta.txt
+
+          curl --silent --show-error --ssl-reqd \
+            --url "$MAIL_SERVER" \
+            --user "${MAIL_USERNAME}:${MAIL_PASSWORD}" \
+            --mail-from "${MAIL_USERNAME}" \
+            --mail-rcpt "${DESTINO}" \
+            --upload-file /tmp/alerta.txt
+
+          echo "Alerta enviado para ${DESTINO}."
+          # Mantém o job vermelho: o alerta avisa, não conserta.
+          exit 1
