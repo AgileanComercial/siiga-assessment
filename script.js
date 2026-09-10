@@ -4658,7 +4658,7 @@ function saveDraft() {
       selectedPilars: selectedPilars.slice()
     };
     localStorage.setItem(DRAFT_KEY, JSON.stringify(draft));
-    showDraftIndicator();
+    showDraftIndicator(syncFailed ? 'error' : 'ok');
   } catch(e) {}
   
   if (sbClient && S.id) {
@@ -4700,11 +4700,39 @@ async function syncToSupabase() {
   try {
     const { error } = await sbClient.from('assessments').upsert([record]);
     if (error) {
-      console.warn("Autosave: Não foi possível salvar no Supabase (verifique as políticas RLS).");
+      console.error("Autosave: falha ao sincronizar com o Supabase.", error);
+      reportSyncFailure();
+      return;
     }
+    reportSyncSuccess();
   } catch(err) {
-    console.error(err);
+    console.error("Autosave: sem conexão com o Supabase.", err);
+    reportSyncFailure();
   }
+}
+
+// O autosave engolia o erro num console.warn: o consultor via "✓ salvo" — que é
+// só o localStorage — e seguia acreditando que o diagnóstico estava no painel.
+// Quando o projeto Supabase pausou (set/2026), ninguém percebeu por uma semana.
+// Agora o indicador reflete o estado real da sincronização. O toast sai só na
+// primeira falha de cada sessão, porque o autosave dispara a cada 2s e um toast
+// por tentativa tornaria a tela inutilizável.
+var syncFailed = false;
+
+function reportSyncFailure() {
+  var primeira = !syncFailed;
+  syncFailed = true;
+  showDraftIndicator('error');
+  if (primeira) {
+    showToast('Sem conexão com o painel — salvo apenas neste dispositivo. Não feche o navegador.', 'error');
+  }
+}
+
+function reportSyncSuccess() {
+  var recuperou = syncFailed;
+  syncFailed = false;
+  showDraftIndicator('ok');
+  if (recuperou) showToast('Conexão com o painel restabelecida — diagnóstico sincronizado.');
 }
 
 function clearDraft() {
@@ -4720,14 +4748,28 @@ function getDraft() {
   } catch(e) { return null; }
 }
 
-function showDraftIndicator() {
+var draftIndicatorTimers = [];
+
+// state 'ok' (padrão) desaparece após 2s, como antes. state 'error' fica FIXO na
+// tela: o consultor precisa continuar enxergando que o que respondeu não subiu.
+function showDraftIndicator(state) {
   var ind = document.getElementById('draft-indicator');
-  if(ind) {
-    ind.textContent = '✓ salvo';
-    ind.style.display = 'inline-flex';
-    setTimeout(function(){ ind.style.opacity='0'; }, 2000);
-    setTimeout(function(){ ind.style.opacity='1'; ind.textContent=''; }, 2600);
+  if(!ind) return;
+  draftIndicatorTimers.forEach(clearTimeout);
+  draftIndicatorTimers = [];
+  ind.style.display = 'inline-flex';
+  ind.style.opacity = '1';
+  if(state === 'error') {
+    ind.textContent = '⚠ não sincronizado';
+    ind.style.color = '#ef4444';
+    ind.title = 'O diagnóstico está salvo neste dispositivo, mas não chegou ao painel.';
+    return;
   }
+  ind.textContent = '✓ salvo';
+  ind.style.color = '';
+  ind.title = '';
+  draftIndicatorTimers.push(setTimeout(function(){ ind.style.opacity='0'; }, 2000));
+  draftIndicatorTimers.push(setTimeout(function(){ ind.style.opacity='1'; ind.textContent=''; }, 2600));
 }
 
 function checkAndOfferResume() {
@@ -4801,6 +4843,87 @@ function discardDraft() {
 // ═══════════════════════════════════════════
 var STORAGE_KEY = 'siiga_diagnosticos';
 
+// Mapeamento local -> colunas do Supabase. Fica num lugar só de propósito: o
+// salvamento e o reenvio precisam gravar exatamente as mesmas colunas, e quando
+// isso estava duplicado bastava acrescentar um campo de um lado para o outro
+// passar a gravar registro incompleto, sem erro nenhum.
+function recordToRow(rec) {
+  return {
+    id: rec.id,
+    nome: rec.nome,
+    empresa: rec.empresa,
+    consultor: rec.consultor,
+    contato: rec.contato,
+    cargo: rec.cargo || '',
+    email: rec.email || '',
+    telefone: rec.telefone || '',
+    data: rec.data,
+    modelo_mo: rec.modeloMO,
+    num_obras: rec.numObras,
+    orcamento_medio: rec.orcamentoMedio,
+    total_score: rec.totalScore,
+    total_max: rec.totalMax,
+    nivel: rec.nivel,
+    scores: rec.scores,
+    state: rec.state
+  };
+}
+
+// ids que já estão no Supabase. null = não deu para consultar (sem rede ou painel
+// fora do ar) — nesse caso não afirmamos que algo está pendente; apenas deixamos o
+// reenvio disponível, que é idempotente.
+var remoteIds = null;
+
+async function fetchRemoteIds() {
+  if(!sbClient) return null;
+  try {
+    var res = await sbClient.from('assessments').select('id');
+    if(res.error) { console.error('Não foi possível verificar o painel:', res.error); return null; }
+    var set = {};
+    (res.data || []).forEach(function(r){ set[r.id] = true; });
+    return set;
+  } catch(e) {
+    console.error('Não foi possível verificar o painel:', e);
+    return null;
+  }
+}
+
+async function refreshSyncStatus() {
+  remoteIds = await fetchRemoteIds();
+  renderAdminList();
+}
+
+// upsert, e não insert, porque reenviar precisa ser seguro de repetir: se o
+// registro já estiver lá, atualiza em vez de estourar erro de chave duplicada.
+async function resendDiagnostico(id) {
+  var rec = getAllDiagnosticos().find(function(r){ return r.id === id; });
+  if(!rec) return;
+  if(!sbClient) { showToast('Painel não configurado nesta instalação.', 'error'); return; }
+  var res = await sbClient.from('assessments').upsert([recordToRow(rec)]);
+  if(res.error) {
+    console.error('Reenvio falhou:', res.error);
+    showToast('Não foi possível reenviar: ' + res.error.message, 'error');
+    return;
+  }
+  showToast('"' + (rec.empresa || rec.nome) + '" enviado ao painel.');
+  refreshSyncStatus();
+}
+
+async function resendAllPending() {
+  if(!sbClient) return;
+  var pendentes = getAllDiagnosticos().filter(function(r){ return remoteIds && !remoteIds[r.id]; });
+  if(!pendentes.length) return;
+  var ok = 0, falhas = 0;
+  for (var i = 0; i < pendentes.length; i++) {
+    var res = await sbClient.from('assessments').upsert([recordToRow(pendentes[i])]);
+    if(res.error) { falhas++; console.error('Reenvio falhou:', pendentes[i].empresa, res.error); }
+    else { ok++; }
+  }
+  if(falhas) showToast(ok + ' enviado(s), ' + falhas + ' com falha. Veja o console.', 'error');
+  else showToast(ok + ' diagnóstico(s) enviado(s) ao painel.');
+  refreshSyncStatus();
+}
+
 function getAllDiagnosticos() {
   try {
     return JSON.parse(localStorage.getItem(STORAGE_KEY) || '[]');
@@ -4867,25 +4990,7 @@ async function confirmSave() {
   // mostra um erro explícito, pedindo para tentar salvar novamente.
   if(sbClient) {
     try {
-      const { data, error } = await sbClient.from('assessments').insert([{
-        id: record.id,
-        nome: record.nome,
-        empresa: record.empresa,
-        consultor: record.consultor,
-        contato: record.contato,
-        cargo: record.cargo,
-        email: record.email,
-        telefone: record.telefone,
-        data: record.data,
-        modelo_mo: record.modeloMO,
-        num_obras: record.numObras,
-        orcamento_medio: record.orcamentoMedio,
-        total_score: record.totalScore,
-        total_max: record.totalMax,
-        nivel: record.nivel,
-        scores: record.scores,
-        state: record.state
-      }]);
+      const { data, error } = await sbClient.from('assessments').insert([recordToRow(record)]);
       if(error) {
         console.error("Erro ao salvar no Supabase:", error);
         showToast('Diagnóstico salvo apenas neste dispositivo — falha ao sincronizar com o painel. Tente salvar novamente.', 'error');
@@ -4928,6 +5033,7 @@ function formatDate(d) {
 function showAdminPanel() {
   renderAdminList();
   showScreen('screen-admin');
+  refreshSyncStatus(); // assíncrono: a lista aparece já, os avisos chegam logo depois
 }
 
 function renderAdminList() {
@@ -4942,9 +5048,26 @@ function renderAdminList() {
   empty.style.display = 'none';
   var levelColors = {'Reativo':'#f87171','Em Construção':'#fb923c','Estruturado':'#60a5fa','Referência SIIGA':'#34d399'};
   var html = '';
+
+  var pendentes = list.filter(function(r){ return remoteIds && !remoteIds[r.id]; });
+  if(pendentes.length) {
+    html += '<div style="background:rgba(248,113,113,0.08);border:1px solid rgba(248,113,113,0.35);border-radius:var(--r);padding:14px 18px;margin-bottom:16px;display:flex;align-items:center;gap:16px;flex-wrap:wrap">' +
+      '<div style="flex:1;min-width:200px">' +
+        '<div style="font-family:Bai Jamjuree;font-size:14px;font-weight:700;color:#f87171">' +
+          pendentes.length + ' diagnóstico(s) não estão no painel' +
+        '</div>' +
+        '<div style="font-size:12px;color:var(--gray2);margin-top:2px">' +
+          'Estão salvos neste dispositivo, mas a equipe não os enxerga.' +
+        '</div>' +
+      '</div>' +
+      '<button onclick="resendAllPending()" style="background:#f87171;color:#14141b;border:none;padding:9px 18px;border-radius:6px;cursor:pointer;font-size:12px;font-family:Bai Jamjuree;font-weight:700;flex-shrink:0">Reenviar todos</button>' +
+    '</div>';
+  }
   list.forEach(function(rec) {
     var pct = Math.round((rec.totalScore/rec.totalMax)*100);
     var col = levelColors[rec.nivel] || '#aaa';
+    var sincronizado = !!(remoteIds && remoteIds[rec.id]);
+    var pendente = !!(remoteIds && !remoteIds[rec.id]);
     html += '<div style="background:var(--black2);border:1px solid rgba(255,255,255,0.07);border-radius:var(--r);padding:20px 24px;margin-bottom:12px;display:flex;align-items:center;gap:20px">' +
       '<div style="width:52px;height:52px;border-radius:50%;background:'+col+'22;border:2px solid '+col+';display:flex;align-items:center;justify-content:center;flex-shrink:0">' +
         '<span style="font-family:Bai Jamjuree;font-size:14px;font-weight:700;color:'+col+'">'+pct+'%</span>' +
@@ -4957,8 +5080,10 @@ function renderAdminList() {
           ' · MO: '+(rec.modeloMO||'—') +
         '</div>' +
         '<div style="font-size:11px;margin-top:4px;color:'+col+'">'+rec.nivel+' · Score: '+rec.totalScore+'/'+rec.totalMax+'</div>' +
+        (pendente ? '<div style="font-size:11px;margin-top:4px;color:#f87171;font-weight:700">não está no painel — só neste dispositivo</div>' : '') +
       '</div>' +
       '<div style="display:flex;gap:8px;flex-shrink:0">' +
+        (sincronizado ? '' : '<button onclick="resendDiagnostico('+rec.id+')" style="background:'+(pendente?'#f87171':'rgba(255,255,255,0.08)')+';color:'+(pendente?'#14141b':'var(--gray2)')+';border:none;padding:7px 14px;border-radius:6px;cursor:pointer;font-size:11px;font-family:Bai Jamjuree;font-weight:700">Reenviar</button>') +
         '<button onclick="loadDiagnostico('+rec.id+')" class="btn btn-p" style="font-size:11px;padding:7px 14px">📊 Ver relatório</button>' +
         '<button onclick="loadAndAnalyze('+rec.id+')" style="background:linear-gradient(135deg,#ff5f1f,#e03d00);color:white;border:none;padding:7px 14px;border-radius:6px;cursor:pointer;font-size:11px;font-family:Bai Jamjuree;font-weight:700">🤖 IA</button>' +
         '<button onclick="generatePDFFromAdmin('+rec.id+')" style="background:#1B4F8A;color:white;border:none;padding:7px 14px;border-radius:6px;cursor:pointer;font-size:11px;font-family:Bai Jamjuree;font-weight:700">📄 PDF</button>' +

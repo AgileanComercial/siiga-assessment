@@ -1,0 +1,3 @@
+# Nunca commitar o JSON em claro: repositório público, dados pessoais de leads.
+*.json
+!.gitignore

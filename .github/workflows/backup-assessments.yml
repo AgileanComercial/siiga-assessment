@@ -1,0 +1,126 @@
+# Backup diário da tabela `assessments`.
+#
+# Por que criptografado: este repositório é PÚBLICO e os diagnósticos contêm
+# dados pessoais de leads (nome, e-mail, telefone, cargo, empresa). Commitar o
+# JSON em claro publicaria isso na internet aberta. O que vai para o repo é um
+# blob AES-256 que só abre com a senha em BACKUP_PASSPHRASE.
+#
+# Por que não é um artifact: em repositório público, artifacts do Actions são
+# baixáveis por qualquer pessoa — teria o mesmo problema.
+#
+# Só commita quando o conteúdo REAL muda: a criptografia usa salt aleatório, então
+# o blob difere a cada execução mesmo com dados idênticos. Por isso a comparação
+# é feita sobre o sha256 do texto em claro, guardado em backups/CHECKSUM.
+#
+# Roda todo dia, o que também mantém o projeto ativo — mas note que isso NÃO é
+# garantia contra a pausa por inatividade do free tier: o keep-alive de 3 em 3
+# dias estava verde em 01/09/2026 e o projeto pausou mesmo assim.
+
+name: Backup assessments
+
+on:
+  schedule:
+    - cron: '0 6 * * *'
+  workflow_dispatch: {}
+
+permissions:
+  contents: write
+
+jobs:
+  backup:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Exportar assessments do Supabase
+        env:
+          SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+          # service_role se existir (continua funcionando depois de fechar o RLS
+          # para o papel anon); senão cai no anon, que é o que há hoje.
+          KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY || secrets.SUPABASE_ANON_KEY }}
+        run: |
+          set -euo pipefail
+          PAGE=1000
+          OFFSET=0
+          echo "[]" > /tmp/all.json
+
+          while : ; do
+            HTTP=$(curl -s -o /tmp/page.json -w "%{http_code}" \
+              "${SUPABASE_URL}/rest/v1/assessments?select=*&order=id.asc&limit=${PAGE}&offset=${OFFSET}" \
+              -H "apikey: ${KEY}" -H "Authorization: Bearer ${KEY}")
+
+            if [ "$HTTP" != "200" ]; then
+              echo "::error::Supabase respondeu HTTP $HTTP ao exportar (offset $OFFSET). Backup abortado."
+              exit 1
+            fi
+
+            N=$(jq 'length' /tmp/page.json)
+            jq -s '.[0] + .[1]' /tmp/all.json /tmp/page.json > /tmp/merged.json
+            mv /tmp/merged.json /tmp/all.json
+            echo "  +${N} registros (offset ${OFFSET})"
+
+            if [ "$N" -lt "$PAGE" ]; then break; fi
+            OFFSET=$((OFFSET + PAGE))
+          done
+
+          TOTAL=$(jq 'length' /tmp/all.json)
+          echo "Total exportado: $TOTAL"
+
+          # Uma tabela vazia quase certamente significa problema de permissão ou
+          # perda de dados — não vale sobrescrever um backup bom com um vazio.
+          if [ "$TOTAL" -eq 0 ]; then
+            echo "::error::Export retornou 0 registros. Abortando para não sobrescrever o backup anterior."
+            exit 1
+          fi
+
+          jq -S . /tmp/all.json > /tmp/assessments.json
+          echo "TOTAL=$TOTAL" >> "$GITHUB_ENV"
+
+      - name: Comparar com o último backup
+        run: |
+          set -euo pipefail
+          NOVO=$(sha256sum /tmp/assessments.json | cut -d' ' -f1)
+          ANTIGO=$(cat backups/CHECKSUM 2>/dev/null || echo "nenhum")
+          echo "NOVO=$NOVO"  >> "$GITHUB_ENV"
+          if [ "$NOVO" = "$ANTIGO" ]; then
+            echo "MUDOU=nao" >> "$GITHUB_ENV"
+            echo "Sem alteração desde o último backup — nada a commitar."
+          else
+            echo "MUDOU=sim" >> "$GITHUB_ENV"
+          fi
+
+      - name: Criptografar e commitar
+        if: env.MUDOU == 'sim'
+        env:
+          BACKUP_PASSPHRASE: ${{ secrets.BACKUP_PASSPHRASE }}
+        run: |
+          set -euo pipefail
+          if [ -z "${BACKUP_PASSPHRASE:-}" ]; then
+            echo "::error::Secret BACKUP_PASSPHRASE não configurado. Sem ele o backup iria em claro num repo público."
+            exit 1
+          fi
+
+          mkdir -p backups
+          gzip -9 -c /tmp/assessments.json > /tmp/assessments.json.gz
+          openssl enc -aes-256-cbc -pbkdf2 -iter 240000 -salt \
+            -in /tmp/assessments.json.gz \
+            -out backups/assessments.json.gz.enc \
+            -pass env:BACKUP_PASSPHRASE
+
+          # Verificação: um backup que não abre não é backup.
+          openssl enc -d -aes-256-cbc -pbkdf2 -iter 240000 \
+            -in backups/assessments.json.gz.enc \
+            -pass env:BACKUP_PASSPHRASE | gunzip | jq -e 'length > 0' > /dev/null
+          echo "Round-trip verificado."
+
+          echo "$NOVO" > backups/CHECKSUM
+          printf '%s\n' \
+            "Último backup: $(date -u '+%Y-%m-%d %H:%M UTC')" \
+            "Registros: $TOTAL" \
+            "Para restaurar: ver backups/README.md" > backups/STATUS.txt
+
+          git config user.name  "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add backups/
+          git commit -m "backup: assessments ($TOTAL registros)"
+          git push
