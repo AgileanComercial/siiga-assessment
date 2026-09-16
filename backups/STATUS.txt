@@ -1,3 +1,3 @@
-Último backup: 2026-09-15 11:03 UTC
-Registros: 94
+Último backup: 2026-09-16 10:50 UTC
+Registros: 96
 Para restaurar: ver backups/README.md
