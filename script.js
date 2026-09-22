@@ -1406,14 +1406,18 @@ function buildAndShowRadar() {
   var phases = ['f1','f2','f3','f4'];
   var maxes = {f1:21,f2:9,f3:15,f4:12};
   var benchmark = [0.70,0.62,0.55,0.58];
-  var reference = [0.92,0.88,0.90,0.85];
+  // Referência SIIGA = teto do radar (100% em todos os eixos). Antes era
+  // [0.92,0.88,0.90,0.85], o que permitia o cliente ultrapassar a referência
+  // quando gabaritava uma fase — a referência tem que ser o máximo atingível.
+  var reference = [1.00,1.00,1.00,1.00];
   var labels = ['Fase 1','Fase 2','Fase 3','Fase 4'];
 
   var clientPct = phases.map(function(k) {
     var arr = S.scores[k];
     if(!Array.isArray(arr)) return 0;
     var sum = arr.reduce(function(a,b){return a+(b||0);},0);
-    return sum/(maxes[k]||1);
+    // trava em 1.0: nenhum eixo do cliente pode passar da Referência SIIGA
+    return Math.max(0, Math.min(1, sum/(maxes[k]||1)));
   });
 
   var totalMax = 21+9+15+12+3;
@@ -1436,7 +1440,7 @@ function buildAndShowRadar() {
   if(teaserEl) teaserEl.textContent = fmtNum(roiTeaser.totalBase * (S.numObras||5));
 
   // Ponto 3a: eixo com maior gap vs. referência SIIGA — destacado e com rótulo de distância
-  var gaps = clientPct.map(function(p,i){ return reference[i]-p; });
+  var gaps = clientPct.map(function(p,i){ return Math.max(0, reference[i]-p); });
   var worstIdx = 0;
   for(var gi=1; gi<gaps.length; gi++) { if(gaps[gi] > gaps[worstIdx]) worstIdx = gi; }
   var worstGapPct = Math.round(gaps[worstIdx]*100);
@@ -2078,7 +2082,7 @@ function buildReport() {
     var worstOpp = worstCritico || opps[0];
     var worstOppLabel = worstOpp ? (fLabels[worstOpp.phase] || worstOpp.phase) : '—';
     var radarWorstLabel = (typeof RADAR_STATE !== 'undefined' && RADAR_STATE) ? RADAR_STATE.labels[RADAR_STATE.worstIdx] : '—';
-    var radarWorstPct = (typeof RADAR_STATE !== 'undefined' && RADAR_STATE) ? Math.round((RADAR_STATE.reference[RADAR_STATE.worstIdx] - RADAR_STATE.clientPct[RADAR_STATE.worstIdx]) * 100) + ' p.p.' : '—';
+    var radarWorstPct = (typeof RADAR_STATE !== 'undefined' && RADAR_STATE) ? Math.round(Math.max(0, RADAR_STATE.reference[RADAR_STATE.worstIdx] - RADAR_STATE.clientPct[RADAR_STATE.worstIdx]) * 100) + ' p.p.' : '—';
     gapsSummaryEl.innerHTML =
       '<div style="padding:12px 14px;background:#f8f8f8;border-radius:8px;border:1px solid #e8e8e8;text-align:center">' +
         '<div style="font-family:\'Bai Jamjuree\';font-size:22px;font-weight:700;color:var(--orange)">' + opps.length + '</div>' +
