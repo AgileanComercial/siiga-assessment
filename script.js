@@ -2201,11 +2201,11 @@ function buildReport() {
   var presPrazo = document.getElementById('pres-prazo');
   if(presPrazo) presPrazo.textContent = (S.prazoMedio||18) + ' meses';
   // Pressupostos dinâmicos — vinculados às MESMAS constantes usadas em calculateROI()
-  // (retrBase e diasLib) para nunca mais divergir do texto estático se a fórmula mudar.
+  // (retrBase e horasRecup) para nunca mais divergir do texto estático se a fórmula mudar.
   var presRetrab = document.getElementById('pres-retrab');
   if(presRetrab) presRetrab.textContent = Math.round((roi.pctRetrabalho||0.10)*100) + '% do portfólio';
   var presDiasLib = document.getElementById('pres-diaslib');
-  if(presDiasLib) presDiasLib.textContent = '~' + (Math.round((roi.diasLib||0)*100)/100).toLocaleString('pt-BR') + ' dias';
+  if(presDiasLib) presDiasLib.textContent = fmtHorasBR(roi.horasRecup) + ' h' + (roi.horasDoCliente ? '' : ' (referência de mercado)');
   // Fórmulas de como o valor BRUTO de cada fonte de perda (item.baseValue) é
   // calculado — mesma memória de cálculo da tabela "Fonte da Perda" acima.
   // A explicação do Fator vive em renderPerdasFonteGanho() (#pres-formulas-ganho),
@@ -2560,6 +2560,10 @@ function generateOpportunities() {
   return opps.slice(0, 14);
 }
 
+function fmtHorasBR(h) {
+  return (Math.round((h||0)*10)/10).toLocaleString('pt-BR', {maximumFractionDigits: 1});
+}
+
 function calculateROI() {
   var obras     = S.numObras || 5;
   var orcamento = S.orcamentoMedio || 8000000;
@@ -2571,14 +2575,19 @@ function calculateROI() {
   var PCT_MO         = 0.45;
   var ESTOURO_MO     = 0.15;
   var CAPTURA_MO     = 0.70;
-  var CUSTO_ENG_DIA  = 800;
   var PCT_RETRABALHO = 0.10; // retrabalho de mercado, referência usada em retrBase
   var PCT_DESVIO_ERROS = 0.05; // desvio médio de folha/medição (planilhas), usado em erroBase
-  var diasRotinas = [
-    {atual:4, depois:1}, {atual:4, depois:0.5},
-    {atual:5, depois:0.25}, {atual:3, depois:0.5}
-  ];
-  var diasLib = diasRotinas.reduce(function(a,r){return a+(r.atual-r.depois);},0);
+  // Otimização do time de gestão: horas RECUPERÁVEIS informadas pelo cliente
+  // na tela "Tempo da Equipe de Gestão" (horas de cada rotina × % de economia,
+  // mesmo "potencial pleno" do ROI Real), × custo da hora técnica do ROI.
+  // Sem horas informadas (tela em branco ou diagnóstico antigo), usa a
+  // referência de mercado de 12,25 dias/mês × 8h — sinalizada no pressuposto.
+  var HORAS_REF_MERCADO = 12.25 * 8;
+  var horasGestao = getHorasGestao();
+  var horasRecup = HORAS_GESTAO_CAMPOS.reduce(function(a,c){ return a + (horasGestao[c.key]||0) * c.ganho; }, 0);
+  var horasDoCliente = horasRecup > 0;
+  if(!horasDoCliente) horasRecup = HORAS_REF_MERCADO;
+  var custoHora = ROI_REAL_K.CUSTO_HORA_TECNICA;
 
   // ── PHASE PERCENTAGES ─────────────────────────────────────────────
   var f1p = getAvgPct('f1');
@@ -2600,7 +2609,7 @@ function calculateROI() {
   var fatErros   = capFactor(f3p * 0.40 + f4p * 0.60);   // erros: F3+F4
 
   // ── GANHOS BASE (potencial teórico por obra) ──────────────────────
-  var engBase    = diasLib * CUSTO_ENG_DIA * prazo;
+  var engBase    = horasRecup * custoHora * prazo;
   var retrBase   = orcamento * PCT_RETRABALHO * 0.40;
   var velocBase  = orcamento * 0.10 * 0.15;
   var erroBase   = orcamento * PCT_MO * PCT_DESVIO_ERROS;
@@ -2625,7 +2634,9 @@ function calculateROI() {
   var items = [
     {
       key:'time', label:'Otimização do time de gestão',
-      basis: Math.round(diasLib) + ' dias/mês × R$800/dia × ' + prazo + ' meses',
+      basis: fmtHorasBR(horasRecup) + ' h/mês recuperáveis ' +
+        (horasDoCliente ? '(horas informadas pelo cliente × % de economia de cada rotina)' : '(referência de mercado: 12,25 dias × 8h — horas não informadas)') +
+        ' × R$' + custoHora + '/h × ' + prazo + ' meses',
       fator: fatTime,
       porObra:   Math.round(engBase  * fatTime),
       portfolio: Math.round(engBase  * fatTime * obras),
@@ -2683,7 +2694,8 @@ function calculateROI() {
     overallFator: overallFator,
     fatores: {time:fatTime, retrabalho:fatRetr, velocidade:fatVeloc, mo:fatMO, erros:fatErros},
     pctRetrabalho: PCT_RETRABALHO,
-    diasLib: diasLib
+    horasRecup: horasRecup,
+    horasDoCliente: horasDoCliente
   };
 }
 
