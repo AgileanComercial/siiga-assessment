@@ -22,14 +22,13 @@ var S = {
   ferramentas:{ planejamento:'', medicao:'', qualidade:'', contratos:'', folha:'', erp:'', erpOutro:'' },
   scores:{ b03:0, f1:[0,0,0,0,0,0,0,0], f2:[0,0,0,0], f3:[0,0,0,0,0,0], mo:{}, f4:[0,0,0,0,0] },
   showMO: false,
-  // Dados para o cálculo de ROI real (calculadora-roi-agilean) — coletados dentro das fases relacionadas
-  // custoHora: fixo (ROI_REAL_K.CUSTO_HORA_TECNICA) — não é mais perguntado ao cliente
-  // diasAtual: derivado da resposta de MO.4/MO.7 — não é mais perguntado ao cliente (evita duplicidade)
+  // Dados para o cálculo de ROI real (calculadora-roi-agilean). As horas da
+  // equipe de gestão são coletadas numa tela única no fim do diagnóstico
+  // (HORAS_GESTAO_CAMPOS, depois do Pilar 4); a folha vem da MO.ROI1.
+  // custoHora: fixo (ROI_REAL_K.CUSTO_HORA_TECNICA) — não é perguntado ao cliente
   roi2: {
     folha: 0,
-    hDiaAtual: 0, hSemQualidade: 0,
-    fluxoPlanejar: 0, fluxoCurto: 0, fluxoMedio: 0, fluxoReprogramar: 0,
-    fluxoMedir: 0, fluxoConferir: 0, fluxoERP: 0, fluxoCruzar: 0
+    hPlanejar: 0, hCurtoMedio: 0, hMedicao: 0, hQualidade: 0, hConsolidar: 0
   },
   mensalidade: 2000, captura: 0.50, mensalidadeManual: false
 };
@@ -157,7 +156,7 @@ var B0Q = [
 var PQ = {
   f1:{
     phase:1, badgeClass:'bf1', color:'#60a5fa', colorHex:'#1B4F8A',
-    label:'Fase 1 · Planejamento Estratégico do Fluxo de Produção',
+    label:'Pilar 1 · Planejamento Estratégico do Fluxo de Produção',
     maxScore:21,
     insight: function(p){
       if(p<0.4) return 'Seu planejamento existe, mas ainda não governa a execução. A obra toma decisões sem linha de base — cada atraso é uma surpresa, não um desvio calculado.';
@@ -189,22 +188,17 @@ var PQ = {
       { code:'F1.5', text:'Existe integração entre o planejamento da obra e o processo de suprimentos — o cronograma de compras é definido com base nas datas de início de cada pacote planejado?', reveals:'ROI direto em compras (menos urgência, melhor negociação). A ausência explica grande parte das paradas por material faltante.',
         anchor:'A integração planejamento × suprimentos é um dos ganhos mais rápidos e visíveis quando o SIIGA é implantado. Cada compra emergencial tem custo oculto que nunca aparece no relatório.',
         opts:[{l:'Suprimentos totalmente reativo',s:'Compra quando percebe que vai faltar',score:0},{l:'Alinhamento informal eventual',s:'Avisamos compras quando lembramos',score:1},{l:'Cronograma de compras existe, desconectado do planejamento',s:'Temos um cronograma mas não bate com o plano de obra',score:1.5},{l:'Cronograma gerado a partir do planejamento',s:'Compras alinhadas com o planejamento e reprogramações de forma automática',score:3}]
-      },
-      { code:'F1.ROI', type:'numgrid', text:'Para dimensionar o potencial de ganho da sua operação, informe:', reveals:'Esses dados alimentam o cálculo de ROI real do diagnóstico — tempo hoje gasto em rotinas manuais de gestão.',
-        fields:[
-          {key:'fluxoPlanejar', label:'Horas/mês gastas planejando o cronograma', type:'number', placeholder:'Ex: 16'}
-        ]
       }
     ]
   },
   f2:{
     phase:2, badgeClass:'bf2', color:'#2dd4bf', colorHex:'#0D7C8C',
-    label:'Fase 2 · Proteção e Garantia da Execução do Plano',
+    label:'Pilar 2 · Proteção e Garantia da Execução do Plano',
     maxScore:9,
     insight: function(p){
       if(p<0.4) return 'Restrições aparecem quando já estão atrasando. Você está respondendo a problemas que poderia ter antecipado — esse tempo de resposta tem custo direto de produção parada.';
       if(p<0.7) return 'Alguma proteção existe, mas é informal. O lookahead não está funcionando como blindagem real — ainda há surpresas que poderiam ter sido antecipadas.';
-      return 'Bom nível de proteção da execução. A maturidade aqui permite colher os frutos de uma Fase 3 mais estruturada.';
+      return 'Bom nível de proteção da execução. A maturidade aqui permite colher os frutos de um Pilar 3 mais estruturado.';
     },
     qs:[
       { code:'F2.1', text:'Como funciona a antecipação de restrições e o planejamento de médio prazo (lookahead) — com que antecedência vocês conseguem visualizar riscos de parada por falta de material, projeto não liberado ou frente bloqueada?', reveals:'Existência e efetividade real do lookahead estruturado e da gestão de restrições. O critério não é o nome da reunião nem a antecedência isolada — é se o processo realmente antecipa problemas antes que travem a produção, com consistência.',
@@ -216,19 +210,12 @@ var PQ = {
       },
       { code:'F2.3', text:'Ao final de cada ciclo de execução — mensal, bimestral ou conforme o ritmo da obra — existe uma reprogramação formal, revisando o que foi feito e construindo novo plano?', reveals:'Cultura de reprogramação. Não fixamos a frequência — o que importa é se o ciclo existe, seja qual for o intervalo.',
         opts:[{l:'Planejamento original até o fim',s:'Não reprogramamos — seguimos o plano inicial',score:0},{l:'Ajustes informais ocasionais',s:'Quando o desvio é muito grande, conversamos',score:1},{l:'Reprogramação periódica sem dados formais',s:'Fazemos mas é mais no feeling',score:1.5},{l:'Ciclo formal de reprogramação com PPC e análise de causas',s:'Dados reais alimentam o novo plano',score:3}]
-      },
-      { code:'F2.ROI', type:'numgrid', text:'Quanto tempo sua equipe gasta hoje nas rotinas de curto e médio prazo?', reveals:'Tempo gasto nessas rotinas manuais é diretamente recuperável com o SIIGA.',
-        fields:[
-          {key:'fluxoCurto', label:'Horas/mês criando o curto prazo', type:'number', placeholder:'Ex: 4'},
-          {key:'fluxoMedio', label:'Horas/mês controlando o médio prazo', type:'number', placeholder:'Ex: 4'},
-          {key:'fluxoReprogramar', label:'Horas/mês reprogramando', type:'number', placeholder:'Ex: 14'}
-        ]
       }
     ]
   },
   f3:{
     phase:3, badgeClass:'bf3', color:'#34d399', colorHex:'#0D6B45',
-    label:'Fase 3 · Gestão Integrada da Produção',
+    label:'Pilar 3 · Gestão Integrada da Produção',
     maxScore:15,
     insight: function(p){
       if(p<0.4) return 'O canteiro está produzindo sem feedback real. O plano existe mas não governa a execução. A gestão descobre o problema 2 semanas depois que ele aconteceu.';
@@ -251,15 +238,6 @@ var PQ = {
       },
       { code:'F3.5', text:'No meio do período — quinzenal ou semanalmente — existe análise de resultado intermediário do cumprimento de metas de prazo: PPC por equipe, causas de não cumprimento e tendência de atraso antes do fechamento do ciclo?', reveals:'Análise intermediária de ritmo e cumprimento de prazo (PPC) — separa gestão que age antes do fechamento da que descobre o desvio de prazo depois.',
         opts:[{l:'Sem análise intermediária',s:'Só sabemos o PPC e as causas de atraso no fechamento do mês',score:0},{l:'Análise verbal eventual na reunião',s:'Comentamos quando alguém percebe que o ritmo caiu',score:1},{l:'Análise periódica sem dado formal',s:'Temos percepção do ritmo mas sem número consolidado',score:1.5},{l:'Relatório quinzenal de PPC por equipe com causas de não cumprimento e tendência de prazo',s:'Dado formal guia decisão de recuperação de ritmo antes do fechamento',score:3}]
-      },
-      { code:'F3.ROI', type:'numgrid', text:'Para dimensionar o ganho operacional, informe os dados abaixo sobre o fechamento e a rotina de produção:', reveals:'Base para o cálculo de horas recuperadas por mês e por obra. Os dias de fechamento já foram capturados no Bloco MO.',
-        fields:[
-          {key:'hDiaAtual', label:'Horas/dia dedicadas a esse fechamento', type:'number', placeholder:'Ex: 6'},
-          {key:'fluxoMedir', label:'Horas/mês medindo avanço físico', type:'number', placeholder:'Ex: 20'},
-          {key:'hSemQualidade', label:'Horas/semana conferindo qualidade', type:'number', placeholder:'Ex: 5'},
-          {key:'fluxoConferir', label:'Horas/mês conferindo planilhas', type:'number', placeholder:'Ex: 12'},
-          {key:'fluxoERP', label:'Horas/mês passando medição para o ERP', type:'number', placeholder:'Ex: 10'}
-        ]
       }
     ]
   },
@@ -290,25 +268,25 @@ var PQ = {
       { code:'MO.7', moType:'terc', text:'O fechamento da medição dos empreiteiros consome quanto tempo do seu time por mês?', reveals:'Eficiência do fechamento de medição. Medição que leva uma semana é feita na base da negociação — não do registro.',
         opts:[{l:'5 dias ou mais',s:'Uma semana inteira ou mais',score:0},{l:'3–4 dias',s:'Boa parte da semana',score:1},{l:'2 dias',s:'Dois dias de trabalho intenso',score:1.5},{l:'1 dia ou menos',s:'Processo fluido com dados já estruturados',score:3}]
       },
-      { code:'MO.ROI1', moType:'propria', type:'numgrid', text:'Para o cálculo financeiro do ROI, informe a folha de mão de obra própria:', reveals:'Alimenta o cálculo de recuperação financeira por retrabalho e pagamentos indevidos.',
+      { code:'MO.ROI1', moType:'propria', type:'numgrid', text:'Para o cálculo financeiro do ROI, informe a folha média de mão de obra própria de uma obra:', reveals:'Alimenta o cálculo de recuperação financeira por retrabalho e pagamentos indevidos.',
         fields:[
-          {key:'folha', label:'Folha de mão de obra própria / mês (R$)', type:'currency', placeholder:'Ex: R$ 300.000'}
+          {key:'folha', label:'Folha de mão de obra própria / mês, média por obra (R$)', type:'currency', placeholder:'Ex: R$ 150.000'}
         ]
       }
     ]
   },
   f4:{
     phase:4, badgeClass:'bf4', color:'#9ca3af', colorHex:'#4a4558',
-    label:'Fase 4 · Controle Real e Performance',
+    label:'Pilar 4 · Controle Real e Performance',
     maxScore:12,
     insight: function(p){
-      if(p<0.4) return 'As reuniões de resultado são basicamente reuniões de culpa — não de decisão. Sem dados estruturados das fases anteriores, a diretoria toma decisões no feeling.';
+      if(p<0.4) return 'As reuniões de resultado são basicamente reuniões de culpa — não de decisão. Sem dados estruturados dos pilares anteriores, a diretoria toma decisões no feeling.';
       if(p<0.7) return 'Existe análise de resultado, mas sem base de dados completa. PCCQ e improdutividade de MO ainda estão fora do radar da diretoria.';
       return 'Bom ciclo de inteligência. O desafio é refinar a velocidade de resposta — encurtar o tempo entre desvio identificado e decisão tomada.';
     },
     qs:[
-      { code:'F4.1', text:'Ao final de cada ciclo de execução, a gerência da obra ou sala técnica reúne com a engenharia para analisar os indicadores do período — prazo, ritmo de produção, restrições abertas, qualidade e custo do projeto — e definir as entradas para a próxima reprogramação? Ou o fechamento é mais informal e não gera decisões estruturadas?', reveals:'Avalia se existe o ciclo técnico de análise que alimenta a Fase 2 — o coração do método SIIGA. Sem esse fechamento, os dados gerados nos Pilares 1, 2 e 3 morrem na semana.',
-        opts:[{l:'Sem reunião de fechamento',s:'Cada obra segue sem análise formal do período',score:0},{l:'Reunião existe mas informal',s:'Sem pauta definida, sem saídas estruturadas — depende de quem está presente',score:1},{l:'Reunião periódica com análise parcial dos indicadores',s:'Alguns dados analisados mas sem visão completa e sem registro das decisões',score:1.5},{l:'Fechamento de período estruturado com análise de prazo, ritmo, restrições, qualidade e custo',s:'Saídas documentadas que alimentam diretamente a próxima Fase 2',score:3}]
+      { code:'F4.1', text:'Ao final de cada ciclo de execução, a gerência da obra ou sala técnica reúne com a engenharia para analisar os indicadores do período — prazo, ritmo de produção, restrições abertas, qualidade e custo do projeto — e definir as entradas para a próxima reprogramação? Ou o fechamento é mais informal e não gera decisões estruturadas?', reveals:'Avalia se existe o ciclo técnico de análise que alimenta o Pilar 2 — o coração do método SIIGA. Sem esse fechamento, os dados gerados nos Pilares 1, 2 e 3 morrem na semana.',
+        opts:[{l:'Sem reunião de fechamento',s:'Cada obra segue sem análise formal do período',score:0},{l:'Reunião existe mas informal',s:'Sem pauta definida, sem saídas estruturadas — depende de quem está presente',score:1},{l:'Reunião periódica com análise parcial dos indicadores',s:'Alguns dados analisados mas sem visão completa e sem registro das decisões',score:1.5},{l:'Fechamento de período estruturado com análise de prazo, ritmo, restrições, qualidade e custo',s:'Saídas documentadas que alimentam diretamente o próximo Pilar 2',score:3}]
       },
       { code:'F4.2', text:'A diretoria recebe mensalmente um relatório consolidado da obra — com status, avanço físico, qualidade e custo do projeto — e valida o plano reprogramado? Ou a visão executiva é baseada em relatos do engenheiro sem dados estruturados?', reveals:'Avalia se o ciclo executivo existe e se a diretoria toma decisão com dado — não com narrativa. A distinção crítica: reunião com dados vs. reunião com relato.',
         opts:[{l:'Sem reunião executiva estruturada',s:'Diretoria só sabe quando o problema já é grave',score:0},{l:'Reunião existe mas baseada em relatos',s:'Cada um chega com um número diferente — sem dado unificado',score:1},{l:'Reunião periódica com alguns indicadores de prazo e custo',s:'Sem visão consolidada de qualidade e análise de tendência',score:1.5},{l:'Reunião mensal garantida com relatório executivo: semáforo, avanço, qualidade, custo e plano de ação já validado',s:'Diretoria valida o plano reprogramado — não apenas recebe resultado',score:3}]
@@ -318,11 +296,6 @@ var PQ = {
       },
       { code:'F4.4', text:'O fechamento mensal de folha e medição de empreiteiros passa por um fluxo de aprovação hierárquica integrado ao ERP — com registro auditável de exceções — ou é mais um fechamento sem governança formal sobre o que foi liberado para pagamento?', reveals:'Maturidade da governança financeira do ciclo mensal. Aplica-se a MO própria (folha) e terceirizada (medição). O que diferencia não é o tipo de MO — é o nível de auditoria, aprovação por instâncias e integração com o ERP por trás do pagamento.',
         opts:[{l:'Fechamento sem governança formal',s:'Aprovado por estimativa ou negociação — sem fluxo de aprovação nem registro auditável',score:0},{l:'Aprovação informal baseada em observação',s:'Engenheiro ou gestor aprova pelo que viu — sem instância hierárquica nem registro',score:1},{l:'Fluxo de aprovação definido, mas manual e fora do ERP',s:'Existe hierarquia de aprovação, mas roda em planilha, sem integração e sem registro de exceções',score:1.5},{l:'Fluxo de aprovação hierárquica integrado ao ERP, com exceções registradas e justificadas',s:'Ciclo financeiro auditável de ponta a ponta — cada exceção tem instância aprovadora e justificativa registrada',score:3}]
-      },
-      { code:'F4.ROI', type:'numgrid', text:'Quanto tempo sua equipe gasta hoje cruzando dados de diferentes fontes para montar a visão executiva?', reveals:'Tempo gasto compilando planilhas manualmente antes das reuniões de resultado.',
-        fields:[
-          {key:'fluxoCruzar', label:'Horas/mês cruzando dados de diferentes fontes', type:'number', placeholder:'Ex: 18'}
-        ]
       }
     ]
   }
@@ -669,6 +642,103 @@ function getScoreByCode(bk, code) {
   return (idx >= 0) ? arr[idx] : undefined;
 }
 
+// ═══════════════════════════════════════════
+//  TEMPO DA EQUIPE DE GESTÃO — tela única de horas (ROI)
+// ═══════════════════════════════════════════
+// Última tela do diagnóstico (depois do Pilar 4, ou do último pilar no
+// Diagnóstico Focado). Substitui as 10 perguntas de horas que ficavam
+// espalhadas em F1.ROI/F2.ROI/F3.ROI/F4.ROI e se sobrepunham (ex.: fechamento
+// de medição perguntado 3 vezes; "conferir planilhas" × "cruzar dados").
+// Cada rotina aparece uma vez só, sempre em horas/mês de UMA obra típica —
+// mesma base da mensalidade fixa por obra usada no ROI.
+var HORAS_GESTAO_CAMPOS = [
+  { key:'hPlanejar',   ganho:0.40, label:'Planejar o cronograma da obra',
+    hint:'Montar o planejamento inicial / linha de balanço', placeholder:'Ex: 16' },
+  { key:'hCurtoMedio', ganho:0.90, label:'Curto e médio prazo e reprogramação',
+    hint:'Programação semanal, lookahead, restrições e reprogramar o plano', placeholder:'Ex: 20' },
+  { key:'hMedicao',    ganho:0.90, label:'Medir avanço e fechar medição / folha',
+    hint:'Levantar o avanço físico, fechar medição de empreiteiros ou folha e lançar no ERP', placeholder:'Ex: 40' },
+  { key:'hQualidade',  ganho:0.90, label:'Conferir a qualidade dos serviços',
+    hint:'Inspeções, FVS e conferência antes de liberar o avanço', placeholder:'Ex: 20' },
+  { key:'hConsolidar', ganho:0.90, label:'Consolidar dados e montar relatórios',
+    hint:'Conferir planilhas e cruzar fontes para reuniões de resultado e diretoria', placeholder:'Ex: 16' }
+];
+
+// Horas da tela única. Diagnósticos gravados antes da unificação só têm os
+// campos antigos (fluxoCurto, fluxoMedir, hSemQualidade…): convertidos aqui
+// para a nova estrutura, somando o que agora é uma rotina só.
+function getHorasGestao(r) {
+  r = r || S.roi2 || {};
+  var novo = HORAS_GESTAO_CAMPOS.some(function(c){ return r[c.key] !== undefined; });
+  if(novo) {
+    var h = {};
+    HORAS_GESTAO_CAMPOS.forEach(function(c){ h[c.key] = r[c.key] || 0; });
+    return h;
+  }
+  var n = function(k){ return r[k] || 0; };
+  return {
+    hPlanejar:   n('fluxoPlanejar'),
+    hCurtoMedio: n('fluxoCurto') + n('fluxoMedio') + n('fluxoReprogramar'),
+    hMedicao:    n('fluxoMedir') + n('fluxoERP'),
+    hQualidade:  n('hSemQualidade') * 4.33,
+    hConsolidar: n('fluxoConferir') + n('fluxoCruzar')
+  };
+}
+
+var horasOrigem = 'full'; // 'full' (Diagnóstico Completo) | 'focused'
+
+function showHorasScreen(origem) {
+  horasOrigem = origem || 'full';
+  currentBlock = 'horas';
+  var h = getHorasGestao();
+  var fieldsHtml = HORAS_GESTAO_CAMPOS.map(function(c) {
+    var v = h[c.key];
+    return '<div class="input-group"><label>'+c.label+'</label>' +
+      '<div style="font-size:11px;color:var(--gray2);margin:-2px 0 6px">'+c.hint+'</div>' +
+      '<input class="text-input" id="hg-'+c.key+'" type="number" min="0" placeholder="'+c.placeholder+'" value="'+(v ? Math.round(v*10)/10 : '')+'"></div>';
+  }).join('');
+  document.getElementById('horas-card').innerHTML =
+    '<div class="phase-badge bb0">Tempo da Equipe de Gestão</div>' +
+    '<div class="q-code">Última etapa do diagnóstico</div>' +
+    '<div class="q-text">Quantas horas por mês a equipe gasta hoje nestas rotinas, em uma obra típica?</div>' +
+    '<div class="q-reveals">Esses dados alimentam o cálculo de ROI. Considere uma obra só, somando o tempo de todos os envolvidos (engenheiro, sala técnica, administrativo) — cada rotina entra uma vez.</div>' +
+    '<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(260px,1fr));gap:14px;margin-top:8px">' + fieldsHtml + '</div>';
+  var navStep = document.getElementById('nav-step');
+  if(navStep) navStep.textContent = 'Etapa final · Tempo da equipe';
+  var nextBtn = document.getElementById('horas-next-btn');
+  if(nextBtn) nextBtn.textContent = horasOrigem === 'focused' ? 'Ver Resultado →' : 'Ver Radar Completo →';
+  showScreen('screen-horas');
+  saveDraft();
+}
+
+function readHorasScreen() {
+  // Grava sempre as 5 chaves novas (mesmo vazias = 0), para o registro deixar
+  // de ser lido pela conversão dos campos antigos em getHorasGestao().
+  HORAS_GESTAO_CAMPOS.forEach(function(c) {
+    var el = document.getElementById('hg-'+c.key);
+    S.roi2[c.key] = el && el.value !== '' ? (parseFloat(el.value) || 0) : 0;
+  });
+}
+
+function nextHoras() {
+  readHorasScreen();
+  saveDraft();
+  if(horasOrigem === 'focused') showFocusedResult();
+  else buildAndShowRadar();
+}
+
+function prevHoras() {
+  readHorasScreen();
+  if(horasOrigem === 'focused') {
+    currentBlock = 'focused';
+    renderFocusedQ();
+    showScreen('screen-focused');
+  } else {
+    currentBlock = 'phase';
+    showScreen('screen-phase-result');
+  }
+}
+
 function findQ(bk, code) {
   var qs = PQ[bk].qs;
   for(var i=0;i<qs.length;i++) { if(qs[i].code === code) return qs[i]; }
@@ -679,8 +749,8 @@ function findQ(bk, code) {
 // F3.4 / MO.6 / F4.4 são coletadas juntas na combo "Trava de Qualidade" (disparada
 // na posição de F3.4, dentro da Fase 3). F2.3 / F4.1 são coletadas juntas na combo
 // "Rito de Reprogramação" (disparada na posição de F2.3, dentro da Fase 2).
-// MO.ROI1 + F4.ROI são coletados juntos numa única tela "Financeiro & Visão
-// Executiva" (disparada na posição de MO.ROI1, quando o bloco MO existe no fluxo).
+// As horas da equipe de gestão (ROI) não estão em nenhum pilar: são coletadas
+// numa tela única depois do Pilar 4 (ver showHorasScreen).
 // O Diagnóstico Focado (renderFocusedQ) NÃO usa esta função — continua pergunta a
 // pergunta, sem fusões, para manter aquele fluxo simples e sem esta complexidade.
 function getNavQs(bd, bk) {
@@ -690,9 +760,7 @@ function getNavQs(bd, bk) {
   }
   if(bk === 'f4') {
     list = list.filter(function(q){
-      if(q.code === 'F4.1' || q.code === 'F4.4') return false;
-      if(q.code === 'F4.ROI' && phaseOrder.indexOf('mo') >= 0) return false;
-      return true;
+      return q.code !== 'F4.1' && q.code !== 'F4.4';
     });
   }
   return list;
@@ -705,7 +773,7 @@ function renderPhaseQ() {
   var q = filteredQs[currentQIdx];
   var card = document.getElementById('phase-card');
   var total = filteredQs.length;
-  document.getElementById('nav-step').textContent = 'Fase '+bd.phase+' · '+(currentQIdx+1)+'/'+total;
+  document.getElementById('nav-step').textContent = (bd.phase === 'MO' ? 'Bloco MO' : 'Pilar '+bd.phase)+' · '+(currentQIdx+1)+'/'+total;
   updateProgress();
 
   var moNotice = '';
@@ -730,13 +798,6 @@ function renderPhaseQ() {
   if(q.type === 'numgrid') {
     var qFields = q.fields;
     var qText = q.text;
-    // Combo de ROI "Financeiro & Visão Executiva" (MO.ROI1 + F4.ROI), só quando
-    // o bloco MO existe no fluxo — senão F4.ROI segue sozinho na Fase 4.
-    if(bk === 'mo' && q.code === 'MO.ROI1' && phaseOrder.indexOf('f4') >= 0) {
-      var f4roiQ = findQ('f4', 'F4.ROI');
-      qFields = q.fields.concat(f4roiQ.fields);
-      qText = 'Financeiro & Visão Executiva — para dimensionar o ROI completo, informe:';
-    }
     var fieldsHtml = qFields.map(function(f) {
       var savedVal = S.roi2[f.key];
       if(f.type === 'currency') {
@@ -829,7 +890,7 @@ function renderComboQualidade(bd, currentQIdx, total, moNotice) {
     '<div class="phase-badge '+bd.badgeClass+'">'+bd.label+'</div>' +
     '<div class="q-code">Trava de Qualidade · Pergunta '+(currentQIdx+1)+' de '+total+'</div>' +
     '<div class="q-text">A aprovação da qualidade no canteiro trava, de forma rastreável, a liberação de pagamento e avanço — ou ainda é possível pagar/avançar sem inspeção concluída?</div>' +
-    '<div class="q-reveals">Esta tela reúne 3 avaliações independentes — cada uma gera seu próprio score, no seu próprio pilar (Fase 3, MO e Fase 4) — sobre se a qualidade técnica realmente trava o fluxo físico e financeiro da obra.</div>' +
+    '<div class="q-reveals">Esta tela reúne 3 avaliações independentes — cada uma gera seu próprio score, no seu próprio pilar (Pilar 3, MO e Pilar 4) — sobre se a qualidade técnica realmente trava o fluxo físico e financeiro da obra.</div>' +
     subs;
 }
 
@@ -841,7 +902,7 @@ function renderComboReprogramacao(bd, currentQIdx, total, moNotice) {
     '<div class="phase-badge '+bd.badgeClass+'">'+bd.label+'</div>' +
     '<div class="q-code">Rito de Reprogramação · Pergunta '+(currentQIdx+1)+' de '+total+'</div>' +
     '<div class="q-text">Existe uma rotina formal de reprogramação a cada ciclo, com análise estruturada que alimenta o próximo plano?</div>' +
-    '<div class="q-reveals">Esta tela reúne 2 avaliações independentes — cada uma gera seu próprio score, no seu próprio pilar (Fase 2 e Fase 4) — sobre a existência do rito de reprogramação e a profundidade do fechamento que o alimenta.</div>' +
+    '<div class="q-reveals">Esta tela reúne 2 avaliações independentes — cada uma gera seu próprio score, no seu próprio pilar (Pilar 2 e Pilar 4) — sobre a existência do rito de reprogramação e a profundidade do fechamento que o alimenta.</div>' +
     subs;
 }
 
@@ -882,11 +943,7 @@ function nextQ() {
     var filteredQs = getNavQs(bd, bk);
     var curQ = filteredQs[currentQIdx];
     if(curQ.type === 'numgrid') {
-      var curFields = curQ.fields;
-      if(bk === 'mo' && curQ.code === 'MO.ROI1' && phaseOrder.indexOf('f4') >= 0) {
-        curFields = curQ.fields.concat(findQ('f4','F4.ROI').fields);
-      }
-      curFields.forEach(function(f) {
+      curQ.fields.forEach(function(f) {
         var el = document.getElementById('rg-'+f.key);
         if(!el) return;
         if(f.type === 'currency') {
@@ -980,7 +1037,7 @@ function showPhaseResult(bk) {
 
   var card = document.getElementById('result-card');
   card.innerHTML = '<div class="phase-badge '+bd.badgeClass+'">'+bd.label+'</div>' +
-    '<h2 style="font-size:20px;margin-bottom:14px">Resultado desta fase</h2>' +
+    '<h2 style="font-size:20px;margin-bottom:14px">Resultado '+(bk === 'mo' ? 'deste bloco' : 'deste pilar')+'</h2>' +
     '<div class="phase-result-box">' +
       '<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px">' +
         '<div style="font-family:Bai Jamjuree;font-size:20px;font-weight:700;color:'+col+'">'+level+'</div>' +
@@ -1006,8 +1063,9 @@ function showPhaseResult(bk) {
       showScreen('screen-phase');
     };
   } else {
-    btn.textContent = 'Ver Radar Completo →';
-    btn.onclick = buildAndShowRadar;
+    // Tela única de horas (ROI) é a última do diagnóstico, depois do Pilar 4.
+    btn.textContent = 'Continuar → Tempo da Equipe de Gestão';
+    btn.onclick = function() { showHorasScreen('full'); };
   }
 
   showScreen('screen-phase-result');
@@ -1282,7 +1340,7 @@ function nextFocusedQ() {
     focusedQIdx = 0;
     renderFocusedQ();
   } else {
-    showFocusedResult();
+    showHorasScreen('focused');
   }
 }
 
@@ -1410,7 +1468,7 @@ function buildAndShowRadar() {
   // [0.92,0.88,0.90,0.85], o que permitia o cliente ultrapassar a referência
   // quando gabaritava uma fase — a referência tem que ser o máximo atingível.
   var reference = [1.00,1.00,1.00,1.00];
-  var labels = ['Fase 1','Fase 2','Fase 3','Fase 4'];
+  var labels = ['Pilar 1','Pilar 2','Pilar 3','Pilar 4'];
 
   var clientPct = phases.map(function(k) {
     var arr = S.scores[k];
@@ -1420,15 +1478,11 @@ function buildAndShowRadar() {
     return Math.max(0, Math.min(1, sum/(maxes[k]||1)));
   });
 
-  var totalMax = 21+9+15+12+3;
-  var totalScore = ['f1','f2','f3','f4'].reduce(function(acc,k) {
-    var arr = S.scores[k];
-    if(!Array.isArray(arr)) return acc;
-    return acc + arr.reduce(function(a,b){return a+(b||0);},0);
-  },0) + (S.scores.b03||0);
-
-  var totalPct = totalScore / totalMax;
-  var totalLevel = levelFromPct(totalPct);
+  var scoreTotal = getMaturityScoreSummary();
+  var totalMax = scoreTotal.max;
+  var totalScore = scoreTotal.score;
+  var totalPct = scoreTotal.pct;
+  var totalLevel = scoreTotal.nivel;
 
   document.getElementById('total-score').textContent = totalScore+'/'+totalMax;
   document.getElementById('total-level').textContent = totalLevel+' · '+Math.round(totalPct*100)+'% de maturidade SIIGA';
@@ -1880,7 +1934,7 @@ function renderPerdasFonteGanho(roi) {
   var presGanhoEl = document.getElementById('pres-formulas-ganho');
   if (presGanhoEl && roi) {
     presGanhoEl.innerHTML =
-      '<div style="font-size:11px;color:#666;line-height:1.5;margin-bottom:8px">• <strong style="color:#333">Fator:</strong> % da perda bruta de cada fonte que é realista capturar, dado o nível de maturidade do cliente nas fases do diagnóstico mais ligadas àquele ganho — quanto menor a maturidade hoje, maior o fator (mais espaço para captura); quanto maior a maturidade, menor o fator. Varia de 20% a 100% por fonte, calculado individualmente para cada uma.</div>' +
+      '<div style="font-size:11px;color:#666;line-height:1.5;margin-bottom:8px">• <strong style="color:#333">Fator:</strong> % da perda bruta de cada fonte que é realista capturar, dado o nível de maturidade do cliente nos pilares do diagnóstico mais ligados àquele ganho — quanto menor a maturidade hoje, maior o fator (mais espaço para captura); quanto maior a maturidade, menor o fator. Varia de 20% a 100% por fonte, calculado individualmente para cada uma.</div>' +
       '<div style="font-size:9.5px;font-weight:700;text-transform:uppercase;letter-spacing:0.06em;color:#999;margin-bottom:6px">Como o fator é aplicado por fonte</div>' +
       roi.items.map(function(item) {
         var fp = Math.round((item.fator||1)*100);
@@ -1936,15 +1990,19 @@ function renderExecutiveSnapshot(totalScore, totalMax, roi, rEstrategica) {
     '</div>';
 }
 
-// Score de maturidade agregado (0-60, mesma escala/pesos usados em
-// renderExecutiveSnapshot dentro de buildReport()) — extraído como função
-// própria para ser reaproveitado pela Proposta Comercial (Capa +
-// Recapitulação Executiva, seção 1) sem duplicar a soma por fase.
-function getMaturityScoreSummary() {
-  var maxes = {f1:21,f2:9,f3:15,f4:12};
+// Score de maturidade agregado — FONTE ÚNICA do score total (0-57: soma dos 4
+// pilares, sem a B0.3 nem o Bloco MO). Radar, relatório, Proposta Comercial,
+// contexto da IA e registros salvos (Supabase / lista local) usam todos esta
+// função; antes cada lugar tinha a sua soma e o radar mostrava /60 (com B0.3)
+// enquanto o relatório mostrava /57. `scores` é opcional (default S.scores),
+// para recalcular registros antigos que foram gravados com total_max 60.
+var SCORE_MAX_PILAR = {f1:21,f2:9,f3:15,f4:12};
+function getMaturityScoreSummary(scores) {
+  scores = scores || S.scores || {};
+  var maxes = SCORE_MAX_PILAR;
   var total = 0, max = 0;
   ['f1','f2','f3','f4'].forEach(function(k) {
-    var arr = S.scores[k];
+    var arr = scores[k];
     var sum = Array.isArray(arr) ? arr.reduce(function(a,b){return a+(b||0);},0) : 0;
     total += sum;
     max += (maxes[k]||0);
@@ -1999,7 +2057,7 @@ function buildReport() {
 
   var maxes = {f1:21,f2:9,f3:15,f4:12};
   var colors = {f1:'#1B4F8A',f2:'#0D7C8C',f3:'#0D6B45',f4:'#4a4558'};
-  var lnames = {f1:'Fase 1 · Planejamento Estratégico',f2:'Fase 2 · Proteção da Execução',f3:'Fase 3 · Gestão da Produção',f4:'Fase 4 · Controle e Performance'};
+  var lnames = {f1:'Pilar 1 · Planejamento Estratégico',f2:'Pilar 2 · Proteção da Execução',f3:'Pilar 3 · Gestão da Produção',f4:'Pilar 4 · Controle e Performance'};
 
   // Meta
   document.getElementById('rep-meta').innerHTML =
@@ -2061,7 +2119,7 @@ function buildReport() {
     // uma vez na mesma sessão e um render anterior sem gaps pode ter
     // substituído este card pela mensagem curta acima.
     if(oppTableCard) {
-      oppTableCard.innerHTML = '<div class="rep-sec-title"><span class="rep-sec-num">04</span>Gaps Identificados</div><table class="opp-table" id="opp-table-el"><thead><tr><th>#</th><th>Gap Identificado</th><th>Severidade</th><th>Fase</th><th>Impacto</th></tr></thead><tbody id="opp-body">'+oppHtml+'</tbody></table>';
+      oppTableCard.innerHTML = '<div class="rep-sec-title"><span class="rep-sec-num">04</span>Gaps Identificados</div><table class="opp-table" id="opp-table-el"><thead><tr><th>#</th><th>Gap Identificado</th><th>Severidade</th><th>Pilar</th><th>Impacto</th></tr></thead><tbody id="opp-body">'+oppHtml+'</tbody></table>';
     }
   }
 
@@ -2072,7 +2130,7 @@ function buildReport() {
   // rápidos para preencher o card de contexto que antecede a tabela.
   var gapsSummaryEl = document.getElementById('gaps-summary-stats');
   if(gapsSummaryEl) {
-    var fLabels = {F1:'Fase 1',F2:'Fase 2',F3:'Fase 3',F4:'Fase 4',MO:'Mão de Obra'};
+    var fLabels = {F1:'Pilar 1',F2:'Pilar 2',F3:'Pilar 3',F4:'Pilar 4',MO:'Mão de Obra'};
     // Prioriza um Gap Crítico real sobre uma Oportunidade de melhoria ao escolher
     // o destaque — opps já vem ordenado por score (pior primeiro), mas se o
     // primeiro item da lista for só uma "oportunidade" e existir algum crítico
@@ -2166,7 +2224,8 @@ function buildReport() {
   buildRoadmap();
   // Executive Snapshot — reaproveita o score já somado acima e o ROI real
   // (calcROIReal) guardado em window._lastROIReal por buildROIReal().
-  renderExecutiveSnapshot(snapTotalScore, snapTotalMax, roi, window._lastROIReal);
+  var snapScore = getMaturityScoreSummary();
+  renderExecutiveSnapshot(snapScore.score, snapScore.max, roi, window._lastROIReal);
 
   // Aplica na tela o tema (claro/escuro) selecionado no toggle — feito por
   // último, depois de todo o conteúdo (inclusive dinâmico) já estar no DOM.
@@ -2211,28 +2270,14 @@ function roiCapturaLabel(fator) {
 
 function buildROIReal() {
   var pctMensalidadeOrcamentoFmt = ''; // preenchido no bloco do #roi2-summary, consumido pelo KPI em #roi2-estrategica
-  var mensInput = document.getElementById('roi2-mensalidade');
-  var capInput = document.getElementById('roi2-captura');
-  // Mensalidade: pré-preenchida pela tabela de preço padrão (calcularMensalidadePadrao),
-  // mas o consultor pode sobrescrever manualmente — a partir daí o valor digitado
-  // é preservado entre re-renders (ex.: navegação entre telas do relatório), em vez
-  // de voltar a ser sobrescrito a cada chamada. Detecta a edição manual comparando
-  // o valor lido do campo com o último valor que NÓS mesmos preenchemos por padrão
-  // (S._mensalidadeAuto) — se divergem, o consultor mexeu no campo.
-  if(mensInput) {
-    var mensLida = mensInput.dataset.raw ? parseInt(mensInput.dataset.raw,10) : parseBRL(mensInput.value);
-    if(!S.mensalidadeManual && S._mensalidadeAuto !== undefined && mensLida !== S._mensalidadeAuto) {
-      S.mensalidadeManual = true;
-    }
-    S.mensalidade = mensLida;
-  }
-  if(!S.mensalidadeManual) {
-    S.mensalidade = MENSALIDADE_ROI_POR_OBRA * (S.numObras || 1);
-    S._mensalidadeAuto = S.mensalidade;
-  }
-  if(capInput && capInput.value !== '') S.captura = Math.max(0.30, Math.min(1, parseFloat(capInput.value)/100));
+  // Mensalidade e fator de captura do ROI são FIXOS (R$ 2.000/mês por obra e
+  // 50%) — sem campo editável. Gravados em S só para quem lê o estado salvo
+  // (registros antigos tinham valores editados pelo consultor).
+  S.mensalidade = MENSALIDADE_ROI_POR_OBRA;
+  S.captura = ROI_CAPTURA_FIXA;
+  S.mensalidadeManual = false;
 
-  var r = calcROIReal(S.captura);
+  var r = calcROIReal(ROI_CAPTURA_FIXA);
   window._lastROIReal = r; // usado por renderExecutiveSnapshot() no fim de buildReport()
   var fmtH = function(n){ return (n||0).toLocaleString('pt-BR',{maximumFractionDigits:1}) + ' h'; };
   // pC/pF/pS: antes coloriam (e pC também negritava) a coluna "Como é
@@ -2275,14 +2320,6 @@ function buildROIReal() {
     '</div>';
   };
 
-  var cfgEl = document.getElementById('roi2-config');
-  if(cfgEl) {
-    cfgEl.innerHTML =
-      '<div class="input-group"><label>Mensalidade Agilean (R$)</label>' +
-        '<input class="text-input" id="roi2-mensalidade" type="text" inputmode="numeric" oninput="fmtOrcamento(this);buildROIReal()" value="'+fmtBRL(S.mensalidade)+'"></div>' +
-      '<div class="input-group"><label>Fator de captura / Cenário (%)</label>' +
-        '<input class="text-input" id="roi2-captura" type="number" min="30" max="100" step="5" oninput="buildROIReal()" value="'+Math.round(S.captura*100)+'"></div>';
-  }
 
   // Peso relativo do investimento — métrica de evidência (validada em
   // PLANO_PROPOSTA_COMERCIAL_REUNIAO2.md §4.1): mensalidade (preço de tabela
@@ -2300,16 +2337,12 @@ function buildROIReal() {
 
   var sumEl = document.getElementById('roi2-summary');
   if(sumEl) {
-    // Exibe o preço por obra (mensalidade média fixa do ROI), não a mensalidade
-    // total do portfólio (S.mensalidade = preço/obra × nº de obras) — pedido do
-    // usuário: esse texto de resumo deve comunicar o investimento de UMA obra,
-    // não o total. S.mensalidade continua intocado e usado normalmente nos
-    // demais cálculos de ROI (ROI Mensal, Payback, tabela "Como é calculado").
-    sumEl.innerHTML = 'Investimento por obra: <strong style="color:#333">'+fmtNum(MENSALIDADE_ROI_POR_OBRA)+'/mês</strong> · Cenário: <strong style="color:#333">'+Math.round(S.captura*100)+'% ('+roiCapturaLabel(S.captura)+')</strong>';
+    // Investimento de UMA obra (mensalidade média fixa) — o mesmo valor usado
+    // em todo o cálculo do ROI, que compara ganho de uma obra × mensalidade.
+    sumEl.innerHTML = 'Investimento por obra: <strong style="color:#333">'+fmtNum(MENSALIDADE_ROI_POR_OBRA)+'/mês</strong> · Cenário: <strong style="color:#333">'+Math.round(ROI_CAPTURA_FIXA*100)+'% ('+roiCapturaLabel(ROI_CAPTURA_FIXA)+')</strong>';
   }
 
   // Parâmetros base informados pelo cliente (alimentam as linhas de R$ abaixo)
-  var diasFechamento = getDiasFechamentoAtual();
   var paramItem = function(label, val) {
     return '<div style="font-size:10.5px;color:var(--rep-text-mut,#666)">• '+label+': <strong style="color:var(--rep-text-strong,#333)">'+val+'</strong></div>';
   };
@@ -2325,39 +2358,36 @@ function buildROIReal() {
   if(paramsEl) {
     paramsEl.innerHTML =
       '<div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:10px">' +
-        paramItem('Folha de MO própria/mês', fmtNum(S.roi2.folha||0)) +
+        paramItem('Mensalidade média (fixa)', fmtNum(MENSALIDADE_ROI_POR_OBRA)+'/mês por obra') +
+        paramItem('Fator de captura (fixo)', Math.round(ROI_CAPTURA_FIXA*100)+'% · '+roiCapturaLabel(ROI_CAPTURA_FIXA)) +
+        paramItem('Folha de MO própria/mês por obra', fmtNum(S.roi2.folha||0)) +
         paramItem('Custo hora técnica', 'R$ '+ROI_REAL_K.CUSTO_HORA_TECNICA+'/h') +
-        paramItem('Dias p/ fechar medição/folha hoje', fmtNumBare(diasFechamento)+' dias <span style="color:#999;font-weight:400">(resposta do Bloco MO)</span>') +
-        paramItem('Horas/dia dedicadas a esse fechamento', fmtH(S.roi2.hDiaAtual)) +
-        paramItem('Horas/semana conferindo qualidade', fmtH(S.roi2.hSemQualidade)) +
+        paramItem('Horas de gestão informadas', fmtH(r.operacional.horasInformadas)+'/mês por obra') +
       '</div>' +
       '<div style="border-top:1px dashed #ddd;padding-top:8px;margin-top:2px">' +
         '<div style="font-size:9.5px;font-weight:700;text-transform:uppercase;letter-spacing:0.06em;color:#999;margin-bottom:6px">Como é calculado — Visão Estratégica</div>' +
-        formulaItem('Retrabalho administrativo liberado', pC('Dias de fechamento informados')+' × 8h/dia × '+pF('R$115/h')+' × '+pS('fator do cenário')) +
-        formulaItem('Pagamentos por retrabalho evitados', pC('Folha de MO própria informada')+' × '+pF('5% de retrabalho')+' × '+pS('fator do cenário')) +
-        formulaItem('Pagamentos indevidos rastreados', pC('Folha de MO própria informada')+' × '+pF('5% indevidos × 80% sem sobreposição')+' × '+pS('fator do cenário')) +
-        formulaItem('Recuperação financeira total', 'Soma das 3 linhas acima') +
-        formulaItem('Capacidade de gestão liberada', pC('Soma dos 8 fluxos informados')+' (quadro "De onde vêm as horas") × '+pS('fator do cenário')+' × '+pF('R$115/h')) +
-        formulaItem('Investimento Agilean (mensalidade)', 'Valor definido pelo consultor') +
+        formulaItem('Pagamentos por retrabalho evitados', pC('Folha de MO própria informada')+' × '+pF('5% de retrabalho')+' × '+pS('fator de captura (50%)')) +
+        formulaItem('Pagamentos indevidos rastreados', pC('Folha de MO própria informada')+' × '+pF('5% indevidos × 80% sem sobreposição')+' × '+pS('fator de captura (50%)')) +
+        formulaItem('Recuperação financeira total', 'Soma das 2 linhas acima') +
+        formulaItem('Capacidade de gestão liberada', pC('Horas recuperadas/mês')+' × '+pF('R$115/h')) +
+        formulaItem('Investimento Agilean (mensalidade)', 'Mensalidade média fixa de '+fmtNum(MENSALIDADE_ROI_POR_OBRA)+'/mês, de uma obra') +
       '</div>' +
       '<div style="border-top:1px dashed #ddd;padding-top:8px;margin-top:8px">' +
         '<div style="font-size:9.5px;font-weight:700;text-transform:uppercase;letter-spacing:0.06em;color:#999;margin-bottom:6px">Como é calculado — Visão Operacional</div>' +
-        formulaItem('Economia nos fluxos de gestão', pC('Soma das horas informadas nos 8 fluxos')+' (quadro "De onde vêm as horas") × '+pF('% de economia por fluxo')) +
-        formulaItem('Fechamento de medição mais rápido', '('+pC('dias × horas/dia informados hoje')+') − (mesmos dados × '+pF('70% de redução SIIGA')+')') +
-        formulaItem('Fim da conferência manual de qualidade', pC('Horas/semana informadas')+' × '+pF('4,33 semanas/mês')) +
-        formulaItem('Desconto de sobreposição entre blocos', 'Soma bruta das linhas acima × '+pF('15% de sobreposição')) +
-        formulaItem('Potencial pleno (antes do fator de captura)', 'Soma bruta − desconto de sobreposição') +
+        formulaItem('Potencial pleno (antes do fator de captura)', pC('Horas/mês informadas em cada rotina')+' × '+pF('% de economia da rotina (40% planejar, 90% demais)')) +
+        formulaItem('Horas recuperadas/mês', 'Potencial pleno × '+pS('fator de captura (50%)')) +
+        formulaItem('Horas recuperadas/obra', 'Horas recuperadas/mês × prazo médio da obra') +
       '</div>';
   }
 
   var fluxosTableEl = document.getElementById('roi2-fluxos-table');
   if(fluxosTableEl) {
-    var fluxoRows = ROI_REAL_FLUXOS.map(function(f) {
-      var horas = S.roi2[f.key] || 0;
-      var resultado = horas * f.ganho;
+    var fluxoRows = r.operacional.fluxos.map(function(f) {
+      var horas = f.horas;
+      var resultado = f.recuperadas;
       var pct = Math.round(f.ganho*100);
       return '<tr>' +
-        '<td>'+FLUXO_LABELS[f.key]+'</td>' +
+        '<td>'+f.label+'</td>' +
         '<td style="text-align:center;color:#1B4F8A;font-weight:600">'+fmtH(horas)+'/mês</td>' +
         '<td style="text-align:center"><span style="padding:2px 8px;border-radius:20px;font-size:10px;font-weight:700;background:rgba(52,211,153,0.15);color:#0d6b45">Economiza '+pct+'%</span></td>' +
         '<td style="text-align:right" class="roi-val">'+fmtH(resultado)+'</td>' +
@@ -2366,7 +2396,7 @@ function buildROIReal() {
     fluxosTableEl.innerHTML =
       '<thead><tr><th>Fluxo (rotina hoje manual)</th><th style="text-align:center">Horas informadas</th><th style="text-align:center">Economia com SIIGA</th><th style="text-align:right">Horas recuperadas</th></tr></thead>' +
       '<tbody>' + fluxoRows +
-      '<tr class="roi-total"><td colspan="3">Total — base de "Economia nos fluxos" e "Capacidade de gestão"</td><td style="text-align:right">'+fmtH(r.operacional.subtotalFluxos)+'</td></tr>' +
+      '<tr class="roi-total"><td colspan="3">Total — potencial pleno, antes do fator de captura</td><td style="text-align:right">'+fmtH(r.operacional.potPleno)+'</td></tr>' +
       '</tbody>';
   }
 
@@ -2398,12 +2428,11 @@ function buildROIReal() {
       '</div>' +
       '<div class="pdf-resumo-hide">' +
       '<table class="roi-table"><thead><tr><th>Item</th><th style="text-align:right">Valor</th></tr></thead><tbody>' +
-        roiRow('Retrabalho administrativo liberado ('+fmtH(r.estrategica.horasAdmLib)+')', null, fmtNum(r.estrategica.rec1)) +
         roiRow('Pagamentos por retrabalho evitados', null, fmtNum(r.estrategica.rec2)) +
         roiRow('Pagamentos indevidos rastreados', null, fmtNum(r.estrategica.rec3)) +
         roiRow('<strong>Recuperação financeira total</strong>', null, '<strong>'+fmtNum(r.estrategica.recTotal)+'</strong>') +
         roiRow('Capacidade de gestão liberada ('+fmtH(r.estrategica.horasLib)+')', null, fmtNum(r.estrategica.valorCapacidade)) +
-        roiRow('Investimento Agilean (mensalidade)', null, '− '+fmtNum(S.mensalidade)+'/mês') +
+        roiRow('Investimento Agilean (mensalidade de uma obra)', null, '− '+fmtNum(r.mensalidade)+'/mês') +
       '</tbody></table>' +
       '</div>';
   }
@@ -2412,17 +2441,15 @@ function buildROIReal() {
   if(opEl) {
     opEl.innerHTML =
       '<div style="display:grid;grid-template-columns:repeat(3,1fr);gap:10px;margin-bottom:8px">' +
-        roiCard('Horas recuperadas/mês', fmtH(r.operacional.hMes), 'no total da operação') +
-        roiCard('Horas recuperadas/obra', fmtH(r.operacional.hObra), 'por obra, no mês') +
+        roiCard('Horas recuperadas/mês', fmtH(r.operacional.hMes), 'por obra') +
+        roiCard('Horas recuperadas/obra', fmtH(r.operacional.hObra), 'ao longo de '+r.prazo+' meses de obra') +
         roiCard('% da jornada liberada', (Math.round(r.operacional.pctJornada*1000)/10)+'%', 'da jornada individual do time técnico') +
       '</div>' +
       '<div class="pdf-resumo-hide">' +
       '<table class="roi-table"><thead><tr><th>Item</th><th style="text-align:right">Valor</th></tr></thead><tbody>' +
-        roiRow('Economia nos fluxos de gestão', null, fmtH(r.operacional.subtotalFluxos)) +
-        roiRow('Fechamento de medição mais rápido', null, fmtH(r.operacional.fechRapido)) +
-        roiRow('Fim da conferência manual de qualidade', null, fmtH(r.operacional.fimConf)) +
-        roiRow('Desconto de sobreposição entre blocos', null, '− '+fmtH(r.operacional.descBlocos)) +
+        roiRow('Horas informadas nas 5 rotinas de gestão', null, fmtH(r.operacional.horasInformadas)) +
         roiRow('<strong>Potencial pleno (antes do fator de captura)</strong>', null, '<strong>'+fmtH(r.operacional.potPleno)+'</strong>') +
+        roiRow('Horas recuperadas/mês (fator de captura de '+Math.round(r.fator*100)+'%)', null, fmtH(r.operacional.hMes)) +
       '</tbody></table>' +
       '</div>';
   }
@@ -2430,7 +2457,7 @@ function buildROIReal() {
   var cenTableEl = document.getElementById('roi2-cenarios-table');
   if(cenTableEl) {
     var cenRows = ROI_REAL_CENARIOS.map(function(c) {
-      var isAtivo = Math.abs(c.fator - S.captura) < 0.001;
+      var isAtivo = Math.abs(c.fator - ROI_CAPTURA_FIXA) < 0.001;
       var rc = calcROIReal(c.fator);
       var rowStyle = isAtivo
         ? 'background:rgba(255,95,31,0.08);border-left:3px solid var(--orange)'
@@ -2472,7 +2499,7 @@ var GAP_INFO = {
   'F3.3':{title:'Frequência de coleta do avanço', impact:'Avanço físico coletado por estimativa mensal. Dado chega semanas atrasado — improdutividade de MO fica invisível até o fechamento.'},
   'F3.4':{title:'Qualidade vinculada ao avanço físico', impact:'Sem vínculo técnico entre inspeção e avanço no canteiro, o avanço registrado pode incluir serviço que ainda precisa de retrabalho.'},
   'F3.5':{title:'Análise intermediária de PPC e prazo', impact:'Sem análise quinzenal de PPC e causas de atraso, o desvio de prazo só é identificado no fechamento — quando já não há tempo de recuperação.'},
-  'F4.1':{title:'Fechamento técnico de período', impact:'Sem fechamento técnico estruturado, os dados gerados nas Fases 1, 2 e 3 morrem na semana — a próxima reprogramação recomeça do zero.'},
+  'F4.1':{title:'Fechamento técnico de período', impact:'Sem fechamento técnico estruturado, os dados gerados nos Pilares 1, 2 e 3 morrem na semana — a próxima reprogramação recomeça do zero.'},
   'F4.2':{title:'Reunião executiva com diretoria', impact:'Reunião executiva sem dados estruturados. Decisões tomadas no feeling — cada reunião termina com narrativa, não com plano.'},
   'F4.3':{title:'Performance HUB — visão integrada', impact:'Sem painel único, alguém precisa compilar manualmente prazo, custo e qualidade antes de cada reunião — tempo gasto montando o dado, não decidindo.'},
   'F4.4':{title:'Governança financeira do fechamento (ERP)', impact:'Fechamento sem fluxo de aprovação hierárquica integrado ao ERP paga por estimativa ou negociação — sem rastreabilidade e sem auditoria possível.'},
@@ -2671,35 +2698,15 @@ var ROI_REAL_K = {
   PCT_RETRABALHO: 0.05,       // pagamentos de retrabalho sobre a folha
   PCT_INDEVIDOS: 0.05,        // pagamentos indevidos sem rastreio sobre a folha
   DESC_SOBREPOSICAO: 0.20,    // sobreposição entre riscos (Estratégica)
-  DESC_BLOCOS_ENG: 0.15,      // sobreposição entre blocos (Operacional)
-  GANHO_PLANEJAR: 0.40,       // fluxo "Planejar cronograma"
-  GANHO_PADRAO: 0.90,         // demais fluxos
-  JORNADA: 176,               // horas úteis/mês
-  HORAS_DIA: 8,               // conversão horas → dias
-  FATOR_AGILEAN: 0.30         // valor "com Agilean" = valor atual × 0,30 (redução de 70%)
+  JORNADA: 176                // horas úteis/mês
+  // % de economia por rotina: HORAS_GESTAO_CAMPOS[].ganho (40% planejar, 90% demais)
 };
 
-var ROI_REAL_FLUXOS = [
-  { key:'fluxoPlanejar',    ganho: ROI_REAL_K.GANHO_PLANEJAR },
-  { key:'fluxoCurto',       ganho: ROI_REAL_K.GANHO_PADRAO },
-  { key:'fluxoMedio',       ganho: ROI_REAL_K.GANHO_PADRAO },
-  { key:'fluxoMedir',       ganho: ROI_REAL_K.GANHO_PADRAO },
-  { key:'fluxoReprogramar', ganho: ROI_REAL_K.GANHO_PADRAO },
-  { key:'fluxoCruzar',      ganho: ROI_REAL_K.GANHO_PADRAO },
-  { key:'fluxoConferir',    ganho: ROI_REAL_K.GANHO_PADRAO },
-  { key:'fluxoERP',         ganho: ROI_REAL_K.GANHO_PADRAO }
-];
-
-var FLUXO_LABELS = {
-  fluxoPlanejar:    'Planejar cronograma',
-  fluxoCurto:       'Criar curto prazo',
-  fluxoMedio:       'Controlar médio prazo',
-  fluxoMedir:       'Medir',
-  fluxoReprogramar: 'Reprogramar',
-  fluxoCruzar:      'Cruzar dados',
-  fluxoConferir:    'Conferir planilhas',
-  fluxoERP:         'Passar medição para o ERP'
-};
+// Fator de captura do ROI — fixo em 50% (cenário Conservador), sem campo
+// editável. A tabela de cenários (ROI_REAL_CENARIOS) continua exibida como
+// análise de sensibilidade. Não afeta o fator por fonte do Mapa de Perdas
+// (calculateROI → capFactor), que segue variando com a maturidade.
+var ROI_CAPTURA_FIXA = 0.50;
 
 var ROI_REAL_CENARIOS = [
   { nome:'Pessimista',  fator:0.30 },
@@ -2708,57 +2715,38 @@ var ROI_REAL_CENARIOS = [
   { nome:'Pleno',       fator:1.00 }
 ];
 
-// Converte a resposta categórica de MO.4/MO.7 (0-3) em uma estimativa de dias
-// para fechar medição/folha — evita perguntar de novo o que o Bloco MO já capturou.
-function diasFromMOScore(score) {
-  var map = { 0:6, 1:3.5, 2:2, 3:1 };
-  return map[score] !== undefined ? map[score] : 5;
-}
-
-function getDiasFechamentoAtual() {
-  var mo = S.scores.mo || {};
-  var temPropria = mo['MO.4'] !== undefined;
-  var temTerc = mo['MO.7'] !== undefined;
-  if(temPropria && temTerc) return (diasFromMOScore(mo['MO.4']) + diasFromMOScore(mo['MO.7'])) / 2;
-  if(temPropria) return diasFromMOScore(mo['MO.4']);
-  if(temTerc) return diasFromMOScore(mo['MO.7']);
-  return 5; // fallback conservador se o Bloco MO ainda não foi respondido
-}
-
-function calcROIReal(fator) {
+function calcROIReal(fator, mensalidadeOverride) {
   var r = S.roi2 || {};
   var K = ROI_REAL_K;
-  fator = (fator === undefined || fator === null) ? (S.captura || 0.50) : fator;
+  fator = (fator === undefined || fator === null) ? ROI_CAPTURA_FIXA : fator;
   var prazo = S.prazoMedio || 18;
-  var mensalidade = S.mensalidade || 0;
-  var diasAtual = getDiasFechamentoAtual();
-
-  var diasAgilean = diasAtual * K.FATOR_AGILEAN;
-  var hDiaAgilean  = (r.hDiaAtual||0) * K.FATOR_AGILEAN;
+  // Mensalidade fixa de UMA obra: as horas e a folha são informadas por obra,
+  // então o ROI compara ganho de uma obra × mensalidade de uma obra.
+  // mensalidadeOverride: só a Proposta Comercial usa (preço de tabela por obra).
+  var mensalidade = mensalidadeOverride !== undefined ? mensalidadeOverride : MENSALIDADE_ROI_POR_OBRA;
 
   // ---- Operacional ----
-  var subtotalFluxos = ROI_REAL_FLUXOS.reduce(function(acc, f) {
-    return acc + (r[f.key]||0) * f.ganho;
-  }, 0);
-  var fechRapido = Math.max(0, diasAtual*(r.hDiaAtual||0) - diasAgilean*hDiaAgilean);
-  var fimConf = (r.hSemQualidade||0) * 4.33;
-  var subtotalRotina = fechRapido + fimConf;
-  var bruto = subtotalFluxos + subtotalRotina;
-  var descBlocos = bruto * K.DESC_BLOCOS_ENG;
-  var potPleno = bruto * (1 - K.DESC_BLOCOS_ENG);
+  // Cada rotina da tela única de horas entra uma vez só — sem o antigo
+  // "desconto de sobreposição entre blocos", que existia porque as perguntas
+  // se repetiam (fechamento de medição contado 3 vezes, etc.).
+  var h = getHorasGestao(r);
+  var fluxos = HORAS_GESTAO_CAMPOS.map(function(c) {
+    return { key: c.key, label: c.label, horas: h[c.key] || 0, ganho: c.ganho, recuperadas: (h[c.key] || 0) * c.ganho };
+  });
+  var horasInformadas = fluxos.reduce(function(a, f){ return a + f.horas; }, 0);
+  var potPleno = fluxos.reduce(function(a, f){ return a + f.recuperadas; }, 0);
   var hMes = potPleno * fator;
   var hObra = hMes * prazo;
   var pctJornada = hMes / K.JORNADA;
 
   // ---- Estratégica ----
-  // horasLib deriva do detalhamento operacional (subtotalFluxos), em vez de
-  // uma estimativa genérica separada de "horas de gestão" + "eficiência".
-  var horasAdmLib = Math.max(0, diasAtual - diasAgilean) * K.HORAS_DIA;
-  var rec1 = horasAdmLib * K.CUSTO_HORA_ADM * fator;
+  // O antigo "retrabalho administrativo liberado" (dias de fechamento × 8h)
+  // saiu: o fechamento agora está dentro de hMedicao e já entra na
+  // capacidade de gestão liberada — contá-lo nos dois lugares duplicava.
   var rec2 = (r.folha||0) * K.PCT_RETRABALHO * fator;
   var rec3 = (r.folha||0) * K.PCT_INDEVIDOS * (1 - K.DESC_SOBREPOSICAO) * fator;
-  var recTotal = rec1 + rec2 + rec3;
-  var horasLib = subtotalFluxos * fator;
+  var recTotal = rec2 + rec3;
+  var horasLib = hMes;
   var valorCapacidade = horasLib * K.CUSTO_HORA_TECNICA;
   var ganhoLiquido = recTotal + valorCapacidade - mensalidade;
   var roiPct = mensalidade > 0 ? ganhoLiquido / mensalidade : 0;
@@ -2767,33 +2755,21 @@ function calcROIReal(fator) {
   return {
     fator: fator, mensalidade: mensalidade, prazo: prazo,
     operacional: {
-      subtotalFluxos: subtotalFluxos, fechRapido: fechRapido, fimConf: fimConf,
-      subtotalRotina: subtotalRotina, bruto: bruto, descBlocos: descBlocos,
+      fluxos: fluxos, horasInformadas: horasInformadas, subtotalFluxos: potPleno,
       potPleno: potPleno, hMes: hMes, hObra: hObra, pctJornada: pctJornada
     },
     estrategica: {
-      horasAdmLib: horasAdmLib, rec1: rec1, rec2: rec2, rec3: rec3, recTotal: recTotal,
+      rec2: rec2, rec3: rec3, recTotal: recTotal,
       horasLib: horasLib, valorCapacidade: valorCapacidade, ganhoLiquido: ganhoLiquido,
       roi: roiPct, payback: payback
     }
   };
 }
 
-// Variante de calcROIReal() que recebe a mensalidade explicitamente em vez de
-// ler S.mensalidade — usada pela Proposta Comercial (seção 4, Retorno
-// Projetado), que precisa recalcular o ROI ancorado no preço de tabela real
-// da proposta (calcularMensalidadePadrao), independente de o consultor ter
-// sobrescrito manualmente o campo de mensalidade na tela de ROI do
-// Diagnóstico (S.mensalidadeManual). Troca S.mensalidade temporariamente
-// (calcROIReal só lê o valor global), chama o cálculo já existente sem
-// duplicar nenhuma fórmula, e restaura o valor original em seguida — nunca
-// deixa efeito colateral no estado global.
+// Variante usada pela Proposta Comercial (seção 4, Retorno Projetado):
+// mesmo cálculo do Diagnóstico, ancorado no preço de tabela por obra da proposta.
 function calcROIRealComMensalidade(fator, mensalidade) {
-  var prev = S.mensalidade;
-  S.mensalidade = mensalidade;
-  var r = calcROIReal(fator);
-  S.mensalidade = prev;
-  return r;
+  return calcROIReal(fator, mensalidade);
 }
 
 // ── SPRINT LIBRARY — full item sets per phase ───────────────────────────────
@@ -3116,7 +3092,7 @@ function restartAssessment() {
   S = {empresa:'',consultor:'',contato:'',cargo:'',email:'',telefone:'',data:'',numObras:5,orcamentoMedio:8000000,prazoMedio:18,numObrasRange:'',orcamentoRange:'',tipologia:'',modeloMO:'',momento:'',
     ferramentas:{planejamento:'',medicao:'',qualidade:'',contratos:'',folha:''},
     scores:{b03:0,f1:[0,0,0,0,0,0,0,0],f2:[0,0,0,0],f3:[0,0,0,0,0,0],mo:{},f4:[0,0,0,0,0]},showMO:false,
-    roi2:{folha:0,hDiaAtual:0,hSemQualidade:0,fluxoPlanejar:0,fluxoCurto:0,fluxoMedio:0,fluxoReprogramar:0,fluxoMedir:0,fluxoConferir:0,fluxoERP:0,fluxoCruzar:0},
+    roi2:{folha:0,hPlanejar:0,hCurtoMedio:0,hMedicao:0,hQualidade:0,hConsolidar:0},
     mensalidade:2000, captura:0.50, mensalidadeManual:false};
   currentBlock='b0'; currentQIdx=0; currentPhaseIdx=0; phaseOrder=['f1','f2','f3','f4'];
   radarChartInst=null;
@@ -4197,12 +4173,9 @@ function buildDiagnosticoJSON() {
   var moMax = moEntries.length * 3;
   var moPct = moMax > 0 ? Math.round((moSum/moMax)*100) : null;
 
-  var totalScore = (S.scores.f1||[]).reduce(function(a,b){return a+(b||0);},0) +
-    (S.scores.f2||[]).reduce(function(a,b){return a+(b||0);},0) +
-    (S.scores.f3||[]).reduce(function(a,b){return a+(b||0);},0) +
-    (S.scores.f4||[]).reduce(function(a,b){return a+(b||0);},0) +
-    (S.scores.b03||0);
-  var totalMax = 60;
+  var scoreTotal = getMaturityScoreSummary();
+  var totalScore = scoreTotal.score;
+  var totalMax = scoreTotal.max;
 
   return {
     cliente: {
@@ -4217,7 +4190,7 @@ function buildDiagnosticoJSON() {
       pilarPriority: S.pilarPriority || [],
       portfolioTotal: (S.numObras||0) * (S.orcamentoMedio||0),
       estruturaTime: { score: S.scores.b03||0, nivel: nivel((S.scores.b03||0)/3*100) },
-      roiReal: { dados: S.roi2 || {}, mensalidade: S.mensalidade||0, captura: S.captura||0.5 }
+      roiReal: { horasGestaoPorObra: getHorasGestao(), folhaPorObra: (S.roi2||{}).folha||0, mensalidade: MENSALIDADE_ROI_POR_OBRA, captura: ROI_CAPTURA_FIXA }
     },
     fases: {
       fase1: { scores: S.scores.f1||[], somatorio: (S.scores.f1||[]).reduce(function(a,b){return a+(b||0);},0), maximo: maxes.f1, percentual: f1pct, nivel: nivel(f1pct) },
@@ -4259,9 +4232,9 @@ BENCHMARKS REAIS (use com precisao):
 - +1.500 canteiros impactados, 70M m2 construidos com Agilean
 
 REGRAS DE DEPENDENCIA (inviolaveis):
-1. Fase 1 fraca: priorize planejamento antes de tudo
-2. Fase 2 fraca: nao recomende Fase 3 sem lookahead funcionando
-3. Fase 3 fraca: dados da Fase 4 sao nao confiaveis
+1. Pilar 1 fraco: priorize planejamento antes de tudo
+2. Pilar 2 fraco: nao recomende Pilar 3 sem lookahead funcionando
+3. Pilar 3 fraco: dados do Pilar 4 sao nao confiaveis
 4. Orcamento score 0-1: limite a promessa, diga isso
 5. MO propria: foco em folha, improdutividade, estudo de pacotes
 6. MO terceirizada: foco em meta por empreiteiro, medicao, qualidade, bloqueios
@@ -4306,11 +4279,11 @@ BLOCO_CLIENTE_FIM
 
 BLOCO_CONSULTOR_INICIO
 ### Radar de maturidade
-| Fase | % | Nivel | Observacao principal |
+| Pilar | % | Nivel | Observacao principal |
 [preencha com os dados reais]
 
 ### Gargalo raiz — justificativa tecnica
-[Por que esse gargalo. Dependencias entre fases. O que acontece se nao for resolvido.]
+[Por que esse gargalo. Dependencias entre pilares. O que acontece se nao for resolvido.]
 
 ### Porta de entrada recomendada
 [Produto especifico + por que agora + o que deixar para depois.]
@@ -4659,7 +4632,8 @@ function saveDraft() {
       phaseOrder: phaseOrder.slice(),
       focusedPilar: focusedPilar,
       focusedQIdx: focusedQIdx,
-      selectedPilars: selectedPilars.slice()
+      selectedPilars: selectedPilars.slice(),
+      horasOrigem: horasOrigem
     };
     localStorage.setItem(DRAFT_KEY, JSON.stringify(draft));
     showDraftIndicator(syncFailed ? 'error' : 'ok');
@@ -4674,12 +4648,9 @@ function saveDraft() {
 async function syncToSupabase() {
   if (!sbClient || !S.id) return;
 
-  var totalMax = 21+9+15+12+3;
-  var totalScore = ['f1','f2','f3','f4'].reduce(function(acc,k) {
-    var arr = S.scores[k];
-    if(!Array.isArray(arr)) return acc;
-    return acc + arr.reduce(function(a,b){return a+(b||0);},0);
-  },0) + (S.scores.b03||0);
+  var scoreTotal = getMaturityScoreSummary();
+  var totalMax = scoreTotal.max;
+  var totalScore = scoreTotal.score;
 
   var record = {
     id: S.id,
@@ -4831,6 +4802,8 @@ function resumeDraft() {
   } else if(currentBlock === 'focused') {
     renderFocusedQ();
     showScreen('screen-focused');
+  } else if(currentBlock === 'horas') {
+    showHorasScreen(draft.horasOrigem || 'full');
   } else {
     startAssessment();
   }
@@ -4953,12 +4926,9 @@ async function confirmSave() {
   var nome = document.getElementById('save-nome').value.trim() || 'Diagnóstico sem nome';
   var list = getAllDiagnosticos();
   var maxes = {f1:21,f2:9,f3:15,f4:12};
-  var totalMax = 21+9+15+12+3;
-  var totalScore = ['f1','f2','f3','f4'].reduce(function(acc,k) {
-    var arr = S.scores[k];
-    if(!Array.isArray(arr)) return acc;
-    return acc + arr.reduce(function(a,b){return a+(b||0);},0);
-  },0) + (S.scores.b03||0);
+  var scoreTotal = getMaturityScoreSummary();
+  var totalMax = scoreTotal.max;
+  var totalScore = scoreTotal.score;
 
   S.status = 'Completo';
   var record = {
@@ -5068,6 +5038,12 @@ function renderAdminList() {
     '</div>';
   }
   list.forEach(function(rec) {
+    // Recalcula a partir das respostas: registros antigos foram gravados com
+    // total_max 60 (incluía a B0.3) e ficariam divergentes do relatório.
+    if(rec.scores) {
+      var sc = getMaturityScoreSummary(rec.scores);
+      rec = Object.assign({}, rec, { totalScore: sc.score, totalMax: sc.max, nivel: rec.nivel === 'Incompleto' ? rec.nivel : sc.nivel });
+    }
     var pct = Math.round((rec.totalScore/rec.totalMax)*100);
     var col = levelColors[rec.nivel] || '#aaa';
     var sincronizado = !!(remoteIds && remoteIds[rec.id]);
@@ -5237,7 +5213,7 @@ function buildPropostaCapa(mode) {
 
   var m = getMaturityScoreSummary();
   var roi = calculateROI(); // mesma função usada no Diagnóstico p/ Exposição em Risco
-  var r = window._lastROIReal || calcROIReal(S.captura);
+  var r = window._lastROIReal || calcROIReal(ROI_CAPTURA_FIXA);
   var paybackFinito = r && isFinite(r.estrategica.payback);
   var paybackTxt = paybackFinito ? ('< ' + Math.ceil(r.estrategica.payback) + ' meses') : 'Payback Imediato';
   var dataEmissao = new Date().toLocaleDateString('pt-BR');
@@ -5309,9 +5285,9 @@ function buildPropostaEscopo(mode) {
 
   container.innerHTML =
     '<div class="rep-sec-title">Escopo de Implementação — Plano de Trabalho Contratual</div>' +
-    '<div style="font-size:12px;color:#94a3b8;margin-bottom:14px">Fases priorizadas pelos gaps de maior impacto identificados neste diagnóstico específico — fases já maduras no portfólio da '+(S.empresa||'empresa')+' são omitidas.</div>' +
+    '<div style="font-size:12px;color:#94a3b8;margin-bottom:14px">Sprints priorizadas pelos gaps de maior impacto identificados neste diagnóstico específico — pilares já maduros no portfólio da '+(S.empresa||'empresa')+' são omitidos.</div>' +
     '<div style="overflow-x:auto"><table class="opp-table" style="min-width:680px"><thead><tr>' +
-      '<th>Fase</th><th>Entregável</th><th>Prazo</th><th>Critério de Conclusão</th><th>Responsabilidade</th>' +
+      '<th>Sprint</th><th>Entregável</th><th>Prazo</th><th>Critério de Conclusão</th><th>Responsabilidade</th>' +
     '</tr></thead><tbody>' + rows + '</tbody></table></div>' +
     f4NoteHtml;
 }
@@ -5412,17 +5388,17 @@ function buildPropostaInvestimento(mode) {
 }
 
 // ── SEÇÃO 4: RETORNO PROJETADO ──────────────────────────────────────────────
-// Reaproveita calcROIReal() (mesma fórmula do Diagnóstico), mas ancorado na
-// mensalidade REAL desta proposta (motor de precificação da seção 3), não
-// mais numa mensalidade hipotética/editável — usa calcROIRealComMensalidade()
-// para isso sem tocar o estado global S.mensalidade.
+// Reaproveita calcROIReal() (mesma fórmula do Diagnóstico), mas ancorado no
+// preço de tabela POR OBRA desta proposta (motor de precificação da seção 3).
 function buildPropostaRetorno(mode) {
   var container = document.getElementById('prop-retorno-container');
   if (!container) return;
   var isResumido = (mode === 'resumido');
 
-  var mensalidadeProposta = calcularMensalidadePadrao(S.numObras);
-  var r = calcROIRealComMensalidade(S.captura, mensalidadeProposta);
+  // Preço POR OBRA (não o total do portfólio): o ganho do ROI é de uma obra,
+  // então o investimento comparado também é de uma obra.
+  var mensalidadeProposta = precoPorObraPadrao(S.numObras);
+  var r = calcROIRealComMensalidade(ROI_CAPTURA_FIXA, mensalidadeProposta);
   var paybackFinito = isFinite(r.estrategica.payback);
   var fmtH = function(n){ return (n||0).toLocaleString('pt-BR',{maximumFractionDigits:1}) + ' h'; };
 
@@ -5440,21 +5416,21 @@ function buildPropostaRetorno(mode) {
       '<table class="roi-table"><thead><tr><th>Item</th><th style="text-align:right">Valor</th></tr></thead><tbody>' +
         '<tr><td>Recuperação financeira total (retrabalho + pagamentos indevidos)</td><td style="text-align:right" class="roi-val">'+fmtNum(r.estrategica.recTotal)+'</td></tr>' +
         '<tr><td>Capacidade de gestão liberada ('+fmtH(r.estrategica.horasLib)+')</td><td style="text-align:right" class="roi-val">'+fmtNum(r.estrategica.valorCapacidade)+'</td></tr>' +
-        '<tr><td>Investimento Agilean (mensalidade desta proposta)</td><td style="text-align:right" class="roi-val">− '+fmtNum(mensalidadeProposta)+'/mês</td></tr>' +
-        '<tr class="roi-total"><td>Horas recuperadas/mês (visão operacional)</td><td style="text-align:right">'+fmtH(r.operacional.hMes)+'</td></tr>' +
+        '<tr><td>Investimento Agilean (preço por obra desta proposta)</td><td style="text-align:right" class="roi-val">− '+fmtNum(mensalidadeProposta)+'/mês</td></tr>' +
+        '<tr class="roi-total"><td>Horas recuperadas/mês por obra (visão operacional)</td><td style="text-align:right">'+fmtH(r.operacional.hMes)+'</td></tr>' +
       '</tbody></table>' +
     '</div>';
 
   container.innerHTML =
     '<div class="rep-sec-title">Retorno Projetado</div>' +
-    '<div style="font-size:12px;color:#94a3b8;margin-bottom:14px">Com base no investimento proposto na seção anterior — mensalidade de '+fmtNum(mensalidadeProposta)+'/mês, não mais uma simulação hipotética.</div>' +
+    '<div style="font-size:12px;color:#94a3b8;margin-bottom:14px">Com base no investimento proposto na seção anterior — preço de '+fmtNum(mensalidadeProposta)+'/mês por obra, comparado ao ganho de uma obra.</div>' +
     '<div style="display:grid;grid-template-columns:repeat(2,1fr);gap:10px;margin-bottom:10px">' +
-      kpi('ROI Mensal', Math.round(r.estrategica.roi*100)+'%', 'sobre a mensalidade proposta, por mês') +
+      kpi('ROI Mensal', Math.round(r.estrategica.roi*100)+'%', 'sobre o preço por obra, por mês') +
       kpi('Payback', paybackFinito ? fmtNumBare(r.estrategica.payback)+' meses' : 'Payback Imediato', paybackFinito ? 'meses até recuperar o investido' : 'retorno já no 1º mês') +
     '</div>' +
     '<div style="display:grid;grid-template-columns:repeat(3,1fr);gap:10px">' +
-      kpi('Horas recuperadas/mês', fmtH(r.operacional.hMes), 'no total da operação') +
-      kpi('Horas recuperadas/obra', fmtH(r.operacional.hObra), 'por obra, no mês') +
+      kpi('Horas recuperadas/mês', fmtH(r.operacional.hMes), 'por obra') +
+      kpi('Horas recuperadas/obra', fmtH(r.operacional.hObra), 'ao longo de '+r.prazo+' meses de obra') +
       kpi('% da jornada liberada', (Math.round(r.operacional.pctJornada*1000)/10)+'%', 'da jornada individual do time técnico') +
     '</div>' +
     memoria;

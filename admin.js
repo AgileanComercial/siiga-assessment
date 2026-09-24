@@ -132,13 +132,13 @@ function getField(row, directKey, stateKey) {
 //  PHASE DEFINITIONS (for display)
 // ═══════════════════════════════════════════
 var PHASES = {
-  f1: { label: 'Fase 1 · Planejamento Estratégico', color: '#60a5fa', max: 21, qCount: 7,
+  f1: { label: 'Pilar 1 · Planejamento Estratégico', color: '#60a5fa', max: 21, qCount: 7,
     questions: ['Planejamento formal', 'Técnica de planejamento', 'Dimensionamento de duração', 'Integração orçamento × plano', 'Análise da Curva S', 'Cronograma bancário', 'Integração com suprimentos'] },
-  f2: { label: 'Fase 2 · Proteção da Execução', color: '#2dd4bf', max: 9, qCount: 3,
+  f2: { label: 'Pilar 2 · Proteção da Execução', color: '#2dd4bf', max: 9, qCount: 3,
     questions: ['Lookahead / antecipação de restrições', 'Confirmação de equipes', 'Reprogramação formal'] },
-  f3: { label: 'Fase 3 · Gestão da Produção', color: '#34d399', max: 15, qCount: 5,
+  f3: { label: 'Pilar 3 · Gestão da Produção', color: '#34d399', max: 15, qCount: 5,
     questions: ['Programação semanal', 'Check-in / Check-out e causa raiz', 'Frequência coleta avanço', 'Qualidade × avanço físico', 'Análise intermediária de PPC'] },
-  f4: { label: 'Fase 4 · Controle e Performance', color: '#9ca3af', max: 12, qCount: 4,
+  f4: { label: 'Pilar 4 · Controle e Performance', color: '#9ca3af', max: 12, qCount: 4,
     questions: ['Reunião de fechamento técnico', 'Reunião executiva com diretoria', 'Painel integrado de indicadores', 'Governança financeira (ERP)'] }
 };
 
@@ -155,6 +155,22 @@ function getPhaseScores(row) {
 function sumArray(arr) {
   if (!Array.isArray(arr)) return 0;
   return arr.reduce(function (a, b) { return a + (b || 0); }, 0);
+}
+
+// Score total = soma dos 4 pilares (máx. 57), mesma regra de
+// getMaturityScoreSummary() em script.js. Registros antigos foram gravados com
+// total_max 60 (incluía a B0.3) — recalcula a partir das respostas para o
+// painel mostrar o mesmo número do radar e do relatório.
+function normalizeTotalScore(row) {
+  var scores = getPhaseScores(row);
+  var total = 0, max = 0;
+  ['f1', 'f2', 'f3', 'f4'].forEach(function (k) {
+    total += sumArray(scores[k]);
+    max += PHASES[k].max;
+  });
+  row.total_score = total;
+  row.total_max = max;
+  if (row.nivel && row.nivel !== 'Incompleto') row.nivel = levelFromPct(total / max);
 }
 
 function levelFromPct(p) {
@@ -195,6 +211,7 @@ async function fetchData() {
 
     allData = result.data || [];
     allData.forEach(function (row) {
+      normalizeTotalScore(row);
       row._leadScore = calcLeadScore(row);
       row._nivel = getNivel(row);
     });
@@ -608,7 +625,7 @@ function exportLeadQuestionsCSV() {
   lines.push([csvField('Consultor'), csvField(consultor)].join(';'));
   lines.push([csvField('Data do diagnóstico'), csvField(dateStr)].join(';'));
   lines.push('');
-  lines.push([csvField('Fase'), csvField('Pergunta'), csvField('Score'), csvField('Score Máximo')].join(';'));
+  lines.push([csvField('Pilar'), csvField('Pergunta'), csvField('Score'), csvField('Score Máximo')].join(';'));
 
   ['f1', 'f2', 'f3', 'f4'].forEach(function(key) {
     var phase = PHASES[key];
@@ -784,7 +801,7 @@ function openDetails(index) {
   html += '</div>';
 
   html += '<div style="background:rgba(255,255,255,0.01);border:1px solid var(--border);border-radius:12px;padding:20px;margin-bottom:20px;">';
-  html += '<h3 style="font-family:var(--font-display);font-size:13px;color:var(--orange);margin-bottom:16px;text-transform:uppercase;letter-spacing:0.05em;">Maturidade por Fase</h3>';
+  html += '<h3 style="font-family:var(--font-display);font-size:13px;color:var(--orange);margin-bottom:16px;text-transform:uppercase;letter-spacing:0.05em;">Maturidade por Pilar</h3>';
 
   ['f1', 'f2', 'f3', 'f4'].forEach(function (key) {
     var phase = PHASES[key];
@@ -889,7 +906,7 @@ function openDetails(index) {
   radarChartInstDetails = new Chart(ctx, {
     type: 'radar',
     data: {
-      labels: ['Fase 1', 'Fase 2', 'Fase 3', 'Fase 4'],
+      labels: ['Pilar 1', 'Pilar 2', 'Pilar 3', 'Pilar 4'],
       datasets: [
         {
           label: 'Sua empresa',

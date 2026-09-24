@@ -308,6 +308,15 @@ function maskPhone(input){var d=input.value.replace(/\D/g,'');if(d.length>11)d=d
   </div>
 </div>
 
+<!-- TEMPO DA EQUIPE DE GESTÃO — tela única de horas do ROI (última do diagnóstico) -->
+<div class="screen" id="screen-horas">
+  <div class="card" id="horas-card"></div>
+  <div class="btn-row">
+    <button class="btn btn-s" onclick="prevHoras()">← Anterior</button>
+    <button class="btn btn-p" id="horas-next-btn" onclick="nextHoras()">Ver Radar Completo →</button>
+  </div>
+</div>
+
 <!-- PHASE RESULT SCREEN -->
 <div class="screen" id="screen-phase-result">
   <div class="card" id="result-card"></div>
@@ -388,7 +397,7 @@ function maskPhone(input){var d=input.value.replace(/\D/g,'');if(d.length>11)d=d
          a tabela cheia (cabeçalho) reservando espaço vazio até o rodapé. -->
     <div class="card card-wide rep-mb" id="opp-table-card" data-keep-group="gaps" data-section="gaps">
       <div class="rep-sec-title"><span class="rep-sec-num">04</span>Gaps Identificados</div>
-      <table class="opp-table" id="opp-table-el"><thead><tr><th>#</th><th>Gap Identificado</th><th>Severidade</th><th>Fase</th><th>Impacto</th></tr></thead><tbody id="opp-body"></tbody></table>
+      <table class="opp-table" id="opp-table-el"><thead><tr><th>#</th><th>Gap Identificado</th><th>Severidade</th><th>Pilar</th><th>Impacto</th></tr></thead><tbody id="opp-body"></tbody></table>
     </div>
 
     <!-- Card C: Perdas Financeiras — cálculo principal (título + inputs + tabela de ROI).
@@ -595,8 +604,7 @@ function maskPhone(input){var d=input.value.replace(/\D/g,'');if(d.length>11)d=d
            instrução interna pro consultor — só faz sentido no Detalhado (o
            documento que ele usa ao vivo). No Resumido (pdf-resumo-hide oculta a
            2ª frase), o pdf-resumido-only injeta só o ponto final que faltaria. -->
-      <p style="font-size:12px;color:#666;margin-bottom:7px">Cálculo baseado nos dados financeiros e de rotina coletados diretamente neste diagnóstico<span class="pdf-resumido-only" style="display:none">.</span><span class="pdf-resumo-hide"> — não apenas na maturidade medida. Ajuste a mensalidade e o cenário de captura antes de apresentar.</span></p>
-      <div id="roi2-config" class="no-print" style="display:grid;grid-template-columns:repeat(2,1fr);gap:14px;margin-bottom:4px;max-width:520px"></div>
+      <p style="font-size:12px;color:#666;margin-bottom:7px">Cálculo baseado nos dados financeiros e de rotina coletados diretamente neste diagnóstico<span class="pdf-resumido-only" style="display:none">.</span><span class="pdf-resumo-hide"> — não apenas na maturidade medida. Mensalidade média fixa de R$ 2.000/mês por obra e fator de captura de 50%.</span></p>
     </div>
 
     <!-- Visão Estratégica/Operacional em card próprio: unidade pequena o bastante
@@ -1078,12 +1086,12 @@ function maskPhone(input){var d=input.value.replace(/\D/g,'');if(d.length>11)d=d
         <!-- Score structure -->
         <div style="margin-bottom:24px">
           <div style="font-size:11px;text-transform:uppercase;letter-spacing:0.1em;color:var(--gray2);font-weight:700;margin-bottom:12px">1. Estrutura de Score por Pilar</div>
-          <p style="font-size:13px;color:rgba(255,255,255,0.8);line-height:1.7;margin-bottom:12px">Cada pergunta do diagnóstico é respondida em uma escala de 0 a 3, onde: <strong>0 = prática inexistente</strong>, <strong>1 = prática informal</strong>, <strong>2 = prática parcial</strong>, <strong>3 = prática estruturada</strong>. O score de cada fase é a soma dos scores de suas perguntas.</p>
+          <p style="font-size:13px;color:rgba(255,255,255,0.8);line-height:1.7;margin-bottom:12px">Cada pergunta do diagnóstico é respondida em uma escala de 0 a 3, onde: <strong>0 = prática inexistente</strong>, <strong>1 = prática informal</strong>, <strong>2 = prática parcial</strong>, <strong>3 = prática estruturada</strong>. O score de cada pilar é a soma dos scores de suas perguntas.</p>
           <div style="overflow-x:auto">
             <table style="width:100%;border-collapse:collapse;font-size:12px">
               <thead>
                 <tr style="border-bottom:1px solid rgba(255,255,255,0.1)">
-                  <th style="text-align:left;padding:8px 12px;color:var(--gray2);font-weight:600">Fase</th>
+                  <th style="text-align:left;padding:8px 12px;color:var(--gray2);font-weight:600">Pilar</th>
                   <th style="text-align:center;padding:8px 12px;color:var(--gray2);font-weight:600">Perguntas</th>
                   <th style="text-align:center;padding:8px 12px;color:var(--gray2);font-weight:600">Score Máximo</th>
                   <th style="text-align:center;padding:8px 12px;color:var(--orange);font-weight:600">Peso</th>
@@ -1170,10 +1178,10 @@ function maskPhone(input){var d=input.value.replace(/\D/g,'');if(d.length>11)d=d
 
         <!-- Dependency rules -->
         <div style="padding:14px 16px;background:rgba(255,255,255,0.03);border-radius:8px;border:1px solid rgba(255,255,255,0.07)">
-          <div style="font-size:11px;text-transform:uppercase;letter-spacing:0.1em;color:var(--gray2);font-weight:700;margin-bottom:10px">4. Regras de Dependência entre Fases</div>
+          <div style="font-size:11px;text-transform:uppercase;letter-spacing:0.1em;color:var(--gray2);font-weight:700;margin-bottom:10px">4. Regras de Dependência entre Pilares</div>
           <div style="display:flex;flex-direction:column;gap:6px">
             <div style="font-size:12px;color:rgba(255,255,255,0.8);padding:8px 10px;background:rgba(255,255,255,0.02);border-radius:6px;border-left:3px solid rgba(255,95,31,0.4)">
-              <strong>F1 fraca (abaixo de 50%)</strong> — Priorizar estruturação do planejamento antes de qualquer outra fase. Nenhuma solução avançada funciona sem linha de base.
+              <strong>F1 fraca (abaixo de 50%)</strong> — Priorizar estruturação do planejamento antes de qualquer outro pilar. Nenhuma solução avançada funciona sem linha de base.
             </div>
             <div style="font-size:12px;color:rgba(255,255,255,0.8);padding:8px 10px;background:rgba(255,255,255,0.02);border-radius:6px;border-left:3px solid rgba(255,95,31,0.4)">
               <strong>F2 fraca (abaixo de 50%)</strong> — Não recomendar F3 como foco principal sem antes estruturar lookahead e reprogramação.
@@ -1351,7 +1359,7 @@ function maskPhone(input){var d=input.value.replace(/\D/g,'');if(d.length>11)d=d
           </div>
 
           <!-- Score per component -->
-          <div style="font-size:11px;color:var(--gray2);font-weight:700;text-transform:uppercase;letter-spacing:0.08em;margin-bottom:8px">Fases que governam cada componente</div>
+          <div style="font-size:11px;color:var(--gray2);font-weight:700;text-transform:uppercase;letter-spacing:0.08em;margin-bottom:8px">Pilares que governam cada componente</div>
           <div style="display:grid;grid-template-columns:1fr 1fr;gap:6px;margin-bottom:14px">
             <div style="padding:8px 10px;background:rgba(255,255,255,0.03);border-radius:6px;font-size:11px">
               <span style="color:#60a5fa;font-weight:700">⏱ Otimização do time</span><br>
@@ -1439,7 +1447,7 @@ function maskPhone(input){var d=input.value.replace(/\D/g,'');if(d.length>11)d=d
               </tbody>
             </table>
           </div>
-          <div style="margin-top:8px;font-size:10px;color:var(--gray2);font-style:italic">* Estimativa para obra de R$8M / 18 meses / MO própria. O fator varia por componente conforme as fases que o governam.</div>
+          <div style="margin-top:8px;font-size:10px;color:var(--gray2);font-style:italic">* Estimativa para obra de R$8M / 18 meses / MO própria. O fator varia por componente conforme os pilares que o governam.</div>
         </div>
 
         <div style="padding:12px 14px;background:rgba(255,255,255,0.03);border-radius:6px;font-size:11px;color:var(--gray2);line-height:1.6;font-style:italic">
