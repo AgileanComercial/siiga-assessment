@@ -2766,6 +2766,17 @@ function calcROIReal(fator, mensalidadeOverride) {
   };
 }
 
+// Texto do payback (meses para o ganho líquido pagar a mensalidade).
+// payback = Infinity quando o ganho líquido é <= 0 — o investimento NÃO se paga
+// nesse cenário (antes era exibido, ao contrário, como "Payback Imediato").
+// Abaixo de 1 mês mostra "< 1 mês" (antes arredondava para "0 meses").
+function fmtPayback(payback) {
+  if(!isFinite(payback)) return { txt: 'Sem retorno', sub: 'ganho não cobre a mensalidade neste cenário' };
+  if(payback < 1) return { txt: '< 1 mês', sub: 'o ganho do 1º mês já cobre a mensalidade' };
+  var m = Math.round(payback * 10) / 10;
+  return { txt: m.toLocaleString('pt-BR', {maximumFractionDigits: 1}) + (m === 1 ? ' mês' : ' meses'), sub: 'meses até recuperar o investido' };
+}
+
 // Variante usada pela Proposta Comercial (seção 4, Retorno Projetado):
 // mesmo cálculo do Diagnóstico, ancorado no preço de tabela por obra da proposta.
 function calcROIRealComMensalidade(fator, mensalidade) {
@@ -5214,8 +5225,7 @@ function buildPropostaCapa(mode) {
   var m = getMaturityScoreSummary();
   var roi = calculateROI(); // mesma função usada no Diagnóstico p/ Exposição em Risco
   var r = window._lastROIReal || calcROIReal(ROI_CAPTURA_FIXA);
-  var paybackFinito = r && isFinite(r.estrategica.payback);
-  var paybackTxt = paybackFinito ? ('< ' + Math.ceil(r.estrategica.payback) + ' meses') : 'Payback Imediato';
+  var paybackTxt = r ? fmtPayback(r.estrategica.payback).txt : '—';
   var dataEmissao = new Date().toLocaleDateString('pt-BR');
 
   var kpi = function(label, value, sub) {
@@ -5399,7 +5409,7 @@ function buildPropostaRetorno(mode) {
   // então o investimento comparado também é de uma obra.
   var mensalidadeProposta = precoPorObraPadrao(S.numObras);
   var r = calcROIRealComMensalidade(ROI_CAPTURA_FIXA, mensalidadeProposta);
-  var paybackFinito = isFinite(r.estrategica.payback);
+  var pb = fmtPayback(r.estrategica.payback);
   var fmtH = function(n){ return (n||0).toLocaleString('pt-BR',{maximumFractionDigits:1}) + ' h'; };
 
   var kpi = function(label, value, sub) {
@@ -5426,7 +5436,7 @@ function buildPropostaRetorno(mode) {
     '<div style="font-size:12px;color:#94a3b8;margin-bottom:14px">Com base no investimento proposto na seção anterior — preço de '+fmtNum(mensalidadeProposta)+'/mês por obra, comparado ao ganho de uma obra.</div>' +
     '<div style="display:grid;grid-template-columns:repeat(2,1fr);gap:10px;margin-bottom:10px">' +
       kpi('ROI Mensal', Math.round(r.estrategica.roi*100)+'%', 'sobre o preço por obra, por mês') +
-      kpi('Payback', paybackFinito ? fmtNumBare(r.estrategica.payback)+' meses' : 'Payback Imediato', paybackFinito ? 'meses até recuperar o investido' : 'retorno já no 1º mês') +
+      kpi('Payback', pb.txt, pb.sub) +
     '</div>' +
     '<div style="display:grid;grid-template-columns:repeat(3,1fr);gap:10px">' +
       kpi('Horas recuperadas/mês', fmtH(r.operacional.hMes), 'por obra') +
