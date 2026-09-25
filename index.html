@@ -405,87 +405,19 @@ function maskPhone(input){var d=input.value.replace(/\D/g,'');if(d.length>11)d=d
          visual + fechamento) foi quebrado em 3 cards (C/D/E) pela mesma razão do
          bloco de Gaps acima: dar ao bin-packing granularidade suficiente para
          encaixar cada pedaço no espaço livre remanescente de cada página. -->
-    <div class="card card-wide rep-mb pdf-resumo-hide" data-keep-group="perdas" data-section="perdas">
-      <div class="rep-sec-title"><span class="rep-sec-num">05</span>Perdas Financeiras na Operação</div>
-      <p style="font-size:12px;color:#666;margin-bottom:14px">Estimativa conservadora com base nos gaps identificados e nos pressupostos documentados abaixo. Valores indicativos da perda atual e do potencial de captura com o SIIGA.</p>
-      <div id="roi-inputs" style="display:grid;grid-template-columns:repeat(3,1fr);gap:10px;margin-bottom:16px"></div>
+    <div class="card card-wide rep-mb" data-keep-group="perdaganho" data-section="perdaganho">
+      <div class="rep-sec-title"><span class="rep-sec-num">03</span>Da Perda ao Ganho Capturável</div>
+      <p style="font-size:12px;color:#666;margin-bottom:14px">Perda atual (bruta) e o potencial de captura realista com o SIIGA, por fonte. Estimativa conservadora — memória de cálculo no apêndice.</p>
+      <div id="roi-inputs" style="display:grid;grid-template-columns:repeat(4,1fr);gap:10px;margin-bottom:16px"></div>
       <table class="roi-table" id="roi-table-el"></table>
+      <div id="perdaganho-extra" style="margin-top:14px"></div>
     </div>
 
-    <!-- Card D: pressupostos do cálculo. Some inteiro no PDF Resumido (classe
-         pdf-resumo-hide no próprio card).
-         Antes formava um único card junto com a composição visual de perdas
-         (Card E abaixo); separados em 2 cards para o PDF Detalhado poder mover
-         só a composição para a página 2 (junto do resumo de Gaps) mantendo os
-         pressupostos na página de Perdas — ver remapeamento/reordenação
-         condicionados a mode==='detalhado' em generatePDF() (script.js), mesmo
-         padrão já usado no PDF Resumido para este mesmo card de composição. -->
-    <div class="card card-wide rep-mb pdf-resumo-hide" data-keep-group="perdas" data-section="perdas">
-      <div style="padding:14px 16px;background:#f8f8f8;border-radius:var(--r3);border:1px solid #e8e8e8">
-        <div style="font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:0.08em;color:#999;margin-bottom:8px">Pressupostos do cálculo</div>
-        <div style="display:grid;grid-template-columns:1fr 1fr;gap:6px">
-          <div style="font-size:11px;color:#666">• MO como % do custo da obra: <strong style="color:#333">45%</strong></div>
-          <div style="font-size:11px;color:#666">• Estouro médio de MO: <strong style="color:#333">15%</strong></div>
-          <div style="font-size:11px;color:#666">• Redução do estouro com Agilean: <strong style="color:#333">70%</strong></div>
-          <div style="font-size:11px;color:#666">• Retrabalhos (referência de mercado): <strong style="color:#333" id="pres-retrab">— % do portfólio</strong></div>
-          <div style="font-size:11px;color:#666">• Ganho de velocidade: <strong style="color:#333">10% prazo × 15% custo prop.</strong></div>
-          <div style="font-size:11px;color:#666">• Horas de gestão recuperáveis/mês por obra: <strong style="color:#333" id="pres-diaslib">— h</strong></div>
-          <div style="font-size:11px;color:#666">• Prazo médio informado: <strong style="color:#333" id="pres-prazo">— meses</strong></div>
-        </div>
-        <!-- Fórmulas de como cada fonte de PERDA (valor bruto, sem fator) é
-             calculada (id="pres-formulas") — só a memória de cálculo do valor
-             bruto exibido na tabela "Fonte da Perda" (Card C, roi-table-el)
-             acima. A explicação do Fator/captura NÃO fica mais aqui — vive no
-             card de pressupostos próprio da tabela "Fonte de Ganho" (Card G,
-             na página de Ganhos, junto do banner "Ganho Esperado com o
-             SIIGA"), por pedido do usuário: cada bloco de pressupostos só
-             deve conter o que é de fato usado no cálculo da tabela a que
-             pertence.
-             Preenchido por buildReport() em script.js. -->
-        <div id="pres-formulas" style="margin-top:10px;padding-top:10px;border-top:1px dashed #ddd"></div>
-        <div style="margin-top:10px;font-size:11px;color:#888;font-style:italic">Valores baseados nas planilhas de ROI Agilean e em benchmarks de Lean Construction. Estimativa conservadora — não representa garantia contratual.</div>
-      </div>
-    </div>
-
-    <!-- Card E: Composição Visual de Perdas x Portfólio. Card próprio (ver nota
-         no Card D acima) — id="perdas-composicao-card" no <div class="card">
-         para ser localizável direto pelo reordenamento condicional de
-         generatePDF() (script.js), tanto no modo Resumido (já existente) quanto
-         no Detalhado (novo). -->
-    <div class="card card-wide rep-mb" id="perdas-composicao-card" data-keep-group="perdas" data-section="perdas">
-      <div id="perdas-composicao-box">
-        <div class="rep-sec-title">
-          <span class="rep-sec-num">03</span>
-          <span style="flex:1">Composição da Perda Identificada vs. Portfólio</span>
-          <span id="perdas-pct-total" style="color:var(--orange);text-transform:none;letter-spacing:0"></span>
-        </div>
-        <table class="rep-bar-table" id="perdas-bar-table">
-          <thead><tr><th>Fonte</th><th style="width:38%">Participação</th><th style="text-align:right">Valor</th><th style="text-align:right">%</th></tr></thead>
-          <tbody id="perdas-bar-body"></tbody>
-        </table>
-      </div>
-    </div>
-
-    <!-- 4. SEÇÃO DE GANHOS -->
-    <!-- Card A1: título + intro da seção de ganhos.
-         Era parte de um único card gigante junto com a tabela de rotina, o grid de
-         ganhos e os depoimentos; quebrado em cards independentes para o bin-packing
-         do PDF conseguir distribuir o conteúdo entre páginas sem sobra nem estouro
-         (ver nota no bloco SIIGA — Sistema Integrado, mais abaixo, sobre a mesma
-         classe de problema). A tabela de rotina (Card A2) fica separada porque seu
-         tamanho varia pouco e ela sozinha já é a unidade certa para completar o
-         espaço livre de uma página vizinha. -->
-    <div class="card card-wide rep-mb" id="qualitative-section" data-keep-group="ganhos" data-section="ganhos" style="padding:22px 26px;margin-bottom:6px">
-      <div class="rep-sec-title" id="rep-title-ganhos"><span class="rep-sec-num">06</span>Plano de Ganho de Maturidade Lean — Escopo SIIGA para Empresa</div>
-      <p style="font-size:12px;color:#666;margin-bottom:8px" id="rep-sub-ganhos">
-        Com base nos gaps identificados, o plano de aumento da maturidade Lean contempla os seguintes ajustes em seus processos, estruturando o método SIIGA e a tecnologia Agilean para estancar perdas e destravar a produtividade da sua operação:
-      </p>
-    </div>
-
-    <!-- Card A2: Tabela de Transformação da Rotina Operacional. id="ganhos-rotina-card"
-         usado por generatePDF() (script.js) pra comprimir padding/fonte SÓ no PDF
-         Resumido (restaurado em finish()/fail()) — Detalhado e tela não mudam. -->
-    <div class="card card-wide rep-mb" id="ganhos-rotina-card" data-keep-group="ganhos" data-section="ganhos" style="padding:22px 26px;margin-bottom:6px">
+    <!-- Tabela "Transformação da Rotina Operacional" — na página "Da Perda ao
+         Ganho" (data-section="perdaganho"), logo após a tabela fundida. Detalha
+         como cada rotina passa a rodar com o SIIGA. Preenchida por
+         renderRotinaComparativa() em script.js. -->
+    <div class="card card-wide rep-mb" id="ganhos-rotina-card" data-keep-group="perdaganho" data-section="perdaganho" style="padding:22px 26px;margin-bottom:6px">
       <div style="font-family:'Bai Jamjuree';font-size:13px;font-weight:700;color:#14141b;margin-bottom:8px;display:flex;align-items:center;gap:8px">
         <span>🔄</span><span>Transformação da Rotina Operacional — Como sua obra passa a rodar com SIIGA e Agilean</span>
       </div>
@@ -502,92 +434,17 @@ function maskPhone(input){var d=input.value.replace(/\D/g,'');if(d.length>11)d=d
       </table>
     </div>
 
-    <!-- Card B: Smart Grid 2x2 de Balões de Ganhos (2 Fixos + 2 Dinâmicos) + badges de resultado.
-         A barra "+1.500 Canteiros | 70M m² | 2x mais | API Nativa" foi movida para o
-         topo da última página do relatório (barra de escala e autoridade),
-         liberando espaço nesta página para o bloco "Ganho Esperado com o SIIGA" a
-         seguir e mantendo a página densa e sem vazios. -->
-    <div class="card card-wide rep-mb" id="ganhos-grid-card" data-keep-group="ganhos" data-section="ganhos" style="padding:22px 26px;margin-bottom:6px">
-      <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px" id="qualitative-grid"></div>
-    </div>
+    <!-- Card D (pressupostos/formulas da perda) e Card E (Composição visual)
+         removidos na reestruturação enxuta: as fórmulas migraram para o Apêndice
+         Metodológico (só no Detalhado) e a Composição era redundante com a
+         tabela fundida "Da Perda ao Ganho" acima. -->
 
-    <!-- Ganho Esperado no Portfólio — logo abaixo do Grid 2x2 de Ganhos Qualitativos,
-         com memória de cálculo integrada imediatamente sob os dois números de
-         destaque. Reaproveita os MESMOS cálculos (calculateROI / calcROIReal) já
-         usados nas páginas de Perdas e ROI Real — não inventa número novo, apenas
-         reenquadra em duas métricas complementares (estancamento de perda vs. ganho
-         líquido mensal real). Preenchido por renderGanhoEsperado() em script.js.
-         Card compactado (padding/tipografia reduzidos) e agrupado via
-         data-keep-group="ganhos" com os 3 cards acima para caber, os 4 juntos,
-         numa única página do PDF — ver bin-packing em generatePDF() (script.js). -->
-    <!-- id="ganho-esperado-card": no PDF Resumido, generatePDF() (script.js)
-         remove em runtime (com restore em finish()/fail()) o background/borda/
-         padding deste container — some a "moldura" externa do card e o título+
-         intro (classe pdf-resumo-hide abaixo), sobrando só o miolo (sub-card
-         branco com o número). No Detalhado e na tela nada muda: continua com
-         título, intro e moldura verde completos. -->
-    <div class="card card-wide rep-mb" id="ganho-esperado-card" data-keep-group="ganhos" data-section="ganhos" style="padding:14px 18px;margin-bottom:8px">
-      <div class="rep-banner">
-        <div>
-          <div style="font-size:9.5px;font-weight:700;text-transform:uppercase;letter-spacing:0.08em;color:var(--orange);margin-bottom:4px">Ganho Esperado com o SIIGA · Capturável no Portfólio Total</div>
-          <div style="font-size:11px;color:var(--rep-text-mut,#666);max-width:520px">A mesma oportunidade identificada nos gaps deste diagnóstico — agora na chave de ganho, no portfólio total sob gestão. Estancamento das perdas ao longo da implantação do SIIGA.</div>
-        </div>
-        <div id="ganho-portfolio-valor" class="rep-banner-val">—</div>
-      </div>
-    </div>
-
-    <!-- Card F: tabela "Fonte de Ganho" (Detalhado) — mesma estrutura da tabela
-         simplificada usada no Resumido (Card id="roi-table-simplificada-card",
-         logo abaixo), mas com a coluna Fator exposta, já que aqui o objetivo é
-         justamente mostrar a memória de cálculo completa. Usa item.porObra/
-         item.portfolio (valor JÁ com o fator de captura aplicado) — diferente
-         da tabela "Fonte da Perda" (Card C, página de Perdas), que é o valor
-         bruto sem fator. Posicionada aqui, logo após o banner "Ganho Esperado
-         com o SIIGA" (id="ganho-esperado-card" acima) — pedido do usuário:
-         a memória de cálculo do ganho capturável fica junto do número
-         consolidado, na página de Ganhos, não na página de Perdas. Some no
-         PDF Resumido (pdf-resumo-hide) porque o Resumido já tem sua própria
-         versão simplificada (sem Fator) logo abaixo (Card
-         id="roi-table-simplificada-card"). Preenchida por
-         renderPerdasFonteGanho() em script.js. -->
-    <div class="card card-wide rep-mb pdf-resumo-hide" id="roi-table-ganho-card" data-keep-group="ganhos" data-section="ganhos">
-      <div style="font-family:'Bai Jamjuree';font-size:13px;font-weight:700;color:#14141b;margin-bottom:4px">Fonte de Ganho — Potencial Capturável com o SIIGA</div>
-      <p style="font-size:11px;color:#666;margin-bottom:10px">Mesmas fontes de perda identificadas no diagnóstico, agora com o Fator de captura aplicado: a fração da perda bruta que é realista capturar dado o nível de maturidade atual do cliente.</p>
-      <table class="roi-table" id="roi-table-ganho-el"></table>
-    </div>
-
-    <!-- Card G: pressupostos do cálculo do GANHO (Fator) — separado dos
-         pressupostos da PERDA (página de Perdas) por pedido do usuário: cada
-         bloco de pressupostos deve conter só o que é usado no cálculo da
-         tabela a que pertence. Aqui só entra a explicação do Fator (como é
-         calculado e aplicado por fonte) — as fórmulas do valor bruto ficam na
-         página de Perdas. Some no PDF Resumido (pdf-resumo-hide), junto com o
-         Card F acima. Preenchido por renderPerdasFonteGanho() em script.js
-         (#pres-formulas-ganho). -->
-    <div class="card card-wide rep-mb pdf-resumo-hide" data-keep-group="ganhos" data-section="ganhos">
-      <div style="padding:14px 16px;background:#f8f8f8;border-radius:var(--r3);border:1px solid #e8e8e8">
-        <div style="font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:0.08em;color:#999;margin-bottom:8px">Pressupostos do cálculo — Fonte de Ganho</div>
-        <div id="pres-formulas-ganho"></div>
-      </div>
-    </div>
-
-    <!-- Tabela "Fonte de Ganho" simplificada — só para o PDF Resumido (classe
-         pdf-resumido-only, oposta de pdf-resumo-hide: fica oculta por padrão na
-         tela e no PDF Detalhado, e é exibida SÓ durante a geração do PDF
-         Resumido, ver generatePdfFromReport() em script.js). Reaproveita os
-         MESMOS itens/valores de roi.items já usados na tabela completa (Card C,
-         #roi-table-el) — remove apenas as colunas de memória de cálculo
-         (Pressuposto/Fator), mantendo nome da fonte + valores por obra/portfólio.
-         Preenchida por renderPerdasFonteSimplificada() em script.js. Movida da
-         página de Perdas/Gaps para a página de Ganhos (data-section="ganhos", em
-         vez de remapeamento condicional) por pedido do usuário: no Resumido, faz
-         mais sentido editorial "Fonte de Ganho" ficar junto do bloco de Ganhos +
-         ROI do que junto de Gaps/Perdas. Card próprio (não card-wide) para o
-         bin-packing poder empacotar com o restante do grupo "ganhos". -->
-    <div class="card card-wide rep-mb pdf-resumido-only" id="roi-table-simplificada-card" data-keep-group="ganhos" data-section="ganhos" style="display:none;padding:14px 18px;margin-bottom:6px">
-      <div style="font-family:'Bai Jamjuree';font-size:12px;font-weight:700;color:#14141b;margin-bottom:8px">Fonte de Ganho</div>
-      <table class="roi-table" id="roi-table-simplificada-el" style="width:100%"></table>
-    </div>
+    <!-- 4. SEÇÃO DE GANHOS — reestruturada: a tabela fundida "Da Perda ao Ganho"
+         (página 3, acima) substitui a antiga página de Perdas + tabelas de Fonte
+         de Ganho (detalhada/simplificada) + banner "Ganho Esperado" + grid 2x2.
+         A tabela "Transformação da Rotina Operacional" foi movida para a página
+         do Plano de Ação (id="ganhos-rotina-card", logo antes de #next-steps-page).
+         A explicação do Fator de captura vai no Apêndice Metodológico (Detalhado). -->
 
     <!-- 5. ROI REAL ESTIMADO — posicionado IMEDIATAMENTE APÓS o slide de Ganhos,
          antes do Roadmap, por exigência da ordenação executiva do relatório. -->
@@ -651,139 +508,20 @@ function maskPhone(input){var d=input.value.replace(/\D/g,'');if(d.length>11)d=d
          muitos gaps elevando a tabela de cenários), o bin-packing por altura
          (generatePDF() em script.js) empurra este card sozinho para uma 2ª
          página — não há quebra forçada aqui, só compactação. -->
-    <div class="card card-wide rep-mb pdf-resumo-hide" data-keep-group="roi" data-section="roi" style="padding:14px 20px">
-      <!-- Faixa de retorno por cenário -->
-      <div style="margin-bottom:8px">
+    <!-- Faixa de Retorno por cenário: agora visível nos DOIS modos (antes
+         detalhado-only). Os Pressupostos/memória de cálculo (#roi2-params-box)
+         saíram deste card e vivem no Apêndice Metodológico (só Detalhado). -->
+    <div class="card card-wide rep-mb" data-keep-group="roi" data-section="roi" style="padding:14px 20px">
+      <div style="margin-bottom:2px">
         <div style="font-size:11.5px;font-weight:700;text-transform:uppercase;letter-spacing:0.08em;color:#999;margin-bottom:5px">Faixa de retorno por cenário</div>
         <table class="roi-table" id="roi2-cenarios-table" style="margin-bottom:5px"></table>
-        <div style="font-size:10px;color:#888;font-style:italic">Cálculo baseado nas planilhas de ROI Agilean. Estimativa a partir dos dados informados pelo cliente — não representa garantia contratual.</div>
-      </div>
-
-      <!-- Pressupostos acoplados ao mesmo card -->
-      <div style="border-top:1px solid #eee;padding-top:8px;margin-top:6px">
-        <div style="font-size:10.5px;font-weight:700;text-transform:uppercase;letter-spacing:0.08em;color:#999;margin-bottom:5px">Pressupostos do cálculo · dados informados nesta operação</div>
-        <div id="roi2-params-box" style="padding:9px 13px;background:#f8f8f8;border-radius:var(--r3);border:1px solid #e8e8e8;font-size:10.5px"></div>
+        <div style="font-size:10px;color:#888;font-style:italic">Cálculo baseado nas planilhas de ROI Agilean. Estimativa a partir dos dados informados pelo cliente — não representa garantia contratual. Pressupostos e memória de cálculo no apêndice (versão detalhada).</div>
       </div>
     </div>
 
-    <!-- Bloco SIIGA — Origem do Método & Garantias. Restaurado do commit e577e33
-         (removido temporariamente durante o experimento de Proposta Comercial
-         separada; decisão final do usuário: 1 único documento, o Diagnóstico).
-         Card independente: o roadmap que antes vinha antes dele foi descartado
-         de vez do Diagnóstico (fica só na ferramenta externa de proposta do
-         usuário), então este card agora vem logo após ROI Real. -->
-    <div class="card card-wide rep-mb" data-keep-group="metodo" data-section="metodo">
-      <div class="rep-sec-title" style="margin-bottom:12px"><span class="rep-sec-num">08</span>SIIGA — Sistema Integrado e Inteligente de Gestão Agilean</div>
-      <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px">
-        <div style="padding:12px 14px;background:#f8f8f8;border-radius:8px;border:1px solid #e8e8e8">
-          <div style="font-size:9.5px;font-weight:700;text-transform:uppercase;letter-spacing:0.08em;color:var(--orange);margin-bottom:8px">Origem do Método</div>
-          <div style="margin-bottom:7px"><div style="font-size:11px;font-weight:700;color:#14141b">Last Planner System</div><div style="font-size:10px;color:#666;line-height:1.4">Embutido nos algoritmos — sequenciamento, balanceamento de fluxo e causa raiz.</div></div>
-          <div style="margin-bottom:7px"><div style="font-size:11px;font-weight:700;color:#14141b">+25 anos de experiência em campo</div><div style="font-size:10px;color:#666;line-height:1.4">De MCMV a alto padrão, carteiras de centenas de obras simultâneas.</div></div>
-          <div style="margin-bottom:7px"><div style="font-size:11px;font-weight:700;color:#14141b">+10 anos de dados estruturados</div><div style="font-size:10px;color:#666;line-height:1.4">Sequências, durações e padrões de produtividade. Nenhuma big tech tem esses dados.</div></div>
-          <div><div style="font-size:11px;font-weight:700;color:#14141b">Boas práticas das obras de maior sucesso</div><div style="font-size:10px;color:#666;line-height:1.4">O que as melhores construtoras brasileiras fazem diferente — sistematizado em método.</div></div>
-        </div>
-        <div style="padding:12px 14px;background:#14141b;border-radius:8px">
-          <div style="font-size:9.5px;font-weight:700;text-transform:uppercase;letter-spacing:0.08em;color:var(--orange);margin-bottom:8px">O que o SIIGA garante</div>
-          <div style="font-size:10px;color:rgba(255,255,255,0.7);font-style:italic;line-height:1.4;margin-bottom:8px">"Planejamento não é o problema. O problema é fazer o planejamento sobreviver à execução."</div>
-          <ul style="list-style:none;padding:0;margin:0 0 10px 0">
-            <li style="font-size:10px;color:#fff;font-weight:600;line-height:1.5;margin-bottom:3px">→ O plano chega ao CPF do operário, não para na sala técnica</li>
-            <li style="font-size:10px;color:#fff;font-weight:600;line-height:1.5;margin-bottom:3px">→ O desvio é visto no mesmo dia, não no fechamento do mês</li>
-            <li style="font-size:10px;color:#fff;font-weight:600;line-height:1.5;margin-bottom:3px">→ Qualidade é trava para pagamento — nenhum centavo sem lastro</li>
-            <li style="font-size:10px;color:#fff;font-weight:600;line-height:1.5;margin-bottom:3px">→ Engenheiro estratégico — não operacional</li>
-            <li style="font-size:10px;color:#fff;font-weight:600;line-height:1.5">→ IA que potencializa quem tem método</li>
-          </ul>
-          <div style="display:grid;grid-template-columns:1fr 1fr;gap:6px">
-            <div style="background:var(--orange);color:#fff;font-size:9px;font-weight:700;text-align:center;padding:5px 6px;border-radius:5px">+25% PRODUTIVIDADE</div>
-            <div style="background:var(--orange);color:#fff;font-size:9px;font-weight:700;text-align:center;padding:5px 6px;border-radius:5px">OBRA NO PRAZO</div>
-            <div style="background:var(--orange);color:#fff;font-size:9px;font-weight:700;text-align:center;padding:5px 6px;border-radius:5px">MARGEM PROTEGIDA</div>
-            <div style="background:var(--orange);color:#fff;font-size:9px;font-weight:700;text-align:center;padding:5px 6px;border-radius:5px">PAGAMENTO VINC. À PRODUÇÃO</div>
-          </div>
-        </div>
-      </div>
-    </div>
-
-    <!-- Lâmina dos 4 Pilares SIIGA — restaurada do commit e577e33. Idêntica nos
-         dois modos (resumido e detalhado), sem toggling — nunca teve modo resumido
-         separado. -->
-    <div class="card card-wide rep-mb" data-keep-group="metodo" data-section="metodo">
-      <div>
-        <div style="font-size:9.5px;font-weight:700;text-transform:uppercase;letter-spacing:0.08em;color:#999;margin-bottom:10px">Os 4 Pilares SIIGA</div>
-        <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:1px;background:#e8e8e8;border-radius:8px;overflow:hidden;border:1px solid #e8e8e8">
-          <div style="background:#14141b;padding:16px 14px;min-height:150px">
-            <div style="font-family:'Bai Jamjuree';font-size:20px;font-weight:700;color:var(--orange);margin-bottom:6px">01</div>
-            <div style="font-size:10.5px;font-weight:700;color:#fff;text-transform:uppercase;letter-spacing:0.04em;margin-bottom:8px">Planejamento</div>
-            <div style="font-size:9.5px;color:rgba(255,255,255,0.65);line-height:1.5">Linha de balanço vinculada ao orçamento, com sequenciamento e causa raiz embutidos.</div>
-          </div>
-          <div style="background:#1c1c26;padding:16px 14px;min-height:150px">
-            <div style="font-family:'Bai Jamjuree';font-size:20px;font-weight:700;color:var(--orange);margin-bottom:6px">02</div>
-            <div style="font-size:10.5px;font-weight:700;color:#fff;text-transform:uppercase;letter-spacing:0.04em;margin-bottom:8px">Proteção</div>
-            <div style="font-size:9.5px;color:rgba(255,255,255,0.65);line-height:1.5">Lookahead e planejamento de MO no médio prazo protegem a execução de paradas evitáveis.</div>
-          </div>
-          <div style="background:#14141b;padding:16px 14px;min-height:150px">
-            <div style="font-family:'Bai Jamjuree';font-size:20px;font-weight:700;color:var(--orange);margin-bottom:6px">03</div>
-            <div style="font-size:10.5px;font-weight:700;color:#fff;text-transform:uppercase;letter-spacing:0.04em;margin-bottom:8px">Gestão</div>
-            <div style="font-size:9.5px;color:rgba(255,255,255,0.65);line-height:1.5">Programação semanal, apontamento diário e coleta de avanço em tempo real no canteiro.</div>
-          </div>
-          <div style="background:#1c1c26;padding:16px 14px;min-height:150px">
-            <div style="font-family:'Bai Jamjuree';font-size:20px;font-weight:700;color:var(--orange);margin-bottom:6px">04</div>
-            <div style="font-size:10.5px;font-weight:700;color:#fff;text-transform:uppercase;letter-spacing:0.04em;margin-bottom:8px">Controle</div>
-            <div style="font-size:9.5px;color:rgba(255,255,255,0.65);line-height:1.5">Fechamento técnico, reunião executiva com dados e Performance HUB integrado ao ERP.</div>
-          </div>
-        </div>
-        <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin-top:10px;background:#f9f9fb;padding:10px 12px;border-radius:8px;border:1px solid #ebebf0;text-align:center">
-          <div><span style="font-weight:700;color:var(--orange);font-size:12px">+10.000</span><div style="font-size:10px;color:#666">Obras</div></div>
-          <div><span style="font-weight:700;color:var(--orange);font-size:12px">+20 Anos</span><div style="font-size:10px;color:#666">de Campo</div></div>
-          <div><span style="font-weight:700;color:var(--orange);font-size:12px">+10 Anos</span><div style="font-size:10px;color:#666">de Dados</div></div>
-        </div>
-      </div>
-    </div>
-
-    <!-- Pareceres de Lideranças do Setor (Prova Social Institucional) — restaurado
-         do commit e577e33, mesmo data-keep-group="metodo" do bloco Método/Pilares
-         acima. Idêntica nos dois modos. -->
-    <div class="card card-wide rep-mb" data-keep-group="metodo" data-section="metodo" style="padding:28px 30px;margin-top:16px">
-      <div style="font-family:'Bai Jamjuree';font-size:13.5px;font-weight:700;color:#14141b;letter-spacing:0.04em;text-transform:uppercase;margin-bottom:20px">
-        Pareceres de Lideranças do Setor & Resultados Comprovados
-      </div>
-      <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:20px">
-        <div style="padding:24px 22px;border-radius:10px;background:#14161f;border:1px solid rgba(255,255,255,0.07);display:flex;flex-direction:column;justify-content:space-between">
-          <div>
-            <div style="display:inline-block;padding:4px 9px;background:rgba(234,88,12,0.12);color:#ea580c;border-radius:5px;font-size:10.5px;font-weight:700;margin-bottom:16px;text-transform:uppercase;letter-spacing:0.04em">Gestão de Mão de Obra</div>
-            <div style="font-size:13px;color:#cbd5e1;line-height:1.7;font-style:italic;margin-bottom:20px">
-              “O Agilean nos trouxe praticidade e soluções reais para acompanhar a mão de obra em grandes construções. Nossas obras têm entre 150 e 200 pessoas e era um desafio gerenciar e integrar todos os recursos. Agora tenho tempo para analisar, criar estratégias e focar no que agrega valor.”
-            </div>
-          </div>
-          <div style="border-top:1px solid rgba(255,255,255,0.08);padding-top:14px">
-            <div style="font-size:12.5px;font-weight:700;color:#ffffff">Natalia V. de Dios</div>
-            <div style="font-size:10.5px;color:#94a3b8;margin-top:3px">Gerência de Processos e Qualidade · Dimas Construções</div>
-          </div>
-        </div>
-        <div style="padding:24px 22px;border-radius:10px;background:#14161f;border:1px solid rgba(255,255,255,0.07);display:flex;flex-direction:column;justify-content:space-between">
-          <div>
-            <div style="display:inline-block;padding:4px 9px;background:rgba(234,88,12,0.12);color:#ea580c;border-radius:5px;font-size:10.5px;font-weight:700;margin-bottom:16px;text-transform:uppercase;letter-spacing:0.04em">Decisão em Tempo Real</div>
-            <div style="font-size:13px;color:#cbd5e1;line-height:1.7;font-style:italic;margin-bottom:20px">
-              “Uma das maiores vantagens que o Agilean nos trouxe foi a capacidade de rastrear e monitorar o progresso das nossas obras em tempo real, permitindo decisões rápidas com dados confiáveis de canteiro. Aumentamos consideravelmente o cumprimento dos prazos.”
-            </div>
-          </div>
-          <div style="border-top:1px solid rgba(255,255,255,0.08);padding-top:14px">
-            <div style="font-size:12.5px;font-weight:700;color:#ffffff">Alessandra Silva</div>
-            <div style="font-size:10.5px;color:#94a3b8;margin-top:3px">Coordenação de Planejamento e Controle · CONX</div>
-          </div>
-        </div>
-        <div style="padding:24px 22px;border-radius:10px;background:#14161f;border:1px solid rgba(255,255,255,0.07);display:flex;flex-direction:column;justify-content:space-between">
-          <div>
-            <div style="display:inline-block;padding:4px 9px;background:rgba(234,88,12,0.12);color:#ea580c;border-radius:5px;font-size:10.5px;font-weight:700;margin-bottom:16px;text-transform:uppercase;letter-spacing:0.04em">Linha de Balanço Ágil</div>
-            <div style="font-size:13px;color:#cbd5e1;line-height:1.7;font-style:italic;margin-bottom:20px">
-              “Saímos de um modelo operacional e trabalhoso para planejar e elaborar nossa linha de balanço; nossos engenheiros passavam meses no processo. Com o Agilean fazemos em questão de horas, simulando múltiplos cenários e planos de ataque.”
-            </div>
-          </div>
-          <div style="border-top:1px solid rgba(255,255,255,0.08);padding-top:14px">
-            <div style="font-size:12.5px;font-weight:700;color:#ffffff">Claudio Barreira</div>
-            <div style="font-size:10.5px;color:#94a3b8;margin-top:3px">Diretor de Engenharia · Dasart</div>
-          </div>
-        </div>
-      </div>
-    </div>
+    <!-- Blocos institucionais REMOVIDOS do diagnóstico (reestruturação enxuta):
+         "SIIGA — Sistema Integrado", "Os 4 Pilares SIIGA" e "Pareceres de
+         Lideranças" (depoimentos) migram para a proposta comercial. -->
 
     <!-- ÚLTIMA PÁGINA: Próximos Passos (Ato 1/2/3) + Fluxo Metodológico + Ecossistema
          ERP + assinatura — restaurada do commit e577e33 SEM edição de texto (validada
@@ -862,94 +600,6 @@ function maskPhone(input){var d=input.value.replace(/\D/g,'');if(d.length>11)d=d
 
         </div>
 
-        <!-- Barra de escala e autoridade -->
-        <div style="background:#181a24;border:1px solid rgba(255,255,255,0.08);border-radius:10px;padding:18px 10px;margin-top:18px;display:grid;grid-template-columns:repeat(4,1fr)">
-          <div style="text-align:center;padding:0 8px;border-right:1px solid rgba(255,255,255,0.08)"><div style="font-family:'Bai Jamjuree';font-weight:700;color:#ea580c;font-size:18px;font-variant-numeric:tabular-nums">+1.500</div><div style="font-size:10.5px;color:#94a3b8;margin-top:3px">Canteiros gerenciados</div></div>
-          <div style="text-align:center;padding:0 8px;border-right:1px solid rgba(255,255,255,0.08)"><div style="font-family:'Bai Jamjuree';font-weight:700;color:#ea580c;font-size:18px;font-variant-numeric:tabular-nums">70M m²</div><div style="font-size:10.5px;color:#94a3b8;margin-top:3px">Construídos com Agilean</div></div>
-          <div style="text-align:center;padding:0 8px;border-right:1px solid rgba(255,255,255,0.08)"><div style="font-family:'Bai Jamjuree';font-weight:700;color:#ea580c;font-size:18px">2x mais</div><div style="font-size:10.5px;color:#94a3b8;margin-top:3px">Aderência de prazo</div></div>
-          <div style="text-align:center;padding:0 8px"><div style="font-family:'Bai Jamjuree';font-weight:700;color:#ea580c;font-size:18px">API Nativa</div><div style="font-size:10.5px;color:#94a3b8;margin-top:3px">Sienge, TOTVS, Informakon, Mega, UAU</div></div>
-        </div>
-
-        <!-- Sistemas com Integração Nativa (logos reais) -->
-        <div style="background:#151722;border:1px solid rgba(255,255,255,0.08);border-radius:10px;padding:20px 24px;margin-top:18px">
-          <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:18px">
-            <div>
-              <div style="font-family:'Bai Jamjuree';font-size:14px;font-weight:700;color:#ffffff;letter-spacing:0.04em;text-transform:uppercase">Ecossistema & Integrações Nativas de ERP</div>
-              <div style="font-size:11px;color:#94a3b8;margin-top:2px">Conexão bidirecional sem redigitação de dados ou planilhas</div>
-            </div>
-            <div style="background:rgba(234,88,12,0.12);color:#ea580c;font-size:10.5px;font-weight:700;padding:5px 12px;border-radius:5px;border:1px solid rgba(234,88,12,0.25)">
-              API REST Bidirecional
-            </div>
-          </div>
-
-          <div style="display:grid;grid-template-columns:repeat(7,1fr);gap:12px">
-
-            <!-- MS Project -->
-            <div style="background:#fff;border:1px solid #cbd5e1;border-radius:8px;padding:14px 8px;text-align:center;display:flex;flex-direction:column;align-items:center;justify-content:center;min-height:106px">
-              <div style="height:40px;display:flex;align-items:center;justify-content:center;margin-bottom:8px">
-                <svg width="32" height="32" viewBox="0 0 32 32" fill="none"><rect width="32" height="32" rx="6" fill="#31752F"/><path d="M10 9h7a4 4 0 010 8h-4v6h-3V9zm3 3v2h4a1 1 0 000-2h-4z" fill="#fff"/></svg>
-              </div>
-              <div style="font-size:11.5px;font-weight:700;color:#0f172a">MS Project</div>
-              <div style="font-size:9.5px;color:#64748b">Planejamento</div>
-            </div>
-
-            <!-- Excel -->
-            <div style="background:#fff;border:1px solid #cbd5e1;border-radius:8px;padding:14px 8px;text-align:center;display:flex;flex-direction:column;align-items:center;justify-content:center;min-height:106px">
-              <div style="height:40px;display:flex;align-items:center;justify-content:center;margin-bottom:8px">
-                <svg width="32" height="32" viewBox="0 0 32 32" fill="none"><rect width="32" height="32" rx="6" fill="#107C41"/><path d="M9 10l5 6-5 6h3.5l3.25-4.25L20 22h3.5l-5-6 5-6H20l-3.25 4.25L13.5 10H9z" fill="#fff"/></svg>
-              </div>
-              <div style="font-size:11.5px;font-weight:700;color:#0f172a">Excel</div>
-              <div style="font-size:9.5px;color:#64748b">Planilhas</div>
-            </div>
-
-            <!-- Sienge -->
-            <div style="background:#fff;border:1px solid #cbd5e1;border-radius:8px;padding:14px 8px;text-align:center;display:flex;flex-direction:column;align-items:center;justify-content:center;min-height:106px">
-              <div style="height:40px;display:flex;align-items:center;justify-content:center;margin-bottom:8px">
-                <img src="logos/SIENGE.png" alt="Sienge" style="max-height:28px;max-width:70px;object-fit:contain">
-              </div>
-              <div style="font-size:11.5px;font-weight:700;color:#0f172a">Sienge</div>
-              <div style="font-size:9.5px;color:#64748b">Softplan</div>
-            </div>
-
-            <!-- TOTVS -->
-            <div style="background:#fff;border:1px solid #cbd5e1;border-radius:8px;padding:14px 8px;text-align:center;display:flex;flex-direction:column;align-items:center;justify-content:center;min-height:106px">
-              <div style="height:40px;display:flex;align-items:center;justify-content:center;margin-bottom:8px">
-                <img src="logos/TOTVs.jpeg" alt="TOTVS" style="max-height:28px;max-width:70px;object-fit:contain">
-              </div>
-              <div style="font-size:11.5px;font-weight:700;color:#0f172a">TOTVS</div>
-              <div style="font-size:9.5px;color:#64748b">RM / Protheus</div>
-            </div>
-
-            <!-- Informakon -->
-            <div style="background:#fff;border:1px solid #cbd5e1;border-radius:8px;padding:14px 8px;text-align:center;display:flex;flex-direction:column;align-items:center;justify-content:center;min-height:106px">
-              <div style="height:40px;display:flex;align-items:center;justify-content:center;margin-bottom:8px">
-                <img src="logos/Informakon.png" alt="Informakon" style="max-height:28px;max-width:70px;object-fit:contain">
-              </div>
-              <div style="font-size:11.5px;font-weight:700;color:#0f172a">Informakon</div>
-              <div style="font-size:9.5px;color:#64748b">ERP Construtora</div>
-            </div>
-
-            <!-- Mega -->
-            <div style="background:#fff;border:1px solid #cbd5e1;border-radius:8px;padding:14px 8px;text-align:center;display:flex;flex-direction:column;align-items:center;justify-content:center;min-height:106px">
-              <div style="height:40px;display:flex;align-items:center;justify-content:center;margin-bottom:8px">
-                <img src="logos/MEGA.jpeg" alt="Senior Mega" style="max-height:28px;max-width:70px;object-fit:contain">
-              </div>
-              <div style="font-size:11.5px;font-weight:700;color:#0f172a">Senior Mega</div>
-              <div style="font-size:9.5px;color:#64748b">ERP Construção</div>
-            </div>
-
-            <!-- UAU -->
-            <div style="background:#fff;border:1px solid #cbd5e1;border-radius:8px;padding:14px 8px;text-align:center;display:flex;flex-direction:column;align-items:center;justify-content:center;min-height:106px">
-              <div style="height:40px;display:flex;align-items:center;justify-content:center;margin-bottom:8px">
-                <img src="logos/UAU.jpeg" alt="UAU" style="max-height:28px;max-width:70px;object-fit:contain">
-              </div>
-              <div style="font-size:11.5px;font-weight:700;color:#0f172a">UAU</div>
-              <div style="font-size:9.5px;color:#64748b">Globaltec</div>
-            </div>
-
-          </div>
-        </div>
-
       </div>
 
       <!-- Bloco de assinatura formal de fechamento da última página. -->
@@ -965,6 +615,60 @@ function maskPhone(input){var d=input.value.replace(/\D/g,'');if(d.length>11)d=d
             <div id="rep-fechamento-contato" style="font-size:14px;font-weight:700;color:#14141b"></div>
             <div id="rep-fechamento-cargo" style="font-size:11px;color:#888;margin-top:3px"></div>
           </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- PÁGINA 6 — variante DETALHADO: Apêndice Metodológico (com fórmulas).
+         pdf-resumo-hide: some no Resumido. Preenchido por buildReport()/calcROIReal()
+         em script.js (#pres-formulas, #pres-formulas-ganho, #roi2-params-box). -->
+    <div class="card card-wide rep-mb pdf-resumo-hide" data-keep-group="apendice" data-section="apendice" style="padding:22px 26px">
+      <div class="rep-sec-title"><span class="rep-sec-num">06</span>Apêndice Metodológico</div>
+      <p style="font-size:12px;color:#666;margin-bottom:14px">Toda a memória de cálculo reunida — com fórmulas. Valores baseados nas planilhas de ROI Agilean e em benchmarks de Lean Construction. Estimativa conservadora — não representa garantia contratual.</p>
+      <div style="padding:14px 16px;background:#f8f8f8;border-radius:var(--r3);border:1px solid #e8e8e8;margin-bottom:12px">
+        <div style="font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:0.08em;color:#999;margin-bottom:8px">Pressupostos do cálculo — Fonte da Perda</div>
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:6px">
+          <div style="font-size:11px;color:#666">• MO como % do custo da obra: <strong style="color:#333">45%</strong></div>
+          <div style="font-size:11px;color:#666">• Estouro médio de MO: <strong style="color:#333">15%</strong></div>
+          <div style="font-size:11px;color:#666">• Redução do estouro com Agilean: <strong style="color:#333">70%</strong></div>
+          <div style="font-size:11px;color:#666">• Retrabalhos (referência de mercado): <strong style="color:#333" id="pres-retrab">— % do portfólio</strong></div>
+          <div style="font-size:11px;color:#666">• Ganho de velocidade: <strong style="color:#333">10% prazo × 15% custo prop.</strong></div>
+          <div style="font-size:11px;color:#666">• Horas de gestão recuperáveis/mês por obra: <strong style="color:#333" id="pres-diaslib">— h</strong></div>
+          <div style="font-size:11px;color:#666">• Prazo médio informado: <strong style="color:#333" id="pres-prazo">— meses</strong></div>
+        </div>
+        <div id="pres-formulas" style="margin-top:10px;padding-top:10px;border-top:1px dashed #ddd"></div>
+      </div>
+      <div style="padding:14px 16px;background:#f8f8f8;border-radius:var(--r3);border:1px solid #e8e8e8;margin-bottom:12px">
+        <div style="font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:0.08em;color:#999;margin-bottom:8px">Fator de Captura</div>
+        <div id="pres-formulas-ganho"></div>
+      </div>
+      <div style="padding:14px 16px;background:#f8f8f8;border-radius:var(--r3);border:1px solid #e8e8e8">
+        <div style="font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:0.08em;color:#999;margin-bottom:8px">Pressupostos do cálculo — ROI (dados informados nesta operação)</div>
+        <div id="roi2-params-box" style="font-size:10.5px"></div>
+      </div>
+    </div>
+
+    <!-- PÁGINA 6 — variante RESUMIDO: Bases do Diagnóstico (sem fórmulas — só taxas
+         de mercado e dados do cliente; fórmulas são PI da Agilean). pdf-resumido-only:
+         só aparece no Resumido. Dados do cliente preenchidos por buildReport()
+         (#bases-cliente-body). -->
+    <div class="card card-wide rep-mb pdf-resumido-only" data-keep-group="apendice" data-section="apendice" style="display:none;padding:22px 26px">
+      <div class="rep-sec-title"><span class="rep-sec-num">06</span>Bases do Diagnóstico</div>
+      <p style="font-size:12px;color:#666;margin-bottom:14px">Referências de mercado e dados da sua operação usados para estimar a perda e o retorno. Estimativa conservadora — não representa garantia contratual.</p>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:16px">
+        <div style="padding:14px 16px;background:#f8f8f8;border-radius:var(--r3);border:1px solid #e8e8e8">
+          <div style="font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:0.08em;color:#999;margin-bottom:10px">Referências de mercado (Lean Construction)</div>
+          <table class="roi-table" style="width:100%;font-size:11px"><tbody>
+            <tr><td>Mão de obra como % do custo da obra</td><td style="text-align:right;font-weight:700">45%</td></tr>
+            <tr><td>Estouro médio de mão de obra</td><td style="text-align:right;font-weight:700">15%</td></tr>
+            <tr><td>Retrabalhos (referência de mercado)</td><td style="text-align:right;font-weight:700">10% do portfólio</td></tr>
+            <tr><td>Ganho de velocidade de produção</td><td style="text-align:right;font-weight:700">10% de prazo</td></tr>
+            <tr><td>Custo de referência da hora técnica</td><td style="text-align:right;font-weight:700">R$ 115/h</td></tr>
+          </tbody></table>
+        </div>
+        <div style="padding:14px 16px;background:#f8f8f8;border-radius:var(--r3);border:1px solid #e8e8e8">
+          <div style="font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:0.08em;color:#999;margin-bottom:10px">Dados da sua operação (coletados no diagnóstico)</div>
+          <table class="roi-table" style="width:100%;font-size:11px"><tbody id="bases-cliente-body"></tbody></table>
         </div>
       </div>
     </div>

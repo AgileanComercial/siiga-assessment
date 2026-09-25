@@ -2176,26 +2176,56 @@ function buildReport() {
   // Ganho" (renderPerdasFonteGanho(), Card F/G no index.html) — e não entra
   // mais nesta tabela nem coluna aqui. Os dois números NÃO são iguais: Ganho
   // é sempre ≤ Perda, exatamente pela aplicação do fator.
-  var roiHtml = '<thead><tr>' +
-    '<th>Fonte da Perda</th>' +
-    '<th style="text-align:right">Por obra</th>' +
-    '<th style="text-align:right">Portfólio</th>' +
-    '</tr></thead><tbody>';
+  // Tabela FUNDIDA "Da Perda ao Ganho" (reestruturação enxuta): reúne, numa
+  // única tabela visível nos dois modos, a perda bruta por fonte (item.baseValue,
+  // sem fator) e o ganho capturável (item.portfolio, já com o fator de captura
+  // aplicado). Substitui as antigas tabelas separadas "Fonte da Perda" e
+  // "Fonte de Ganho". Colunas em portfólio (não por obra) para caber e por ser
+  // o recorte de diretoria.
   var obrasAtual = S.numObras || 5;
+  var roiHtml = '<thead><tr>' +
+    '<th>Fonte</th>' +
+    '<th style="text-align:right">Perda bruta (portfólio)</th>' +
+    '<th style="text-align:center">Fator de captura</th>' +
+    '<th style="text-align:right">Ganho capturável (portfólio)</th>' +
+    '</tr></thead><tbody>';
   roi.items.forEach(function(item) {
+    var fp = Math.round((item.fator||1)*100);
     roiHtml += '<tr>' +
       '<td>'+item.label+'</td>' +
-      '<td style="text-align:right" class="roi-val">'+fmtNum(item.baseValue)+'</td>' +
-      '<td style="text-align:right;font-weight:600" class="roi-val">'+fmtNum(item.baseValue*obrasAtual)+'</td>' +
+      '<td style="text-align:right" class="roi-val">'+fmtNum(item.baseValue*obrasAtual)+'</td>' +
+      '<td style="text-align:center;font-weight:700;font-size:12px">'+fp+'%</td>' +
+      '<td style="text-align:right;font-weight:600" class="roi-val">'+fmtNum(item.portfolio)+'</td>' +
       '</tr>';
   });
   roiHtml += '<tr class="roi-total" style="background:#f4f4f6;border-top:2px solid #ddd">' +
-    '<td style="font-weight:700;padding:10px 12px">PERDA FINANCEIRA NO PORTFÓLIO</td>' +
-    '<td style="text-align:right;color:#555;font-weight:600;white-space:nowrap;padding:10px 12px">'+fmtNum(roi.totalBase)+' / obra</td>' +
-    '<td style="text-align:right;color:var(--orange);font-weight:700;white-space:nowrap;padding:10px 12px">'+fmtNum(roi.totalBase*obrasAtual)+'</td>' +
+    '<td style="font-weight:700;padding:10px 12px">TOTAL NO PORTFÓLIO</td>' +
+    '<td style="text-align:right;color:#555;font-weight:700;white-space:nowrap;padding:10px 12px">'+fmtNum(roi.totalBase*obrasAtual)+'</td>' +
+    '<td style="text-align:center;color:#999;padding:10px 12px">—</td>' +
+    '<td style="text-align:right;color:var(--orange);font-weight:700;white-space:nowrap;padding:10px 12px">'+fmtNum(roi.totalPortfolio)+'</td>' +
     '</tr></tbody>';
   document.getElementById('roi-table-el').innerHTML = roiHtml;
   renderPerdasFonteGanho(roi);
+
+  // KPIs Perda/Ganho + nota do Fator — logo abaixo da tabela fundida (página
+  // "Da Perda ao Ganho"). Reaproveita os mesmos totais da tabela.
+  var pgExtra = document.getElementById('perdaganho-extra');
+  if(pgExtra) {
+    pgExtra.innerHTML =
+      '<div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:12px">' +
+        '<div style="padding:14px 16px;background:#fff4ed;border:1px solid #ffd6c0;border-radius:var(--r3)">' +
+          '<div style="font-size:9.5px;font-weight:700;text-transform:uppercase;letter-spacing:0.08em;color:#999;margin-bottom:6px">Perda financeira hoje</div>' +
+          '<div style="font-family:Bai Jamjuree;font-size:26px;font-weight:700;color:#ea580c">'+fmtNum(roi.totalBase*obrasAtual)+'</div>' +
+          '<div style="font-size:10.5px;color:#888;margin-top:2px">Perda bruta estimada no portfólio, sem intervenção</div>' +
+        '</div>' +
+        '<div style="padding:14px 16px;background:#f0faf6;border:1px solid #c9ead9;border-radius:var(--r3)">' +
+          '<div style="font-size:9.5px;font-weight:700;text-transform:uppercase;letter-spacing:0.08em;color:#999;margin-bottom:6px">Ganho esperado com o SIIGA</div>' +
+          '<div style="font-family:Bai Jamjuree;font-size:26px;font-weight:700;color:#0d7c4f">'+fmtNum(roi.totalPortfolio)+'</div>' +
+          '<div style="font-size:10.5px;color:#888;margin-top:2px">Capturável no portfólio total sob gestão</div>' +
+        '</div>' +
+      '</div>' +
+      '<div style="font-size:11px;color:#666;line-height:1.55;font-style:italic;border-left:3px solid var(--orange);padding:8px 12px;background:#faf7f5;border-radius:0 6px 6px 0">O <strong>fator de captura</strong> é a fração da perda bruta que é realista recuperar dado o nível de maturidade atual — quanto menor a maturidade hoje, maior o espaço para captura. Aplicado individualmente por fonte.</div>';
+  }
 
   // Update prazo in pressupostos
   var presPrazo = document.getElementById('pres-prazo');
@@ -2226,6 +2256,22 @@ function buildReport() {
   // (calcROIReal) guardado em window._lastROIReal por buildROIReal().
   var snapScore = getMaturityScoreSummary();
   renderExecutiveSnapshot(snapScore.score, snapScore.max, roi, window._lastROIReal);
+
+  // Bases do Diagnóstico (Resumido, página 6): dados do cliente coletados no
+  // diagnóstico — sem fórmulas (PI da Agilean). Preenchido após buildROIReal()
+  // para reaproveitar as horas de gestão informadas (window._lastROIReal).
+  var basesBody = document.getElementById('bases-cliente-body');
+  if(basesBody) {
+    var _rr = window._lastROIReal;
+    var basesRow = function(l,v){ return '<tr><td>'+l+'</td><td style="text-align:right;font-weight:700">'+v+'</td></tr>'; };
+    basesBody.innerHTML =
+      basesRow('Obras em andamento', (S.numObras||5)) +
+      basesRow('Orçamento médio por obra', fmtNum(S.orcamentoMedio||8000000)) +
+      basesRow('Portfólio estimado sob gestão', fmtNum(portfolio)) +
+      basesRow('Prazo médio das obras', (S.prazoMedio||18)+' meses') +
+      basesRow('Horas de gestão informadas', (_rr && _rr.operacional ? fmtHorasBR(_rr.operacional.horasInformadas)+' h/mês' : '—')) +
+      basesRow('Cenário adotado', Math.round(ROI_CAPTURA_FIXA*100)+'% · '+roiCapturaLabel(ROI_CAPTURA_FIXA));
+  }
 
   // Aplica na tela o tema (claro/escuro) selecionado no toggle — feito por
   // último, depois de todo o conteúdo (inclusive dinâmico) já estar no DOM.
@@ -3600,6 +3646,16 @@ function generatePDF(fromAdmin, themeMode, mode) {
         compressedEls.push({ el: el, prev: prev });
       });
     }
+    // Compactação aplicada nos DOIS modos (reestruturação enxuta 9→6 páginas):
+    // reduz o padding generoso (.card = 36px) das seções mais altas para que
+    // cada seção editorial caiba em UMA página do PDF (o app na tela não é
+    // tocado — só o clone/medição da geração). Sem isso a seção de Gaps
+    // (Síntese + resumo + tabela) estoura para 2 páginas.
+    compressStyle('[data-section="gaps"]', { padding: '22px 26px' }, true);
+    compressStyle('.opp-table th', { padding: '6px 10px' }, true);
+    compressStyle('.opp-table td', { padding: '7px 10px' }, true);
+    compressStyle('#exec-snapshot', { padding: '20px 26px' });
+
     if (isResumido) {
       compressStyle('#qualitative-section', { padding: '12px 16px', marginBottom: '4px' });
       compressStyle('#qualitative-section p', { marginBottom: '5px', fontSize: '10.5px' });
