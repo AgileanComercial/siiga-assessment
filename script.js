@@ -2474,9 +2474,14 @@ function buildROIReal() {
       '</div>' +
       '<div class="pdf-resumo-hide">' +
       '<table class="roi-table"><thead><tr><th>Item</th><th style="text-align:right">Valor</th></tr></thead><tbody>' +
-        roiRow('Pagamentos por retrabalho evitados', null, fmtNum(r.estrategica.rec2)) +
-        roiRow('Pagamentos indevidos rastreados', null, fmtNum(r.estrategica.rec3)) +
-        roiRow('<strong>Recuperação financeira total</strong>', null, '<strong>'+fmtNum(r.estrategica.recTotal)+'</strong>') +
+        // Linhas de recuperação por folha PRÓPRIA só aparecem quando há folha
+        // própria informada (MO própria/mista). Em MO terceirizada a folha é do
+        // empreiteiro (r.folha = 0) e esses itens sairiam zerados ("—"): omitidos.
+        ((r.estrategica.recTotal || 0) > 0 ?
+          roiRow('Pagamentos por retrabalho evitados', null, fmtNum(r.estrategica.rec2)) +
+          roiRow('Pagamentos indevidos rastreados', null, fmtNum(r.estrategica.rec3)) +
+          roiRow('<strong>Recuperação financeira total</strong>', null, '<strong>'+fmtNum(r.estrategica.recTotal)+'</strong>')
+          : '') +
         roiRow('Capacidade de gestão liberada ('+fmtH(r.estrategica.horasLib)+')', null, fmtNum(r.estrategica.valorCapacidade)) +
         roiRow('Investimento Agilean (mensalidade de uma obra)', null, '− '+fmtNum(r.mensalidade)+'/mês') +
       '</tbody></table>' +
@@ -3468,6 +3473,27 @@ function applyPdfDarkTheme(root, liveMode) {
     el.style.borderColor = 'rgba(255,255,255,0.08)';
   });
 
+  // Cards "Perda financeira" / "Ganho esperado" e a nota do Fator de Captura
+  // (página "Da Perda ao Ganho", #perdaganho-extra) — fundos claros hardcoded
+  // (#fff4ed peach, #f0faf6 verde, #faf7f5 creme) que o conversor genérico acima
+  // não pega. Vira tint escuro laranja/verde/neutro, casando com o dark do PDF.
+  root.querySelectorAll('[style*="background:#fff4ed"], [style*="background: #fff4ed"]').forEach(function(el){
+    el.style.background = 'rgba(234,88,12,0.13)';
+    el.style.borderColor = 'rgba(234,88,12,0.35)';
+  });
+  root.querySelectorAll('[style*="background:#f0faf6"], [style*="background: #f0faf6"]').forEach(function(el){
+    el.style.background = 'rgba(16,185,129,0.12)';
+    el.style.borderColor = 'rgba(16,185,129,0.30)';
+  });
+  root.querySelectorAll('[style*="background:#faf7f5"], [style*="background: #faf7f5"]').forEach(function(el){
+    el.style.background = '#181a24';
+    el.style.borderColor = 'rgba(255,255,255,0.08)';
+  });
+  // Valor verde do "Ganho esperado" (#0d7c4f) brilha para contraste no fundo escuro
+  root.querySelectorAll('[style*="color:#0d7c4f"], [style*="color: #0d7c4f"]').forEach(function(el){
+    el.style.color = '#10b981';
+  });
+
   // Depoimentos cards
   root.querySelectorAll('[style*="background:#14141b"], [style*="background: #14141b"]').forEach(function(el){
     el.style.background = '#12141c';
@@ -3651,10 +3677,10 @@ function generatePDF(fromAdmin, themeMode, mode) {
     // cada seção editorial caiba em UMA página do PDF (o app na tela não é
     // tocado — só o clone/medição da geração). Sem isso a seção de Gaps
     // (Síntese + resumo + tabela) estoura para 2 páginas.
-    compressStyle('[data-section="gaps"]', { padding: '22px 26px' }, true);
-    compressStyle('.opp-table th', { padding: '6px 10px' }, true);
-    compressStyle('.opp-table td', { padding: '7px 10px' }, true);
-    compressStyle('#exec-snapshot', { padding: '20px 26px' });
+    compressStyle('[data-section="gaps"]', { padding: '18px 26px', marginBottom: '8px' }, true);
+    compressStyle('.opp-table th', { padding: '4px 10px' }, true);
+    compressStyle('.opp-table td', { padding: '5px 10px', lineHeight: '1.3' }, true);
+    compressStyle('#exec-snapshot', { padding: '16px 26px' });
 
     if (isResumido) {
       compressStyle('#qualitative-section', { padding: '12px 16px', marginBottom: '4px' });
