@@ -5307,329 +5307,594 @@ async function checkAdminPdfRequest() {
 var PROPOSTA_WEEK_LABELS = ['Semanas 1–4', 'Semanas 5–8', 'Semanas 9–12'];
 var PROPOSTA_WEEK_DEFERRED = 'A partir da Semana 13 (Mês 4+)';
 
-// ── SEÇÃO 1: CAPA + RECAPITULAÇÃO EXECUTIVA ─────────────────────────────────
-// Reaproveita SÓ os 3 números do Executive Snapshot do Diagnóstico (Score,
-// Exposição em Risco, Payback) — não repete a tabela de gaps nem os textos
-// completos do Diagnóstico. Igual nos dois modos (resumido/detalhado): é uma
-// capa, não faz sentido "resumir" mais do que isso.
-function buildPropostaCapa(mode) {
-  var container = document.getElementById('prop-capa-container');
-  if (!container) return;
+// ═══════════════════════════════════════════════════════════════════════════
+//  PROPOSTA — 12 seções (reunião 2), reconstruída a partir do protótipo de 13
+//  telas revisado no "Considerações da Proposta.docx" (Israel, 2026-09-28).
+//  Nova ordem 1→13 do documento; a antiga faixa "prêmio / valor em jogo" foi
+//  REMOVIDA (#2 — passava impressão de "joguinho"). Todo número derivado do
+//  diagnóstico (S) e dos motores já existentes (getMaturityScoreSummary,
+//  calculateROI, calcROIReal, precoPorObraPadrao, generateOpportunities) — sem
+//  fórmula nova nem LLM. Ver [[project_siiga_proposta_reuniao2]].
+// ───────────────────────────────────────────────────────────────────────────
 
+// Programa de consultoria: ticket e duração fixos por escopo (decisão de
+// negócio travada — R$15.000/mês × 4 meses = R$60.000). NÃO é implementação
+// única; é a mensalidade da consultoria (Modelo 4 / WR).
+var PROP_PROGRAMA_MENSAL = 15000;
+var PROP_PROGRAMA_MESES  = 4;
+var PROP_PROGRAMA_TOTAL  = PROP_PROGRAMA_MENSAL * PROP_PROGRAMA_MESES;
+
+// Nomes curtos dos pilares para a Proposta (mesmos do relatório, encurtados
+// como no protótipo revisado).
+var PROP_PILAR_NOMES = {
+  f1: 'Pilar 1 · Planejamento Estratégico do Fluxo',
+  f2: 'Pilar 2 · Proteção e Garantia da Execução',
+  f3: 'Pilar 3 · Gestão Integrada da Produção',
+  f4: 'Pilar 4 · Controle e Performance'
+};
+// Benchmark de mercado por pilar (mesmo vetor do radar do diagnóstico) — usado
+// como marcador ("tick") nas barras de maturidade da Proposta.
+var PROP_BENCHMARK = { f1: 0.70, f2: 0.62, f3: 0.55, f4: 0.58 };
+
+// Meta de maturidade por pilar: fecha 50% do gap até a Referência SIIGA (100%).
+// Regra determinística validada contra o protótipo (reproduz o 35→46 e os
+// pares por pilar da tela "Metas do Programa"). meta = atual + 0.5×(1−atual).
+function propMetaPct(curPct) { return curPct + 0.5 * (1 - curPct); }
+
+// ── Helpers visuais (paleta Executive Dark, fixa) ───────────────────────────
+function propSecHead(num, titleUpper) {
+  return '<div style="display:flex;align-items:center;gap:12px;padding:12px 16px;margin-bottom:18px;background:#151824;border-left:3px solid #ea580c;border-radius:8px">' +
+    '<span style="font-family:Bai Jamjuree;font-size:11px;font-weight:700;color:#ea580c;background:rgba(234,88,12,0.14);padding:3px 8px;border-radius:5px">'+num+'</span>' +
+    '<span style="font-size:13px;font-weight:700;letter-spacing:0.14em;text-transform:uppercase;color:#f8fafc">'+titleUpper+'</span>' +
+  '</div>';
+}
+function propLead(html) {
+  return '<div style="font-size:13.5px;color:#cbd5e1;line-height:1.6;margin-bottom:18px">'+html+'</div>';
+}
+function propKpi(label, value, sub, accent) {
+  var vColor = accent ? '#ea580c' : '#f8fafc';
+  var bg = accent ? 'rgba(234,88,12,0.10)' : '#1a1c26';
+  var bd = accent ? 'rgba(234,88,12,0.45)' : 'rgba(255,255,255,0.08)';
+  return '<div style="padding:16px 18px;background:'+bg+';border:1px solid '+bd+';border-radius:10px">' +
+    '<div style="font-size:9.5px;font-weight:700;text-transform:uppercase;letter-spacing:0.1em;color:#94a3b8;margin-bottom:8px">'+label+'</div>' +
+    '<div style="font-family:Bai Jamjuree,sans-serif;font-size:24px;font-weight:700;color:'+vColor+'">'+value+'</div>' +
+    (sub ? '<div style="font-size:10.5px;color:#94a3b8;margin-top:4px;line-height:1.4">'+sub+'</div>' : '') +
+  '</div>';
+}
+// Barra de maturidade com preenchimento gradiente cobre e marcador de benchmark.
+function propBar(nome, curPct, right, benchPct) {
+  var fill = Math.max(2, Math.round(curPct * 100));
+  var tick = benchPct != null
+    ? '<div style="position:absolute;top:-2px;bottom:-2px;left:'+Math.round(benchPct*100)+'%;width:2px;background:#e2e8f0;opacity:0.7"></div>'
+    : '';
+  return '<div style="margin-bottom:14px">' +
+    '<div style="display:flex;justify-content:space-between;font-size:12px;color:#e2e8f0;margin-bottom:6px"><span>'+nome+'</span><span style="color:#94a3b8">'+right+'</span></div>' +
+    '<div style="position:relative;height:10px;background:rgba(255,255,255,0.06);border-radius:6px;overflow:visible">' +
+      '<div style="height:100%;width:'+fill+'%;background:linear-gradient(90deg,#b91c1c,#ea580c);border-radius:6px"></div>' + tick +
+    '</div>' +
+  '</div>';
+}
+
+// ── SEÇÃO: HERO (#1) ────────────────────────────────────────────────────────
+// Renomeada de "Proposta Comercial" para "Proposta do Escopo de Projeto para a
+// Evolução da [empresa]" (#1). Abertura curta e consultiva: o lead deve sentir
+// que o escopo nasceu do próprio diagnóstico.
+function buildPropostaHero(mode) {
+  var c = document.getElementById('prop-hero-container'); if (!c) return;
+  var emp = S.empresa || 'sua empresa';
+  var dataEmissao = new Date().toLocaleDateString('pt-BR');
+  c.innerHTML =
+    '<div style="padding:34px 30px 30px">' +
+      '<div style="display:flex;justify-content:space-between;align-items:flex-start;flex-wrap:wrap;gap:10px;border-bottom:1px solid rgba(234,88,12,0.5);padding-bottom:16px;margin-bottom:22px">' +
+        '<div style="font-family:Bai Jamjuree;font-size:22px;font-weight:700;color:#ea580c">Agilean</div>' +
+        '<div style="text-align:right;font-size:11px;color:#94a3b8;line-height:1.5"><div style="font-weight:700;letter-spacing:0.14em;text-transform:uppercase;color:#94a3b8">Proposta de Escopo · Programa SIIGA</div><div style="color:#e2e8f0;margin-top:2px">'+emp+' · '+dataEmissao+'</div></div>' +
+      '</div>' +
+      '<div style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:0.16em;color:#ea580c;margin-bottom:14px">Programa de Redesenho SIIGA · Escopo de Projeto</div>' +
+      '<div style="font-family:Bai Jamjuree;font-size:34px;font-weight:700;line-height:1.15;color:#f8fafc;margin-bottom:18px">Proposta do Escopo de Projeto para a<br>Evolução da <span style="color:#ea580c">'+emp+'</span></div>' +
+      '<div style="font-size:14px;color:#cbd5e1;line-height:1.65;max-width:640px">Este escopo nasce diretamente do diagnóstico SIIGA da '+emp+'. Ele traduz os gaps identificados em um programa de '+PROP_PROGRAMA_MESES+' meses para redesenhar a forma de planejar e executar — destravando valor real na sua operação e deixando o time autônomo para sustentar o ganho.</div>' +
+      // Faixa de fotos do Lean Experience no rodapé da capa (imagens em img/lean/,
+      // da pág. 7 da proposta modelo WR Engenharia). O kick-off do programa é o
+      // Workshop Lean Experience — a capa ancora essa prova visual.
+      '<div style="margin-top:26px;padding-top:20px;border-top:1px solid rgba(255,255,255,0.08)">' +
+        '<div style="font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:0.14em;color:#ea580c;margin-bottom:12px">Workshop Lean Experience · o ponto de partida do programa</div>' +
+        '<div style="display:grid;grid-template-columns:repeat(3,1fr);gap:12px">' +
+          ['Foto%201.png','Foto%202.png','Foto%203.jpeg'].map(function(fn){
+            return '<div style="height:220px;border-radius:10px;overflow:hidden;border:1px solid rgba(255,255,255,0.10);background:#0f1015">' +
+              '<img src="img/lean/'+fn+'" alt="Workshop Lean Experience" style="width:100%;height:100%;object-fit:cover;display:block">' +
+            '</div>';
+          }).join('') +
+        '</div>' +
+      '</div>' +
+    '</div>';
+}
+
+// ── SEÇÃO 01: RECAPITULAÇÃO EXECUTIVA DO DIAGNÓSTICO (#3) ────────────────────
+// Título com nome da empresa (#3). Reaproveita os 3 números do Executive
+// Snapshot (Score, Exposição, Payback) + barras de maturidade por pilar.
+function buildPropostaRecap(mode) {
+  var c = document.getElementById('prop-recap-container'); if (!c) return;
+  var emp = S.empresa || 'sua empresa';
   var m = getMaturityScoreSummary();
-  var roi = calculateROI(); // mesma função usada no Diagnóstico p/ Exposição em Risco
+  var roi = calculateROI();
   var r = window._lastROIReal || calcROIReal(ROI_CAPTURA_FIXA);
   var paybackTxt = r ? fmtPayback(r.estrategica.payback).txt : '—';
-  var dataEmissao = new Date().toLocaleDateString('pt-BR');
 
-  var kpi = function(label, value, sub) {
-    return '<div style="padding:16px 18px;background:#1a1c26;border:1px solid rgba(255,255,255,0.08);border-radius:10px">' +
-      '<div style="font-size:9.5px;font-weight:700;text-transform:uppercase;letter-spacing:0.1em;color:#94a3b8;margin-bottom:8px">'+label+'</div>' +
-      '<div style="font-family:Bai Jamjuree,sans-serif;font-size:24px;font-weight:700;color:#f8fafc">'+value+'</div>' +
-      (sub ? '<div style="font-size:10.5px;color:#cbd5e1;margin-top:4px">'+sub+'</div>' : '') +
-    '</div>';
-  };
+  var bars = ['f1','f2','f3','f4'].map(function(k){
+    var cur = getAvgPct(k);
+    var sc = getScore(k), mx = SCORE_MAX_PILAR[k];
+    return propBar(PROP_PILAR_NOMES[k], cur, sc+' / '+mx+' · '+Math.round(cur*100)+'%', PROP_BENCHMARK[k]);
+  }).join('');
 
-  container.innerHTML =
-    '<div style="text-align:center;padding:30px 10px 26px;border-bottom:1px solid rgba(255,255,255,0.08);margin-bottom:22px">' +
-      '<div style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:0.18em;color:#ea580c;margin-bottom:16px">Proposta Comercial · SIIGA + Agilean</div>' +
-      '<div style="font-family:Bai Jamjuree;font-size:32px;font-weight:700;color:#f8fafc;margin-bottom:10px;line-height:1.15">'+(S.empresa||'Empresa')+'</div>' +
-      '<div style="font-size:12.5px;color:#94a3b8">Emitida em '+dataEmissao+' &nbsp;·&nbsp; Consultor responsável: '+(S.consultor||'Equipe Agilean')+'</div>' +
+  c.innerHTML =
+    propSecHead('01', 'Recapitulação Executiva do Diagnóstico SIIGA da ' + emp) +
+    propLead('Os três números que fecharam a 1ª reunião — a régua contra a qual mediremos o programa.') +
+    '<div style="display:grid;grid-template-columns:repeat(3,1fr);gap:14px;margin-bottom:22px">' +
+      propKpi('SIIGA Score', m.score+'<span style="font-size:15px;color:#94a3b8">/'+m.max+'</span>', 'Nível '+m.nivel+' — '+Math.round(m.pct*100)+'% da maturidade de referência.') +
+      propKpi('Exposição em Risco', fmtNum(roi.totalPortfolio), 'Perda estimada no portfólio pela falta de rastreabilidade e controle.', true) +
+      propKpi('Payback Projetado', paybackTxt, 'Tempo para o programa se pagar com o valor recuperado.') +
     '</div>' +
-    '<div style="font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:0.12em;color:#ea580c;margin-bottom:4px">Recapitulação Executiva</div>' +
-    '<div style="font-size:12px;color:#94a3b8;margin-bottom:14px">Baseado no diagnóstico realizado em '+(S.data||'—')+'. Os números abaixo resumem o Executive Snapshot já apresentado — o detalhamento de gaps não é repetido aqui.</div>' +
-    '<div style="display:grid;grid-template-columns:repeat(3,1fr);gap:14px">' +
-      kpi('Score de Maturidade', m.score+'/'+m.max, m.nivel) +
-      kpi('Exposição em Risco', fmtNum(roi.totalPortfolio), 'Perda estimada no portfólio, sem intervenção') +
-      kpi('Payback Estimado', paybackTxt, 'Cenário conservador de captura') +
+    '<div style="font-size:10.5px;font-weight:700;text-transform:uppercase;letter-spacing:0.1em;color:#94a3b8;margin-bottom:12px">Maturidade por pilar <span style="font-weight:400;text-transform:none;letter-spacing:0">· marcador claro = benchmark de mercado</span></div>' +
+    bars;
+}
+
+// ── SEÇÃO 02: MAIORES GAPS IDENTIFICADOS NO DIAGNÓSTICO (#4) ─────────────────
+// Título simplificado (#4). Traz os 6 gaps mais críticos (generateOpportunities
+// já ordena pior score primeiro) + o quadro de composição da exposição
+// (calculateROI().items) renomeado.
+function buildPropostaGaps(mode) {
+  var c = document.getElementById('prop-gaps-container'); if (!c) return;
+  var emp = S.empresa || 'sua empresa';
+  var top = generateOpportunities().slice(0, 6);
+  var roi = calculateROI();
+
+  var cards = top.map(function(o){
+    var crit = o.severity === 'critico';
+    var tagColor = crit ? '#f87171' : '#fbbf24';
+    var tagBg = crit ? 'rgba(248,113,113,0.12)' : 'rgba(251,191,36,0.12)';
+    var tag = crit ? 'CRÍTICO' : 'OPORTUNIDADE';
+    return '<div style="padding:16px 18px;background:#1a1c26;border:1px solid rgba(255,255,255,0.08);border-left:3px solid '+tagColor+';border-radius:10px">' +
+      '<div style="font-size:9.5px;font-weight:700;letter-spacing:0.08em;color:'+tagColor+';background:'+tagBg+';display:inline-block;padding:2px 7px;border-radius:4px;margin-bottom:10px">'+tag+'</div>' +
+      '<div style="font-size:13.5px;font-weight:700;color:#f8fafc;margin-bottom:6px;line-height:1.3">'+o.gap+'</div>' +
+      '<div style="font-size:11.5px;color:#94a3b8;line-height:1.5">'+o.impact+'</div>' +
+    '</div>';
+  }).join('');
+
+  var items = roi.items.slice().sort(function(a,b){ return b.portfolio - a.portfolio; });
+  var maxV = items.reduce(function(a,b){ return Math.max(a, b.portfolio); }, 1);
+  var compRows = items.map(function(it){
+    var w = Math.max(3, Math.round((it.portfolio / maxV) * 100));
+    return '<div style="display:flex;align-items:center;gap:12px;margin-bottom:9px">' +
+      '<div style="flex:0 0 210px;font-size:11.5px;color:#e2e8f0">'+it.label+'</div>' +
+      '<div style="flex:1;height:16px;background:rgba(255,255,255,0.05);border-radius:5px;overflow:hidden"><div style="height:100%;width:'+w+'%;background:linear-gradient(90deg,#ea580c,#f97316);border-radius:5px"></div></div>' +
+      '<div style="flex:0 0 90px;text-align:right;font-size:11.5px;font-weight:700;color:#f8fafc;font-variant-numeric:tabular-nums">'+fmtNum(it.portfolio)+'</div>' +
+    '</div>';
+  }).join('');
+
+  c.innerHTML =
+    propSecHead('02', 'Maiores Gaps Identificados no Diagnóstico') +
+    propLead('A operação da '+emp+' escala mais rápido que os controles. Cada gap abaixo tem um custo que hoje passa despercebido.') +
+    '<div style="display:grid;grid-template-columns:repeat(3,1fr);gap:14px;margin-bottom:24px">' + cards + '</div>' +
+    '<div style="padding:18px 20px;background:#151824;border:1px solid rgba(255,255,255,0.06);border-radius:10px">' +
+      '<div style="font-size:12px;font-weight:700;color:#e2e8f0;margin-bottom:14px">Onde o '+fmtNum(roi.totalPortfolio)+' se forma — composição da exposição no portfólio</div>' +
+      compRows +
     '</div>';
 }
 
-// ── SEÇÃO 2: ESCOPO DE IMPLEMENTAÇÃO ────────────────────────────────────────
-// Reaproveita EXATAMENTE a mesma seleção/priorização de fases por gap do
-// Roadmap do Diagnóstico (selectRoadmapSprints()) — reformatada de narrativa
-// de sprint para tabela contratual (Entregável | Prazo em semanas | Critério
-// de conclusão | Responsabilidade Agilean vs. Cliente).
-function buildPropostaEscopo(mode) {
-  var container = document.getElementById('prop-escopo-container');
-  if (!container) return;
-  var isResumido = (mode === 'resumido');
+// ── SEÇÃO 03: OBJETIVO DO REDESENHO SIIGA (#5) ──────────────────────────────
+// Ex-"Metas do Programa", reposicionada logo após os gaps e retitulada (#5).
+// Meta = fecha 50% do gap até a Referência SIIGA (propMetaPct).
+function buildPropostaObjetivo(mode) {
+  var c = document.getElementById('prop-objetivo-container'); if (!c) return;
+  var emp = S.empresa || 'sua empresa';
+  var m = getMaturityScoreSummary();
+  var metaScore = 0;
+  var bars = ['f1','f2','f3','f4'].map(function(k){
+    var cur = getAvgPct(k);
+    var meta = propMetaPct(cur);
+    metaScore += Math.round(SCORE_MAX_PILAR[k] * meta);
+    var right = Math.round(cur*100)+'% <span style="color:#ea580c">→ '+Math.round(meta*100)+'%</span>';
+    return '<div style="margin-bottom:14px">' +
+      '<div style="display:flex;justify-content:space-between;font-size:12px;color:#e2e8f0;margin-bottom:6px"><span>'+PROP_PILAR_NOMES[k]+'</span><span>'+right+'</span></div>' +
+      '<div style="position:relative;height:10px;background:rgba(255,255,255,0.06);border-radius:6px">' +
+        '<div style="height:100%;width:'+Math.round(cur*100)+'%;background:#7c2d12;border-radius:6px"></div>' +
+        '<div style="position:absolute;top:0;height:100%;left:'+Math.round(cur*100)+'%;width:'+Math.max(2,Math.round((meta-cur)*100))+'%;background:linear-gradient(90deg,#ea580c,#f97316);border-radius:0 6px 6px 0"></div>' +
+      '</div>' +
+    '</div>';
+  }).join('');
+  var metaPctFmt = Math.round((metaScore / m.max) * 100);
 
-  var sel = selectRoadmapSprints();
-  var sprints = sel.sprintDefs;
+  c.innerHTML =
+    propSecHead('03', 'Objetivo do Redesenho SIIGA') +
+    propLead('Consultoria de resultado se compromete com número. O objetivo central é levar a '+emp+' do nível <strong style="color:#f8fafc">'+m.nivel+'</strong> à <strong style="color:#f8fafc">Referência SIIGA</strong> em '+PROP_PROGRAMA_MESES+' meses — com cada pilar alcançando, no mínimo, o benchmark do setor.') +
+    '<div style="display:flex;align-items:center;gap:18px;flex-wrap:wrap;padding:18px 22px;margin-bottom:22px;background:rgba(234,88,12,0.08);border:1.5px solid rgba(234,88,12,0.4);border-radius:12px">' +
+      '<div><div style="font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:0.08em;color:#ea580c;margin-bottom:4px">Meta Central · SIIGA Score</div>' +
+      '<div style="font-family:Bai Jamjuree;font-size:30px;font-weight:700;color:#f8fafc">'+m.score+' <span style="color:#ea580c">→ '+metaScore+'</span> <span style="font-size:15px;color:#94a3b8">/'+m.max+'</span></div></div>' +
+      '<div style="flex:1;min-width:200px;font-size:12.5px;color:#cbd5e1;line-height:1.55">Subir a maturidade de <strong style="color:#f8fafc">'+Math.round(m.pct*100)+'%</strong> para <strong style="color:#f8fafc">'+metaPctFmt+'%</strong> da referência — em '+PROP_PROGRAMA_MESES+' meses.</div>' +
+    '</div>' +
+    bars +
+    '<div style="margin-top:16px;padding:12px 16px;border-left:3px solid #ea580c;background:#151824;border-radius:6px;font-size:11.5px;color:#94a3b8;line-height:1.6">As metas de maturidade acima saem direto do diagnóstico. As metas <strong style="color:#e2e8f0">operacionais e financeiras</strong> — aderência plano × realizado, dias de fechamento da folha, % de retrabalho — são pactuadas sobre a baseline real medida na Fase 1, nunca estimadas antes.</div>';
+}
 
-  var rows = sprints.map(function(sp) {
-    var isDeferred = !!sp.deferred;
-    var prazo = isDeferred
-      ? PROPOSTA_WEEK_DEFERRED
-      : (PROPOSTA_WEEK_LABELS[parseInt((sp.lbl||'S1').replace('S',''), 10) - 1] || PROPOSTA_WEEK_DEFERRED);
-    var focusHtml = (!isResumido && sp.focus)
-      ? '<div style="font-size:10.5px;color:#94a3b8;margin-top:6px;line-height:1.5;font-style:italic">'+sp.focus+'</div>'
-      : '';
+// ── SEÇÃO 04: O PROGRAMA DE REDESENHO SIIGA (#6) ────────────────────────────
+// Ex-"Fluxo / Como os 4 meses funcionam", retitulada (#6). Conteúdo estrutural
+// do programa (fixo por escopo).
+function buildPropostaPrograma(mode) {
+  var c = document.getElementById('prop-programa-container'); if (!c) return;
+  var etapas = [
+    ['Kick-off', 'Lean Experience', 'Workshop presencial de nivelamento Lean, até 25 pessoas.', 'CORTESIA · INCLUSA'],
+    ['Pilar macro', 'Planejamento × orçamento', 'Planejamento do fluxo conectado ao orçamento e ao ERP.', ''],
+    ['Pilar tático', 'Proteção do plano', 'Análise de restrições e planejamento de médio prazo.', ''],
+    ['Pilar operacional', 'Curto prazo & MO', 'Last Planner, mão de obra e folha de produção no canteiro.', '']
+  ];
+  var cards = etapas.map(function(e){
+    var badge = e[3] ? '<div style="margin-top:12px;display:inline-block;font-size:9.5px;font-weight:700;color:#34d399;border:1px solid rgba(52,211,153,0.5);border-radius:20px;padding:3px 10px">'+e[3]+'</div>' : '';
+    return '<div style="padding:16px 18px;background:#1a1c26;border:1px solid rgba(255,255,255,0.08);border-radius:10px">' +
+      '<div style="font-size:11px;color:#ea580c;font-weight:600;margin-bottom:8px">'+e[0]+'</div>' +
+      '<div style="font-size:14px;font-weight:700;color:#f8fafc;margin-bottom:8px;line-height:1.25">'+e[1]+'</div>' +
+      '<div style="font-size:11.5px;color:#94a3b8;line-height:1.5">'+e[2]+'</div>' + badge +
+    '</div>';
+  }).join('');
+
+  c.innerHTML =
+    propSecHead('04', 'O Programa de Redesenho SIIGA') +
+    propLead('Do workshop de nivelamento à governança contínua — começa com o time no mesmo idioma (Lean Experience) e avança do macro ao chão de obra, com meta, entregável e responsável definidos em cada etapa.') +
+    '<div style="display:grid;grid-template-columns:repeat(4,1fr);gap:12px;margin-bottom:20px">' + cards + '</div>' +
+    '<div style="display:flex;height:44px;border-radius:8px;overflow:hidden;border:1px solid rgba(255,255,255,0.08)">' +
+      '<div style="flex:0 0 75%;background:linear-gradient(90deg,#b91c1c,#ea580c);display:flex;align-items:center;padding:0 16px;font-size:12px;font-weight:700;color:#fff">Construção · ~75%</div>' +
+      '<div style="flex:1;background:#1a1c26;display:flex;align-items:center;padding:0 16px;font-size:12px;color:#94a3b8">Validação · ~25%</div>' +
+    '</div>' +
+    '<div style="display:flex;justify-content:space-between;font-size:10.5px;color:#94a3b8;margin-top:8px"><span>Mês 1 — Kick-off / Lean Experience</span><span>Mês '+PROP_PROGRAMA_MESES+' — Análise e resultados</span></div>';
+}
+
+// ── SEÇÃO 05: RESULTADOS ESPERADOS POR NÍVEL (#7) ───────────────────────────
+function buildPropostaResultados(mode) {
+  var c = document.getElementById('prop-resultados-container'); if (!c) return;
+  var emp = S.empresa || 'sua empresa';
+  var niveis = [
+    ['Estratégico · Diretoria', 'Previsibilidade e visão de portfólio', ['Previsibilidade de fluxo de caixa das obras', 'Visão físico-financeira em tempo real', 'Gestão integrada do portfólio, não obra a obra']],
+    ['Tático · Sala Técnica', 'Mais escala, menos redigitação', ['Fim da redigitação entre planejamento e ERP', 'Análise proativa de desvios, não reativa', 'Uma sala técnica que cobre mais obras']],
+    ['Operacional · Engenharia de Campo', 'Plano que chega ao canteiro', ['Aderência entre o plano e o que a obra executa', 'Equipes, medições e MO puxadas do planejamento', 'Folha de produção fechada no sistema']]
+  ];
+  var cards = niveis.map(function(n){
+    var bullets = n[2].map(function(b){ return '<li style="display:flex;gap:8px;margin-bottom:6px"><span style="color:#ea580c;flex-shrink:0">•</span><span>'+b+'</span></li>'; }).join('');
+    return '<div style="padding:18px 20px;background:#1a1c26;border:1px solid rgba(255,255,255,0.08);border-left:3px solid #ea580c;border-radius:10px;margin-bottom:12px">' +
+      '<div style="font-size:10.5px;font-weight:700;letter-spacing:0.06em;text-transform:uppercase;color:#ea580c;margin-bottom:6px">'+n[0]+'</div>' +
+      '<div style="font-size:15px;font-weight:700;color:#f8fafc;margin-bottom:12px">'+n[1]+'</div>' +
+      '<ul style="list-style:none;font-size:12px;color:#cbd5e1;line-height:1.4">'+bullets+'</ul>' +
+    '</div>';
+  }).join('');
+
+  // Integração com o ERP do cliente — bloco "Ecossistema & Integrações Nativas
+  // de ERP" do protótipo anterior (cards + logos). Personaliza pelo ERP do
+  // diagnóstico (S.ferramentas.erp / erpOutro). RESSALVA (Israel, 2026-09-28):
+  // citar SÓ as integrações PADRÃO — orçamento×planejamento e envio das medições
+  // físico-financeiras. Folha e suprimentos são integrações personalizadas, NÃO
+  // entram aqui.
+  var f = S.ferramentas || {};
+  var ERP_LABELS = { sienge:'Sienge', totvs:'TOTVS', informakon:'Informakon', mega:'Senior Mega', uau:'UAU' };
+  var erpVal = f.erp || '';
+  var erpLabel = ERP_LABELS[erpVal];
+  var erpMsg;
+  if (erpLabel) {
+    erpMsg = 'A plataforma Agilean conecta-se <strong style="color:#f8fafc">nativamente ao '+erpLabel+'</strong> da '+emp+' — sem redigitação entre os sistemas. O SIIGA entra integrado ao ERP, não como mais uma ilha de dados.';
+  } else if (erpVal === 'outro') {
+    var erpNome = (f.erpOutro && f.erpOutro.trim()) ? f.erpOutro.trim() : 'o ERP da '+emp;
+    erpMsg = 'A plataforma Agilean integra-se a <strong style="color:#f8fafc">'+erpNome+'</strong> via conector de API ou exportação estruturada — sem redigitação entre os sistemas.';
+  } else {
+    erpMsg = 'A plataforma Agilean funciona como <strong style="color:#f8fafc">hub de gestão operacional</strong> e integra-se de forma nativa aos principais ERPs do mercado quando a '+emp+' adotar um.';
+  }
+
+  // Cards das integrações PADRÃO (só estas duas).
+  var integCard = function(titulo, desc){
+    return '<div style="padding:14px 16px;background:#1a1c26;border:1px solid rgba(255,255,255,0.08);border-left:3px solid #ea580c;border-radius:8px">' +
+      '<div style="font-size:12.5px;font-weight:700;color:#f8fafc;margin-bottom:6px">'+titulo+'</div>' +
+      '<div style="font-size:11px;color:#94a3b8;line-height:1.5">'+desc+'</div>' +
+    '</div>';
+  };
+  var integCards =
+    integCard('Orçamento × Planejamento', 'O orçamento do ERP alimenta o planejamento (Linha de Balanço e Curva S) — físico-financeiro confiável, sem redigitar o orçamento em outra ferramenta.') +
+    integCard('Envio das medições físico-financeiras', 'As medições de avanço físico-financeiro da obra são enviadas ao ERP automaticamente, mantendo custo e execução sincronizados.');
+
+  // Ecossistema — logos dos ERPs com integração nativa (ERP do cliente destacado).
+  var ERP_LOGOS = [
+    ['sienge','Sienge','logos/SIENGE.png'],
+    ['totvs','TOTVS','logos/TOTVs.jpeg'],
+    ['informakon','Informakon','logos/Informakon.png'],
+    ['mega','Senior Mega','logos/MEGA.jpeg'],
+    ['uau','UAU','logos/UAU.jpeg']
+  ];
+  var logoCards = ERP_LOGOS.map(function(l){
+    var atual = (l[0] === erpVal);
+    return '<div style="background:#fff;border:'+(atual?'2px solid #ea580c':'1px solid #cbd5e1')+';border-radius:8px;padding:8px 12px;display:flex;align-items:center;gap:6px;min-height:38px">' +
+      '<img src="'+l[2]+'" alt="'+l[1]+'" style="max-height:22px;max-width:62px;object-fit:contain">' +
+      (atual?'<span style="font-size:11px;font-weight:700;color:#ea580c">✓</span>':'') +
+    '</div>';
+  }).join('');
+
+  var erpBloco =
+    '<div style="margin-top:8px;padding:20px 22px;background:#151824;border:1px solid rgba(234,88,12,0.35);border-radius:10px">' +
+      '<div style="display:flex;justify-content:space-between;align-items:flex-start;flex-wrap:wrap;gap:10px;margin-bottom:6px">' +
+        '<div style="font-size:11px;font-weight:700;letter-spacing:0.06em;text-transform:uppercase;color:#ea580c">Ecossistema & Integrações Nativas de ERP</div>' +
+        '<div style="font-size:9.5px;font-weight:700;color:#ea580c;background:rgba(234,88,12,0.12);border:1px solid rgba(234,88,12,0.3);border-radius:5px;padding:4px 10px">API Nativa · Bidirecional</div>' +
+      '</div>' +
+      '<div style="font-size:12px;color:#cbd5e1;line-height:1.6;margin-bottom:16px">'+erpMsg+'</div>' +
+      '<div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:16px">'+integCards+'</div>' +
+      '<div style="display:flex;flex-wrap:wrap;gap:10px;align-items:center">'+logoCards+
+        '<span style="font-size:10.5px;color:#94a3b8">· conexão bidirecional, sem digitação duplicada</span>' +
+      '</div>' +
+    '</div>';
+
+  c.innerHTML =
+    propSecHead('05', 'Resultados Esperados por Nível') +
+    propLead('O mesmo programa entrega valor diferente para cada camada de gestão da '+emp+'.') +
+    cards +
+    erpBloco;
+}
+
+// ── SEÇÃO 06: JORNADA, GOVERNANÇA E TIME (#8) ───────────────────────────────
+// #8: em "Formato de atuação", REMOVIDA a menção a encontros presenciais — o
+// padrão é remoto; presencial é exceção (só o kick-off/Lean Experience).
+function buildPropostaJornada(mode) {
+  var c = document.getElementById('prop-jornada-container'); if (!c) return;
+  var etapas = [
+    ['01','Diagnóstico','Alinhamento da estratégia da jornada'],
+    ['02','Implantação','Setup dos processos essenciais'],
+    ['03','Adoção','Ampliação para as demais frentes'],
+    ['04','Engajamento','Avaliação proativa do uso'],
+    ['05','Acompanhamento','Ritos até a cultura enraizar']
+  ];
+  var etapaCards = etapas.map(function(e){
+    return '<div style="flex:1;min-width:110px;padding:14px;background:#1a1c26;border:1px solid rgba(255,255,255,0.08);border-radius:10px;text-align:center">' +
+      '<div style="font-family:Bai Jamjuree;font-size:14px;font-weight:700;color:#ea580c;margin-bottom:6px">'+e[0]+'</div>' +
+      '<div style="font-size:13px;font-weight:700;color:#f8fafc;margin-bottom:4px">'+e[1]+'</div>' +
+      '<div style="font-size:10.5px;color:#94a3b8;line-height:1.4">'+e[2]+'</div>' +
+    '</div>';
+  }).join('');
+  var ritos = [
+    ['MENSAL','Comitê Executivo','Diretoria + Agilean: leitura do Health Score, avanço das metas e decisões de curso.'],
+    ['QUINZENAL','Rito Tático','Sala técnica: análise de restrições e planejamento de médio prazo.'],
+    ['SEMANAL','Rito Operacional','Obra: Last Planner, compromissos de curto prazo e mão de obra.']
+  ];
+  var ritoCards = ritos.map(function(r){
+    return '<div style="flex:1;min-width:180px;padding:16px 18px;background:#1a1c26;border:1px solid rgba(255,255,255,0.08);border-radius:10px">' +
+      '<div style="font-size:10px;font-weight:700;letter-spacing:0.08em;color:#ea580c;margin-bottom:8px">'+r[0]+'</div>' +
+      '<div style="font-size:14px;font-weight:700;color:#f8fafc;margin-bottom:8px">'+r[1]+'</div>' +
+      '<div style="font-size:11.5px;color:#94a3b8;line-height:1.5">'+r[2]+'</div>' +
+    '</div>';
+  }).join('');
+  var papeis = [
+    ['APRESENTA','Comercial','Conduz a proposta e a transição para a execução.'],
+    ['EXECUTA','Customer Success','Responsável pela condução do programa nos '+PROP_PROGRAMA_MESES+' meses.'],
+    ['APOIA','Sócio / CEO','Presença pontual em momentos-chave da transformação.']
+  ];
+  var papelCards = papeis.map(function(p){
+    return '<div style="flex:1;min-width:180px;padding:16px 18px;background:#1a1c26;border:1px solid rgba(255,255,255,0.08);border-radius:10px">' +
+      '<div style="font-size:10px;font-weight:700;letter-spacing:0.08em;color:#ea580c;margin-bottom:8px">'+p[0]+'</div>' +
+      '<div style="font-size:14px;font-weight:700;color:#f8fafc;margin-bottom:8px">'+p[1]+'</div>' +
+      '<div style="font-size:11.5px;color:#94a3b8;line-height:1.5">'+p[2]+'</div>' +
+    '</div>';
+  }).join('');
+
+  c.innerHTML =
+    propSecHead('06', 'Jornada, Governança e Time') +
+    propLead('Cinco etapas de intensidade decrescente — do redesenho à autonomia — sustentadas por uma cadência de ritos e medidas por Health Score.') +
+    '<div style="display:flex;gap:10px;flex-wrap:wrap;margin-bottom:20px">' + etapaCards + '</div>' +
+    '<div style="display:flex;gap:12px;flex-wrap:wrap;margin-bottom:16px">' + ritoCards + '</div>' +
+    '<div style="padding:12px 16px;border-left:3px solid #ea580c;background:#151824;border-radius:6px;font-size:11.5px;color:#cbd5e1;line-height:1.6;margin-bottom:20px">Gatilho de intensificação: se a aderência cair abaixo de <strong style="color:#f8fafc">70% da baseline</strong>, a cadência sobe automaticamente até o indicador se recuperar.</div>' +
+    '<div style="display:flex;gap:12px;flex-wrap:wrap;margin-bottom:16px">' + papelCards + '</div>' +
+    '<div style="padding:14px 18px;background:#1a1c26;border:1px solid rgba(255,255,255,0.08);border-radius:10px;font-size:12px;color:#cbd5e1;line-height:1.6"><strong style="color:#f8fafc">Formato de atuação:</strong> programa conduzido de forma <strong style="color:#f8fafc">remota</strong>, com os ritos de governança e a sala técnica em cadência semanal/quinzenal/mensal. Encontros presenciais são exceção, reservados a momentos-chave como o kick-off (Lean Experience).</div>';
+}
+
+// ── SEÇÃO 07: O MÉTODO SIIGA (#9) ───────────────────────────────────────────
+// #9: seção "O Método SIIGA"; "Os três pilares" vira "A base da nossa
+// Metodologia SIIGA"; "Tradicional × SIIGA" vira "Implantação de Sistema ×
+// Redesenho SIIGA".
+function buildPropostaMetodo(mode) {
+  var c = document.getElementById('prop-metodo-container'); if (!c) return;
+  var pilares = [
+    ['Pessoas', 'Cultura que enraíza', 'Nivelamento Lean da equipe (Workshop Lean Experience), papéis definidos por RACI e um time que continua operando o método depois que a gente sai.'],
+    ['Processos', 'Fluxo redesenhado', 'Planejamento do fluxo de produção, proteção do plano por análise de restrições e Last Planner System — o processo que a tecnologia vai sustentar.'],
+    ['Tecnologia', 'Agilean como consequência', 'A plataforma entra para dar visibilidade e governança ao processo já maduro — integrada ao ERP, não como uma ilha a mais de dados.']
+  ];
+  var pilarCards = pilares.map(function(p){
+    return '<div style="flex:1;min-width:180px;padding:18px 20px;background:#1a1c26;border:1px solid rgba(255,255,255,0.08);border-top:2px solid #ea580c;border-radius:10px">' +
+      '<div style="font-size:10.5px;font-weight:700;letter-spacing:0.06em;text-transform:uppercase;color:#ea580c;margin-bottom:8px">'+p[0]+'</div>' +
+      '<div style="font-size:15px;font-weight:700;color:#f8fafc;margin-bottom:10px">'+p[1]+'</div>' +
+      '<div style="font-size:11.5px;color:#94a3b8;line-height:1.55">'+p[2]+'</div>' +
+    '</div>';
+  }).join('');
+  var linhas = [
+    ['Treino de tela padrão, igual para todos', 'Diagnóstico com score e programa sob medida'],
+    ['Não mapeia o processo da empresa', 'Redesenha o fluxo de produção antes do sistema'],
+    ['Sem definição de papéis', 'RACI definido para cada rotina'],
+    ['Sistema vira mais uma ilha de dados', 'Integração nativa com o ERP'],
+    ['Acaba na entrega, sem acompanhamento', 'Health Score e ritos até a cultura enraizar']
+  ];
+  var rows = linhas.map(function(l){
     return '<tr>' +
-      '<td style="white-space:nowrap"><span style="display:inline-block;padding:3px 10px;border-radius:20px;background:'+sp.color+'33;color:'+sp.color+';font-size:10.5px;font-weight:700">'+sp.lbl+'</span></td>' +
-      '<td>' +
-        '<strong style="color:#f8fafc">'+sp.title+'</strong>' +
-        '<div style="font-size:11px;color:#cbd5e1;margin-top:4px">'+sp.entregavel+'</div>' +
-        focusHtml +
-      '</td>' +
-      '<td style="white-space:nowrap">'+prazo+'</td>' +
-      '<td style="font-size:11px">'+sp.criterio+'</td>' +
-      '<td style="font-size:11px">' +
-        '<div style="margin-bottom:5px"><strong style="color:#ea580c">Agilean:</strong> '+sp.respAgilean+'</div>' +
-        '<div><strong style="color:#94a3b8">Cliente:</strong> '+sp.respCliente+'</div>' +
-      '</td>' +
+      '<td style="padding:12px 14px;border-bottom:1px solid rgba(255,255,255,0.06);font-size:11.5px;color:#94a3b8"><span style="color:#f87171;margin-right:6px">✕</span>'+l[0]+'</td>' +
+      '<td style="padding:12px 14px;border-bottom:1px solid rgba(255,255,255,0.06);font-size:11.5px;color:#e2e8f0"><span style="color:#34d399;margin-right:6px">✓</span>'+l[1]+'</td>' +
     '</tr>';
   }).join('');
 
-  var f4NoteHtml = (!isResumido && sel.f4Note)
-    ? '<div style="margin-top:14px;padding:12px 16px;background:rgba(74,69,88,0.3);border-radius:8px;border:1px solid rgba(74,69,88,0.5);font-size:11.5px;color:#cbd5e1;line-height:1.65">' +
-        '<strong style="color:#f8fafc">Sobre o Pilar 4:</strong> ' + sel.f4Note + '</div>'
-    : '';
-
-  container.innerHTML =
-    '<div class="rep-sec-title">Escopo de Implementação — Plano de Trabalho Contratual</div>' +
-    '<div style="font-size:12px;color:#94a3b8;margin-bottom:14px">Sprints priorizadas pelos gaps de maior impacto identificados neste diagnóstico específico — pilares já maduros no portfólio da '+(S.empresa||'empresa')+' são omitidos.</div>' +
-    '<div style="overflow-x:auto"><table class="opp-table" style="min-width:680px"><thead><tr>' +
-      '<th>Sprint</th><th>Entregável</th><th>Prazo</th><th>Critério de Conclusão</th><th>Responsabilidade</th>' +
-    '</tr></thead><tbody>' + rows + '</tbody></table></div>' +
-    f4NoteHtml;
+  c.innerHTML =
+    propSecHead('07', 'O Método SIIGA') +
+    '<div style="font-size:16px;font-weight:700;color:#f8fafc;margin-bottom:6px">Por que vamos além da tecnologia</div>' +
+    propLead('O SIIGA não é a implantação de um sistema. É o redesenho de como a empresa planeja e executa — a plataforma entra como consequência do processo maduro.') +
+    '<div style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:0.1em;color:#ea580c;margin-bottom:12px">A base da nossa Metodologia SIIGA</div>' +
+    '<div style="display:flex;gap:12px;flex-wrap:wrap;margin-bottom:24px">' + pilarCards + '</div>' +
+    '<div style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:0.1em;color:#ea580c;margin-bottom:12px">Implantação de Sistema × Redesenho SIIGA</div>' +
+    '<table style="width:100%;border-collapse:collapse;background:#151824;border:1px solid rgba(255,255,255,0.06);border-radius:10px;overflow:hidden">' +
+      '<thead><tr>' +
+        '<th style="padding:12px 14px;text-align:left;font-size:10.5px;font-weight:700;text-transform:uppercase;letter-spacing:0.06em;color:#94a3b8;border-bottom:1px solid rgba(255,255,255,0.1)">Implantação tradicional</th>' +
+        '<th style="padding:12px 14px;text-align:left;font-size:10.5px;font-weight:700;text-transform:uppercase;letter-spacing:0.06em;color:#ea580c;border-bottom:1px solid rgba(255,255,255,0.1)">Programa SIIGA</th>' +
+      '</tr></thead><tbody>' + rows + '</tbody></table>';
 }
 
-// ── SEÇÃO 3: INVESTIMENTO ───────────────────────────────────────────────────
-// Reaproveita o motor de precificação já implementado no Diagnóstico
-// (precoPorObraPadrao/calcularMensalidadePadrao, Plano Maestria · coluna
-// Tabela) — não duplica a tabela de preço, só reapresenta o mesmo cálculo
-// num formato de investimento formal.
-//
-// PLACEHOLDER DE NEGÓCIO (ver PLANO_PROPOSTA_COMERCIAL_REUNIAO2.md §4.2-4.4,
-// "ainda pendente"): a lista "O que está incluso" e as "Condições de
-// pagamento" abaixo são um preenchimento plausível e genérico de produto
-// SaaS B2B — NÃO é uma decisão de negócio validada. Ajustar/substituir
-// conforme o time comercial definir.
-function buildPropostaInvestimento(mode) {
-  var container = document.getElementById('prop-investimento-container');
-  if (!container) return;
-  var isResumido = (mode === 'resumido');
+// ── SEÇÃO 08: DEPOIMENTOS (#10) ─────────────────────────────────────────────
+// #10: usa os depoimentos reais existentes (boilerplate recuperado do relatório
+// — Dimas, CONX, Dasart). CONX contempla o pedido "Conx".
+function buildPropostaDepoimentos(mode) {
+  var c = document.getElementById('prop-depoimentos-container'); if (!c) return;
+  var deps = [
+    ['Gestão de Mão de Obra', '“O Agilean nos trouxe praticidade e soluções reais para acompanhar a mão de obra em grandes construções. Nossas obras têm entre 150 e 200 pessoas e era um desafio gerenciar e integrar todos os recursos. Agora tenho tempo para analisar, criar estratégias e focar no que agrega valor.”', 'Natalia V. de Dios', 'Gerência de Processos e Qualidade · Dimas Construções'],
+    ['Decisão em Tempo Real', '“Uma das maiores vantagens que o Agilean nos trouxe foi a capacidade de rastrear e monitorar o progresso das nossas obras em tempo real, permitindo decisões rápidas com dados confiáveis de canteiro. Aumentamos consideravelmente o cumprimento dos prazos.”', 'Alessandra Silva', 'Coordenação de Planejamento e Controle · CONX'],
+    ['Linha de Balanço Ágil', '“Saímos de um modelo operacional e trabalhoso para planejar e elaborar nossa linha de balanço; nossos engenheiros passavam meses no processo. Com o Agilean fazemos em questão de horas, simulando múltiplos cenários e planos de ataque.”', 'Claudio Barreira', 'Diretor de Engenharia · Dasart']
+  ];
+  var cards = deps.map(function(d){
+    return '<div style="padding:22px 20px;background:#1a1c26;border:1px solid rgba(255,255,255,0.08);border-radius:10px;display:flex;flex-direction:column;justify-content:space-between">' +
+      '<div>' +
+        '<div style="display:inline-block;padding:3px 9px;background:rgba(234,88,12,0.12);color:#ea580c;border-radius:5px;font-size:9.5px;font-weight:700;text-transform:uppercase;letter-spacing:0.04em;margin-bottom:14px">'+d[0]+'</div>' +
+        '<div style="font-size:12.5px;color:#cbd5e1;line-height:1.65;font-style:italic;margin-bottom:16px">'+d[1]+'</div>' +
+      '</div>' +
+      '<div style="border-top:1px solid rgba(255,255,255,0.08);padding-top:12px">' +
+        '<div style="font-size:12px;font-weight:700;color:#f8fafc">'+d[2]+'</div>' +
+        '<div style="font-size:10px;color:#94a3b8;margin-top:2px">'+d[3]+'</div>' +
+      '</div>' +
+    '</div>';
+  }).join('');
+  var stats = [['22','estados com operação'],['70 mi','m² construídos com Agilean'],['+1.500','canteiros impactados'],['+5 mil','gestores usando por dia'],['15%','de ganho médio de produtividade']];
+  var statCells = stats.map(function(s){
+    return '<div style="text-align:center"><div style="font-family:Bai Jamjuree;font-size:24px;font-weight:700;color:#ea580c">'+s[0]+'</div><div style="font-size:10px;color:#94a3b8;line-height:1.3;margin-top:2px">'+s[1]+'</div></div>';
+  }).join('');
+  c.innerHTML =
+    propSecHead('08', 'Pareceres de Lideranças & Resultados Comprovados') +
+    '<div style="display:flex;justify-content:space-around;flex-wrap:wrap;gap:14px;padding:18px;background:#151824;border:1px solid rgba(255,255,255,0.06);border-radius:10px;margin-bottom:20px">' + statCells + '</div>' +
+    '<div style="display:grid;grid-template-columns:repeat(3,1fr);gap:14px">' + cards + '</div>';
+}
 
+// ── SEÇÃO 09: INVESTIMENTO PERSONALIZADO (#11) ──────────────────────────────
+// #11: título com nome da empresa; REMOVIDOS os valores por módulo e as chips
+// de planos; expõe só o valor do programa (fixo R$60k) + o total do plano
+// escolhido da plataforma. Removida a observação "dois produtos…".
+function buildPropostaInvestimento(mode) {
+  var c = document.getElementById('prop-investimento-container'); if (!c) return;
+  var emp = S.empresa || 'sua empresa';
   var numObras = S.numObras || 1;
   var precoObra = precoPorObraPadrao(numObras);
-  var mensalidadeProposta = calcularMensalidadePadrao(numObras);
-  var orcamentoMedio = S.orcamentoMedio || 8000000;
-  var pctMensalidadeOrcamento = orcamentoMedio ? (precoObra / orcamentoMedio) * 100 : 0;
-  var pctFmt = pctMensalidadeOrcamento < 0.01
-    ? '< 0,01%'
-    : pctMensalidadeOrcamento.toLocaleString('pt-BR', {maximumFractionDigits: 2}) + '%';
+  var plataformaMes = calcularMensalidadePadrao(numObras);
 
-  var tabelaRows = TABELA_PRECO_MAESTRIA.map(function(f) {
-    var isFaixaAtual = f.precoPorObra === precoObra;
-    return '<tr style="'+(isFaixaAtual ? 'background:rgba(234,88,12,0.12);border-left:3px solid #ea580c' : '')+'">' +
-      '<td>'+(isFaixaAtual ? '<strong style="color:#ea580c">✓ '+f.label+'</strong>' : f.label)+'</td>' +
-      '<td style="text-align:right" class="roi-val">'+fmtBRL(f.precoPorObra)+' /obra/mês</td>' +
-    '</tr>';
-  }).join('');
-
-  var kpi = function(label, value, sub, highlight) {
-    if (highlight) {
-      return '<div style="padding:16px 18px;background:rgba(234,88,12,0.10);border:1.5px solid rgba(234,88,12,0.45);border-radius:10px">' +
-        '<div style="font-size:10.5px;color:#ea580c;font-weight:700;text-transform:uppercase;letter-spacing:0.07em">'+label+'</div>' +
-        '<div style="font-family:Bai Jamjuree;font-size:26px;font-weight:700;margin-top:3px;color:#ea580c">'+value+'</div>' +
-        (sub ? '<div style="font-size:10px;color:#94a3b8;margin-top:3px">'+sub+'</div>' : '') +
-      '</div>';
-    }
-    return '<div style="padding:12px 14px;background:#1a1c26;border:1px solid rgba(255,255,255,0.08);border-radius:8px">' +
-      '<div style="font-size:10px;color:#94a3b8;text-transform:uppercase;letter-spacing:0.06em">'+label+'</div>' +
-      '<div style="font-family:Bai Jamjuree;font-size:20px;font-weight:700;margin-top:3px;color:#f8fafc">'+value+'</div>' +
-      (sub ? '<div style="font-size:9.5px;color:#94a3b8;margin-top:2px">'+sub+'</div>' : '') +
-    '</div>';
-  };
-
-  // "O que está incluso" — PLACEHOLDER (ver comentário no topo da função).
-  var inclusoItems = [
-    'Acesso à plataforma SIIGA para todas as obras contempladas neste plano',
-    'Suporte técnico via canal dedicado em horário comercial',
-    'Treinamento inicial da equipe de planejamento, campo e engenharia',
-    'Atualizações e novas funcionalidades da plataforma incluídas, sem custo adicional',
-    'Integração nativa com o ERP utilizado pela empresa (Sienge, TOTVS, Informakon, Mega ou UAU)'
-  ];
-
-  var memoriaCalculo = isResumido ? '' :
+  // Documento único: a memória de cálculo é sempre exibida (mantida por decisão
+  // do Israel em 2026-09-28).
+  var memoria =
     '<div style="margin-top:16px;padding-top:12px;border-top:1px solid rgba(255,255,255,0.08)">' +
       '<div style="font-size:10.5px;font-weight:700;text-transform:uppercase;letter-spacing:0.08em;color:#94a3b8;margin-bottom:8px">Memória de cálculo</div>' +
       '<div style="font-size:11px;color:#cbd5e1;line-height:1.7">' +
-        '• Faixa de preço: <strong style="color:#f8fafc">'+numObras+' obra(s)</strong> → preço/obra de tabela (Plano Maestria)<br>' +
-        '• Mensalidade total = preço/obra × nº de obras = '+fmtBRL(precoObra)+' × '+numObras+' = <strong style="color:#f8fafc">'+fmtNum(mensalidadeProposta)+'/mês</strong><br>' +
-        '• % Mensalidade/Orçamento = preço/obra ÷ orçamento médio de 1 obra = '+fmtBRL(precoObra)+' ÷ '+fmtNum(orcamentoMedio)+' = <strong style="color:#f8fafc">'+pctFmt+'</strong>' +
+        '• Programa de consultoria: '+fmtBRL(PROP_PROGRAMA_MENSAL)+'/mês × '+PROP_PROGRAMA_MESES+' meses = <strong style="color:#f8fafc">'+fmtNum(PROP_PROGRAMA_TOTAL)+'</strong><br>' +
+        '• Plataforma pós-programa: '+fmtBRL(precoObra)+'/obra/mês × '+numObras+' obra(s) = <strong style="color:#f8fafc">'+fmtNum(plataformaMes)+'/mês</strong>' +
       '</div>' +
     '</div>';
 
-  container.innerHTML =
-    '<div class="rep-sec-title">Investimento</div>' +
-    '<div style="display:grid;grid-template-columns:repeat(3,1fr);gap:12px;margin-bottom:16px">' +
-      kpi('Nº de obras do plano', numObras, 'informado no diagnóstico') +
-      kpi('Mensalidade total', fmtNum(mensalidadeProposta), fmtBRL(precoObra)+' /obra/mês · Plano Maestria') +
-      kpi('Mensalidade / Orçamento', pctFmt, 'preço de 1 obra sobre o orçamento médio de 1 obra', true) +
-    '</div>' +
-    (isResumido ? '' :
-      '<div style="margin-bottom:16px"><div style="font-size:10.5px;font-weight:700;text-transform:uppercase;letter-spacing:0.08em;color:#94a3b8;margin-bottom:8px">Tabela de preços — Plano Maestria (por obra/mês)</div>' +
-      '<table class="roi-table"><tbody>'+tabelaRows+'</tbody></table></div>'
-    ) +
-    '<div style="display:grid;grid-template-columns:1fr 1fr;gap:16px;margin-top:4px">' +
-      '<div>' +
-        '<div style="font-size:10.5px;font-weight:700;text-transform:uppercase;letter-spacing:0.08em;color:#94a3b8;margin-bottom:8px">O que está incluso</div>' +
-        '<ul style="list-style:none;display:flex;flex-direction:column;gap:6px;font-size:11.5px;color:#e2e8f0;line-height:1.4">' +
-          inclusoItems.map(function(it){ return '<li style="display:flex;gap:8px"><span style="color:#ea580c;flex-shrink:0">→</span>'+it+'</li>'; }).join('') +
-        '</ul>' +
+  c.innerHTML =
+    propSecHead('09', 'Investimento Personalizado para a ' + emp) +
+    propLead('Dois produtos, uma jornada: o <strong style="color:#f8fafc">programa de consultoria</strong> em destaque, com a plataforma inclusa durante os '+PROP_PROGRAMA_MESES+' meses; a assinatura recorrente entra depois, se a '+emp+' seguir.') +
+    '<div style="display:grid;grid-template-columns:1fr 1fr;gap:14px;margin-bottom:8px">' +
+      '<div style="padding:20px 22px;background:rgba(234,88,12,0.10);border:1.5px solid rgba(234,88,12,0.45);border-radius:12px">' +
+        '<div style="font-size:10.5px;font-weight:700;text-transform:uppercase;letter-spacing:0.07em;color:#ea580c;margin-bottom:8px">Programa de Redesenho SIIGA · '+PROP_PROGRAMA_MESES+' meses</div>' +
+        '<div style="font-family:Bai Jamjuree;font-size:30px;font-weight:700;color:#ea580c">'+fmtNum(PROP_PROGRAMA_TOTAL)+'</div>' +
+        '<div style="font-size:11px;color:#94a3b8;margin-top:4px">'+fmtBRL(PROP_PROGRAMA_MENSAL)+'/mês × '+PROP_PROGRAMA_MESES+' meses · valor total do programa</div>' +
       '</div>' +
-      '<div>' +
-        '<div style="font-size:10.5px;font-weight:700;text-transform:uppercase;letter-spacing:0.08em;color:#94a3b8;margin-bottom:8px">Condições de pagamento</div>' +
-        '<div style="font-size:11.5px;color:#e2e8f0;line-height:1.6;padding:12px 14px;background:#1a1c26;border-radius:8px;border:1px solid rgba(255,255,255,0.08)">' +
-          'Mensal, via boleto ou cartão — condições especiais para pagamento anual disponíveis mediante consulta ao time comercial.' +
-        '</div>' +
+      '<div style="padding:20px 22px;background:#1a1c26;border:1px solid rgba(255,255,255,0.08);border-radius:12px">' +
+        '<div style="font-size:10.5px;font-weight:700;text-transform:uppercase;letter-spacing:0.07em;color:#94a3b8;margin-bottom:8px">Plataforma Agilean · pós-programa</div>' +
+        '<div style="font-family:Bai Jamjuree;font-size:30px;font-weight:700;color:#f8fafc">'+fmtNum(plataformaMes)+'<span style="font-size:14px;color:#94a3b8">/mês</span></div>' +
+        '<div style="font-size:11px;color:#94a3b8;margin-top:4px">Inclusa durante o programa · assinatura recorrente por obra começa após os '+PROP_PROGRAMA_MESES+' meses</div>' +
       '</div>' +
-    '</div>' +
-    memoriaCalculo;
-}
-
-// ── SEÇÃO 4: RETORNO PROJETADO ──────────────────────────────────────────────
-// Reaproveita calcROIReal() (mesma fórmula do Diagnóstico), mas ancorado no
-// preço de tabela POR OBRA desta proposta (motor de precificação da seção 3).
-function buildPropostaRetorno(mode) {
-  var container = document.getElementById('prop-retorno-container');
-  if (!container) return;
-  var isResumido = (mode === 'resumido');
-
-  // Preço POR OBRA (não o total do portfólio): o ganho do ROI é de uma obra,
-  // então o investimento comparado também é de uma obra.
-  var mensalidadeProposta = precoPorObraPadrao(S.numObras);
-  var r = calcROIRealComMensalidade(ROI_CAPTURA_FIXA, mensalidadeProposta);
-  var pb = fmtPayback(r.estrategica.payback);
-  var fmtH = function(n){ return (n||0).toLocaleString('pt-BR',{maximumFractionDigits:1}) + ' h'; };
-
-  var kpi = function(label, value, sub) {
-    return '<div style="padding:12px 14px;background:#1a1c26;border:1px solid rgba(255,255,255,0.08);border-radius:8px">' +
-      '<div style="font-size:10px;color:#94a3b8;text-transform:uppercase;letter-spacing:0.06em">'+label+'</div>' +
-      '<div style="font-family:Bai Jamjuree;font-size:20px;font-weight:700;margin-top:3px;color:#f8fafc">'+value+'</div>' +
-      (sub ? '<div style="font-size:9.5px;color:#94a3b8;margin-top:2px">'+sub+'</div>' : '') +
-    '</div>';
-  };
-
-  var memoria = isResumido ? '' :
-    '<div style="margin-top:16px;padding-top:12px;border-top:1px solid rgba(255,255,255,0.08)">' +
-      '<div style="font-size:10.5px;font-weight:700;text-transform:uppercase;letter-spacing:0.08em;color:#94a3b8;margin-bottom:8px">Como é calculado</div>' +
-      '<table class="roi-table"><thead><tr><th>Item</th><th style="text-align:right">Valor</th></tr></thead><tbody>' +
-        '<tr><td>Recuperação financeira total (retrabalho + pagamentos indevidos)</td><td style="text-align:right" class="roi-val">'+fmtNum(r.estrategica.recTotal)+'</td></tr>' +
-        '<tr><td>Capacidade de gestão liberada ('+fmtH(r.estrategica.horasLib)+')</td><td style="text-align:right" class="roi-val">'+fmtNum(r.estrategica.valorCapacidade)+'</td></tr>' +
-        '<tr><td>Investimento Agilean (preço por obra desta proposta)</td><td style="text-align:right" class="roi-val">− '+fmtNum(mensalidadeProposta)+'/mês</td></tr>' +
-        '<tr class="roi-total"><td>Horas recuperadas/mês por obra (visão operacional)</td><td style="text-align:right">'+fmtH(r.operacional.hMes)+'</td></tr>' +
-      '</tbody></table>' +
-    '</div>';
-
-  container.innerHTML =
-    '<div class="rep-sec-title">Retorno Projetado</div>' +
-    '<div style="font-size:12px;color:#94a3b8;margin-bottom:14px">Com base no investimento proposto na seção anterior — preço de '+fmtNum(mensalidadeProposta)+'/mês por obra, comparado ao ganho de uma obra.</div>' +
-    '<div style="display:grid;grid-template-columns:repeat(2,1fr);gap:10px;margin-bottom:10px">' +
-      kpi('ROI Mensal', Math.round(r.estrategica.roi*100)+'%', 'sobre o preço por obra, por mês') +
-      kpi('Payback', pb.txt, pb.sub) +
-    '</div>' +
-    '<div style="display:grid;grid-template-columns:repeat(3,1fr);gap:10px">' +
-      kpi('Horas recuperadas/mês', fmtH(r.operacional.hMes), 'por obra') +
-      kpi('Horas recuperadas/obra', fmtH(r.operacional.hObra), 'ao longo de '+r.prazo+' meses de obra') +
-      kpi('% da jornada liberada', (Math.round(r.operacional.pctJornada*1000)/10)+'%', 'da jornada individual do time técnico') +
     '</div>' +
     memoria;
 }
 
-// ── SEÇÃO 5: O QUE MUDA A PARTIR DA ASSINATURA (30/60/90 DIAS) ──────────────
-// Reaproveita a mesma seleção de fases do Escopo (selectRoadmapSprints),
-// resumida em marcos de timeline, com nomes de responsáveis: papel fixo do
-// lado Agilean ("Implementation Manager Agilean") e o contato/cargo reais
-// capturados no diagnóstico (S.contato/S.cargo) do lado do cliente.
-function buildPropostaTimeline(mode) {
-  var container = document.getElementById('prop-timeline-container');
-  if (!container) return;
-  var isResumido = (mode === 'resumido');
+// ── SEÇÃO 10: RETORNO PROJETADO (#12) ───────────────────────────────────────
+// #12: título com nome da empresa; cenário ÚNICO Base (captura 50% =
+// ROI_CAPTURA_FIXA); duração do ROI = média das obras (S.prazoMedio, já usada
+// internamente por calcROIReal); payback recapitulado.
+function buildPropostaRetorno(mode) {
+  var c = document.getElementById('prop-retorno-container'); if (!c) return;
+  var emp = S.empresa || 'sua empresa';
+  var roi = calculateROI();
+  var precoObra = precoPorObraPadrao(S.numObras);
+  var r = calcROIRealComMensalidade(ROI_CAPTURA_FIXA, precoObra);
+  var pb = fmtPayback(r.estrategica.payback);
+  var valorCapturado = Math.round(roi.totalPortfolio * ROI_CAPTURA_FIXA);
+  var prazo = r.prazo;
+  var fmtH = function(n){ return (n||0).toLocaleString('pt-BR',{maximumFractionDigits:1}) + ' h'; };
 
-  var sel = selectRoadmapSprints();
-  var sprints = sel.sprintDefs;
-  var pontoFocal = 'Ponto focal ' + (S.contato || S.empresa || 'do cliente') + (S.cargo ? ', ' + S.cargo : '');
-
-  var marks = sprints.map(function(sp) {
-    var isDeferred = !!sp.deferred;
-    var marco = isDeferred ? 'Mês 4+' : ('Dia ' + (parseInt((sp.lbl||'S1').replace('S',''),10) * 30));
-    var bulletCount = isResumido ? 2 : 3;
-    var bullets = sp.items.slice(0, bulletCount).map(function(it){ return '<li>'+it+'</li>'; }).join('');
-    return '<div class="sprint">' +
-      '<div class="sprint-marker">' +
-        '<div class="sprint-dot" style="background:'+(isDeferred?'rgba(74,69,88,0.8)':sp.color)+';color:white;font-size:'+(isDeferred?'9px':'11px')+'">'+sp.lbl+'</div>' +
-        '<div class="sprint-line"></div>' +
-        '<div class="sprint-lbl">'+marco+'</div>' +
-      '</div>' +
-      '<div class="sprint-body">' +
-        '<h4 style="color:'+(isDeferred?'#9ca3af':sp.color)+'">'+sp.title+'</h4>' +
-        '<ul>'+bullets+'</ul>' +
-        '<div style="margin-top:10px;font-size:10.5px;color:#94a3b8;display:flex;flex-wrap:wrap;gap:14px">' +
-          '<span><strong style="color:#ea580c">Agilean:</strong> Implementation Manager Agilean</span>' +
-          '<span><strong style="color:#94a3b8">Cliente:</strong> '+pontoFocal+'</span>' +
-        '</div>' +
-      '</div>' +
+  // Documento único: "Como é calculado" sempre exibido (mantido por decisão do
+  // Israel em 2026-09-28).
+  var memoria =
+    '<div style="margin-top:16px;padding-top:12px;border-top:1px solid rgba(255,255,255,0.08)">' +
+      '<div style="font-size:10.5px;font-weight:700;text-transform:uppercase;letter-spacing:0.08em;color:#94a3b8;margin-bottom:8px">Como é calculado</div>' +
+      '<table class="roi-table"><thead><tr><th>Item</th><th style="text-align:right">Valor</th></tr></thead><tbody>' +
+        '<tr><td>Exposição total no portfólio (Mapa de Perdas)</td><td style="text-align:right" class="roi-val">'+fmtNum(roi.totalPortfolio)+'</td></tr>' +
+        '<tr><td>Fração capturada — cenário Base (50%)</td><td style="text-align:right" class="roi-val">'+fmtNum(valorCapturado)+'</td></tr>' +
+        '<tr><td>Recuperação financeira + capacidade de gestão liberada ('+fmtH(r.estrategica.horasLib)+'/mês)</td><td style="text-align:right" class="roi-val">'+fmtNum(r.estrategica.recTotal + r.estrategica.valorCapacidade)+'/mês</td></tr>' +
+        '<tr><td>Investimento (preço da plataforma por obra)</td><td style="text-align:right" class="roi-val">− '+fmtNum(precoObra)+'/mês</td></tr>' +
+        '<tr class="roi-total"><td>Duração considerada (média das obras)</td><td style="text-align:right">'+prazo+' meses</td></tr>' +
+      '</tbody></table>' +
     '</div>';
-  }).join('');
 
-  container.innerHTML =
-    '<div class="rep-sec-title">O que muda a partir da assinatura</div>' +
-    '<div style="font-size:12px;color:#94a3b8;margin-bottom:14px">Linha do tempo dos primeiros marcos de implementação, com responsáveis definidos de ambos os lados.</div>' +
-    marks;
+  c.innerHTML =
+    propSecHead('10', 'Retorno Projetado para a ' + emp) +
+    propLead('Consultoria de resultado não promete número mágico. Partimos da exposição de '+fmtNum(roi.totalPortfolio)+' do diagnóstico e do <strong style="color:#f8fafc">cenário Base — captura de 50%</strong>, medido sobre a duração média das obras da '+emp+' ('+prazo+' meses), não sobre um ano travado.') +
+    '<div style="display:grid;grid-template-columns:repeat(3,1fr);gap:14px">' +
+      propKpi('Valor recuperado · Base', fmtNum(valorCapturado), 'Captura de 50% da exposição sobre o ciclo das obras ('+prazo+' meses).', true) +
+      propKpi('ROI Mensal', Math.round(r.estrategica.roi*100)+'%', 'sobre o preço por obra da plataforma, por mês.') +
+      propKpi('Payback', pb.txt, pb.sub) +
+    '</div>' +
+    '<div style="display:grid;grid-template-columns:repeat(3,1fr);gap:12px;margin-top:12px">' +
+      propKpi('Horas recuperadas/mês', fmtH(r.operacional.hMes), 'por obra') +
+      propKpi('Horas recuperadas/obra', fmtH(r.operacional.hObra), 'ao longo de '+prazo+' meses') +
+      propKpi('% da jornada liberada', (Math.round(r.operacional.pctJornada*1000)/10)+'%', 'do time técnico') +
+    '</div>' +
+    memoria;
 }
 
-// ── SEÇÃO 6: TERMOS & PRÓXIMO PASSO ─────────────────────────────────────────
-// Duração do contrato = prazo médio das obras do lead (S.prazoMedio) — decisão
-// validada com o usuário: o contrato acompanha o ciclo de vida típico das
-// obras do portfólio, não um prazo fixo genérico. As demais condições
-// (reajuste, validade da proposta) são PLACEHOLDER explícito aguardando
-// decisão de negócio (ver PLANO_PROPOSTA_COMERCIAL_REUNIAO2.md §4.3-4.4).
+// ── SEÇÃO 11: TERMOS & PRÓXIMO PASSO (#13) ──────────────────────────────────
+// #13: tom consultivo; próximo passo gera compromisso real (data de Kick-Off +
+// recebimento do planejamento e orçamento das obras contempladas).
 function buildPropostaTermos(mode) {
-  var container = document.getElementById('prop-termos-container');
-  if (!container) return;
-
-  var prazoMeses = S.prazoMedio || 18;
+  var c = document.getElementById('prop-termos-container'); if (!c) return;
+  var emp = S.empresa || 'sua empresa';
   var hoje = new Date();
   var validade = new Date(hoje.getTime() + 15*24*60*60*1000);
   var validadeFmt = validade.toLocaleDateString('pt-BR');
 
   var termo = function(label, value) {
-    return '<div style="padding:14px 16px;background:#1a1c26;border:1px solid rgba(255,255,255,0.08);border-radius:8px">' +
+    return '<div style="padding:14px 16px;background:#1a1c26;border:1px solid rgba(255,255,255,0.08);border-radius:10px">' +
       '<div style="font-size:10px;color:#94a3b8;text-transform:uppercase;letter-spacing:0.08em;margin-bottom:6px">'+label+'</div>' +
-      '<div style="font-size:12.5px;color:#e2e8f0;line-height:1.55">'+value+'</div>' +
+      '<div style="font-size:12.5px;color:#e2e8f0;line-height:1.5">'+value+'</div>' +
     '</div>';
   };
 
-  container.innerHTML =
-    '<div style="font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:0.12em;color:#ea580c;margin-bottom:14px">Termos & Próximo Passo</div>' +
-    '<div style="display:grid;grid-template-columns:repeat(2,1fr);gap:12px;margin-bottom:20px">' +
-      termo('Duração do contrato', 'Contrato com duração de <strong style="color:#f8fafc">'+prazoMeses+' meses</strong>, alinhado ao prazo médio das obras do portfólio da '+(S.empresa||'empresa')+' — renovação conforme necessidade de novas obras.') +
-      termo('Política de reajuste', '<em>[placeholder — a confirmar pelo time comercial]</em> Reajuste anual por IPCA (ou índice equivalente), a partir do 13º mês de vigência.') +
-      termo('Validade desta proposta', 'Válida por 15 dias a partir da data de emissão — até <strong style="color:#f8fafc">'+validadeFmt+'</strong>.') +
-      termo('Formalização', '<em>[placeholder — a confirmar pelo time comercial]</em> Aceite simples nesta primeira versão, sem assinatura eletrônica formal.') +
+  c.innerHTML =
+    propSecHead('11', 'Termos & Próximo Passo') +
+    '<div style="display:grid;grid-template-columns:repeat(4,1fr);gap:12px;margin-bottom:20px">' +
+      termo('Programa', fmtBRL(PROP_PROGRAMA_MENSAL)+'/mês · '+PROP_PROGRAMA_MESES+' meses') +
+      termo('Plataforma (após)', 'Contrato anual · por obra') +
+      termo('Inclui', 'Plataforma inclusa durante o programa') +
+      termo('Validade', '15 dias — até '+validadeFmt) +
     '</div>' +
-    // CTA de aceite — puramente visual neste protótipo. O gravamento do aceite
-    // no Supabase (registro de estágio de funil "Proposta aceita") é um
-    // next-step, fora do escopo desta rodada (ver PLANO_PROPOSTA_COMERCIAL_REUNIAO2.md §5).
-    '<div style="text-align:center;padding:22px;background:linear-gradient(135deg,rgba(234,88,12,0.14),rgba(234,88,12,0.04));border:1.5px solid rgba(234,88,12,0.4);border-radius:10px">' +
-      '<div style="font-size:13px;color:#e2e8f0;margin-bottom:14px">Pronto para destravar a produtividade da sua operação com o SIIGA?</div>' +
-      '<div style="display:inline-block;padding:13px 34px;background:#ea580c;color:white;border-radius:8px;font-family:Bai Jamjuree;font-weight:700;font-size:14px;letter-spacing:0.03em">✓ Aceitar Proposta</div>' +
-      '<div style="font-size:10px;color:#94a3b8;margin-top:12px">Botão ilustrativo neste protótipo — o registro de aceite no Supabase é o próximo passo de implementação.</div>' +
+    '<div style="padding:22px 24px;background:linear-gradient(135deg,rgba(234,88,12,0.14),rgba(234,88,12,0.04));border:1.5px solid rgba(234,88,12,0.4);border-radius:12px">' +
+      '<div style="font-size:16px;font-weight:700;color:#f8fafc;margin-bottom:12px">Próximo passo</div>' +
+      '<div style="font-size:13px;color:#e2e8f0;line-height:1.7">Para avançarmos, será necessário <strong style="color:#f8fafc">definirmos a data do Kick-Off</strong> e <strong style="color:#f8fafc">recebermos o planejamento e o orçamento das obras</strong> que serão contempladas no programa. Confirmada a data, a Agilean inicia a Fase 1 na semana seguinte, começando pelo Workshop Lean Experience.</div>' +
+      '<div style="display:inline-block;margin-top:16px;padding:10px 20px;border:1px solid rgba(234,88,12,0.5);border-radius:8px;font-size:12px;color:#fbbf24">⏳ Validade até '+validadeFmt+' · 15 dias (ajustável pelo vendedor)</div>' +
     '</div>';
 }
 
-// Constrói todas as 6 seções da Proposta no DOM (#screen-proposta), segundo o
-// modo (resumido/detalhado) — chamado por generateProposta() antes da captura.
+// Constrói todas as seções da Proposta no DOM (#screen-proposta), na ordem
+// definida no "Considerações da Proposta.docx" (1→13). Chamado por
+// generateProposta() antes da captura.
 function buildProposta(mode) {
-  buildPropostaCapa(mode);
-  buildPropostaEscopo(mode);
+  buildPropostaHero(mode);
+  buildPropostaRecap(mode);
+  buildPropostaGaps(mode);
+  buildPropostaObjetivo(mode);
+  buildPropostaPrograma(mode);
+  buildPropostaResultados(mode);
+  buildPropostaJornada(mode);
+  buildPropostaMetodo(mode);
+  buildPropostaDepoimentos(mode);
   buildPropostaInvestimento(mode);
   buildPropostaRetorno(mode);
-  buildPropostaTimeline(mode);
   buildPropostaTermos(mode);
 }
 
@@ -5692,26 +5957,32 @@ function generateProposta(mode) {
     var heightsPx = sections.map(function(s){ return s.getBoundingClientRect().height; });
     var PAGE_SAFETY_MM = 6;
 
-    // Bin-packing por data-section (mesma regra de generatePDF, simplificada:
-    // aqui não há pares de seção liberados — cada uma das 6 seções da
-    // Proposta abre página nova, cards da MESMA seção podem ficar juntos).
+    // Bin-packing por ALTURA (fluxo): as seções se agrupam para preencher cada
+    // página, sem forçar quebra a cada data-section — elimina o espaço morto que
+    // seções curtas deixavam quando cada uma abria página nova. Única exceção: o
+    // HERO (proposta-hero) fica sozinho como capa. GAP_MM aproxima a margem
+    // entre cards empilhados (rep-mb) para o cálculo de caber na página.
+    var GAP_MM = 5;
     var pageGroups = [];
     var cur = [], curHMm = 0, curSection = null;
     for(var i = 0; i < sections.length; i++) {
       var hMm = heightsPx[i] * mmPerPx;
       var availMm = (pageGroups.length === 0 ? (pageH - margin - 10) : (pageH - margin - margin)) - PAGE_SAFETY_MM;
       var secId = sections[i].getAttribute('data-section') || ('__sec' + i);
-      var sameSection = (curSection !== null && secId === curSection);
-      var pageEmpty = (cur.length === 0);
-      var forceBreak = (cur.length > 0) && !sameSection;
-      var fitsHeight = (curHMm + hMm) <= availMm;
+      var isHero = (secId === 'proposta-hero');
+      var prevHero = (curSection === 'proposta-hero');
+      // hero sempre isolado; demais seções só quebram quando não cabem em altura
+      var forceBreak = (cur.length > 0) && (isHero || prevHero);
+      var addHMm = hMm + (cur.length > 0 ? GAP_MM : 0);
+      var fitsHeight = (curHMm + addHMm) <= availMm;
 
       if(cur.length > 0 && (forceBreak || !fitsHeight)) {
         pageGroups.push(cur);
         cur = []; curHMm = 0; curSection = null;
+        addHMm = hMm; // primeira seção da nova página não soma GAP
       }
       cur.push(i);
-      curHMm += hMm;
+      curHMm += addHMm;
       curSection = secId;
     }
     if(cur.length > 0) pageGroups.push(cur);
@@ -5721,11 +5992,12 @@ function generateProposta(mode) {
     function finish() {
       var empresa = (S.empresa || 'prospect').replace(/[^a-zA-Z0-9]/g, '_');
       var data = (S.data || new Date().toISOString().split('T')[0]);
-      var suffix = isResumido ? '_RESUMIDO' : '_DETALHADO';
+      // Documento único (a Proposta não tem versão resumida/detalhada como o
+      // Diagnóstico — só o conteúdo completo). Sem sufixo no nome do arquivo.
       window.__LAST_PROPOSTA_PDF_DATA = pdf.output('datauristring');
-      pdf.save('SIIGA_Proposta_' + empresa + suffix + '_' + data + '.pdf');
+      pdf.save('SIIGA_Proposta_' + empresa + '_' + data + '.pdf');
       document.body.removeChild(loadDiv);
-      showToast('Proposta ' + (isResumido ? 'Resumida ' : 'Detalhada ') + 'gerada com sucesso!');
+      showToast('Proposta gerada com sucesso!');
     }
 
     function fail(err) {
@@ -5751,7 +6023,7 @@ function generateProposta(mode) {
 
       pdf.setFontSize(7);
       pdf.setTextColor(148, 163, 184); // #94a3b8
-      pdf.text('SIIGA · Agilean · Proposta Comercial (Executive Dark)', margin, pageH - 4);
+      pdf.text('SIIGA · Agilean · Proposta de Escopo de Projeto', margin, pageH - 4);
       pdf.text('Página ' + (globalPageNum + 1), pageW - margin - 15, pageH - 4);
 
       globalPageNum++;

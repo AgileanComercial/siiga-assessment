@@ -690,8 +690,7 @@ function maskPhone(input){var d=input.value.replace(/\D/g,'');if(d.length>11)d=d
         <button class="btn btn-s" onclick="window.print()">🖨 Imprimir</button>
         <button class="btn btn-p" onclick="generatePDF(false, window.reportPdfTheme, 'resumido')" style="background:#14161f;border:1.5px solid #ff5f1f;color:#ff5f1f;box-shadow:0 0 14px rgba(255,95,31,0.25)" title="Versão enxuta, para entregar ao cliente">📄 Gerar PDF Resumido</button>
         <button class="btn btn-p" onclick="generatePDF(false, window.reportPdfTheme, 'detalhado')" style="background:#14161f;border:1.5px solid #1B4F8A;color:#7fb0ff;box-shadow:0 0 14px rgba(27,79,138,0.25)" title="Versão completa, com tabelas e pressupostos, para apresentação ao vivo">🖥️ Gerar PDF Detalhado</button>
-        <button class="btn btn-p" onclick="generateProposta('resumido')" style="background:#14161f;border:1.5px solid #10b981;color:#34d399;box-shadow:0 0 14px rgba(16,185,129,0.2)" title="Proposta Comercial (reunião 2) — versão enxuta">📝 Gerar Proposta Resumida</button>
-        <button class="btn btn-p" onclick="generateProposta('detalhado')" style="background:#14161f;border:1.5px solid #10b981;color:#34d399;box-shadow:0 0 14px rgba(16,185,129,0.2)" title="Proposta Comercial (reunião 2) — versão completa">📝 Gerar Proposta Detalhada</button>
+        <button class="btn btn-p" onclick="generateProposta('detalhado')" style="background:#14161f;border:1.5px solid #10b981;color:#34d399;box-shadow:0 0 14px rgba(16,185,129,0.2)" title="Proposta do Escopo de Projeto (reunião 2) — documento único">📝 Gerar Proposta</button>
         <button class="btn btn-p" onclick="restartAssessment()">Novo Diagnóstico</button>
       </div>
     </div>
@@ -701,34 +700,65 @@ function maskPhone(input){var d=input.value.replace(/\D/g,'');if(d.length>11)d=d
 
 <!-- PROPOSTA COMERCIAL SCREEN (reunião 2) — documento SEPARADO do Diagnóstico
      (screen-report acima). Ver PLANO_PROPOSTA_COMERCIAL_REUNIAO2.md (raiz do
-     projeto) para o contexto de negócio completo. 6 seções, cada uma com seu
-     próprio data-section (proposta-capa/escopo/investimento/retorno/timeline/
-     termos) — não colidem com os data-section do Diagnóstico (gaps/perdas/
-     ganhos/roi/cta-final), então o bin-packing de generateProposta() (script.js)
+     projeto) para o contexto de negócio completo. 12 seções (ordem 1→13 do
+     "Considerações da Proposta.docx"), cada uma com seu próprio data-section
+     (proposta-hero/recap/gaps/objetivo/programa/resultados/jornada/metodo/
+     depoimentos/investimento/retorno/termos) — não colidem com os data-section
+     do Diagnóstico (gaps/perdas/ganhos/roi/cta-final), então o bin-packing de generateProposta() (script.js)
      sempre isola cada seção em seu próprio grupo de páginas. Conteúdo
      preenchido por buildProposta(mode) — mode 'resumido'/'detalhado', mesmo
      conceito de profundidade já usado no Diagnóstico. -->
 <div class="screen" id="screen-proposta">
   <div style="width:100%;max-width:920px">
 
-    <div class="card card-wide rep-mb" id="prop-capa-card" data-section="proposta-capa" style="background:#151720;border:1px solid rgba(255,255,255,0.06)">
-      <div id="prop-capa-container"></div>
+    <!-- 12 seções na ordem do "Considerações da Proposta.docx" (1→13; a antiga
+         faixa de destaque do valor anual foi retirada). Cada card tem seu próprio
+         data-section (proposta-hero/recap/gaps/objetivo/programa/resultados/
+         jornada/metodo/depoimentos/investimento/retorno/termos) — o bin-packing
+         de generateProposta() isola cada seção em sua própria página. -->
+
+    <div class="card card-wide rep-mb" id="prop-hero-card" data-section="proposta-hero" style="background:#151720;border:1px solid rgba(255,255,255,0.06);padding:0;overflow:hidden">
+      <div id="prop-hero-container"></div>
     </div>
 
-    <div class="card card-wide rep-mb" id="prop-escopo-card" data-keep-group="proposta-escopo" data-section="proposta-escopo">
-      <div id="prop-escopo-container"></div>
+    <div class="card card-wide rep-mb" id="prop-recap-card" data-section="proposta-recap" style="background:#151720;border:1px solid rgba(255,255,255,0.06);padding:22px 26px">
+      <div id="prop-recap-container"></div>
     </div>
 
-    <div class="card card-wide rep-mb" id="prop-investimento-card" data-keep-group="proposta-investimento" data-section="proposta-investimento">
+    <div class="card card-wide rep-mb" id="prop-gaps-card" data-section="proposta-gaps" style="background:#151720;border:1px solid rgba(255,255,255,0.06);padding:22px 26px">
+      <div id="prop-gaps-container"></div>
+    </div>
+
+    <div class="card card-wide rep-mb" id="prop-objetivo-card" data-section="proposta-objetivo" style="background:#151720;border:1px solid rgba(255,255,255,0.06);padding:22px 26px">
+      <div id="prop-objetivo-container"></div>
+    </div>
+
+    <div class="card card-wide rep-mb" id="prop-programa-card" data-section="proposta-programa" style="background:#151720;border:1px solid rgba(255,255,255,0.06);padding:22px 26px">
+      <div id="prop-programa-container"></div>
+    </div>
+
+    <div class="card card-wide rep-mb" id="prop-resultados-card" data-section="proposta-resultados" style="background:#151720;border:1px solid rgba(255,255,255,0.06);padding:22px 26px">
+      <div id="prop-resultados-container"></div>
+    </div>
+
+    <div class="card card-wide rep-mb" id="prop-jornada-card" data-section="proposta-jornada" style="background:#151720;border:1px solid rgba(255,255,255,0.06);padding:22px 26px">
+      <div id="prop-jornada-container"></div>
+    </div>
+
+    <div class="card card-wide rep-mb" id="prop-metodo-card" data-section="proposta-metodo" style="background:#151720;border:1px solid rgba(255,255,255,0.06);padding:22px 26px">
+      <div id="prop-metodo-container"></div>
+    </div>
+
+    <div class="card card-wide rep-mb" id="prop-depoimentos-card" data-section="proposta-depoimentos" style="background:#151720;border:1px solid rgba(255,255,255,0.06);padding:22px 26px">
+      <div id="prop-depoimentos-container"></div>
+    </div>
+
+    <div class="card card-wide rep-mb" id="prop-investimento-card" data-section="proposta-investimento" style="background:#151720;border:1px solid rgba(255,255,255,0.06);padding:22px 26px">
       <div id="prop-investimento-container"></div>
     </div>
 
-    <div class="card card-wide rep-mb" id="prop-retorno-card" data-keep-group="proposta-retorno" data-section="proposta-retorno">
+    <div class="card card-wide rep-mb" id="prop-retorno-card" data-section="proposta-retorno" style="background:#151720;border:1px solid rgba(255,255,255,0.06);padding:22px 26px">
       <div id="prop-retorno-container"></div>
-    </div>
-
-    <div class="card card-wide rep-mb" id="prop-timeline-card" data-keep-group="proposta-timeline" data-section="proposta-timeline">
-      <div id="prop-timeline-container"></div>
     </div>
 
     <div class="card card-wide rep-mb" id="prop-termos-card" data-section="proposta-termos" style="background:#151720;border:1px solid rgba(255,255,255,0.06);padding:22px 26px">
@@ -738,8 +768,7 @@ function maskPhone(input){var d=input.value.replace(/\D/g,'');if(d.length>11)d=d
     <div class="btn-row no-print" style="max-width:920px;justify-content:space-between">
       <button class="btn btn-s" onclick="showScreen('screen-report')">← Voltar ao Relatório</button>
       <div style="display:flex;gap:10px;flex-wrap:wrap;justify-content:flex-end">
-        <button class="btn btn-p" onclick="generateProposta('resumido')" style="background:#14161f;border:1.5px solid #10b981;color:#34d399">📝 Gerar Proposta Resumida</button>
-        <button class="btn btn-p" onclick="generateProposta('detalhado')" style="background:#14161f;border:1.5px solid #10b981;color:#34d399">📝 Gerar Proposta Detalhada</button>
+        <button class="btn btn-p" onclick="generateProposta('detalhado')" style="background:#14161f;border:1.5px solid #10b981;color:#34d399">📝 Gerar Proposta</button>
       </div>
     </div>
   </div>
