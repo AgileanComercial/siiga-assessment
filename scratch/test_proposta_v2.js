@@ -42,7 +42,7 @@ server.listen(PORT, async () => {
     page.on('pageerror', err => { console.log('PAGE ERROR:', err.message); fails.push('pageerror: ' + err.message); });
     page.on('dialog', d => d.dismiss());
     await page.setViewport({ width: 1280, height: 1000, deviceScaleFactor: 2 });
-    const URL = 'http://localhost:' + PORT + '/index.html';
+    const URL = process.env.URL || ('http://localhost:' + PORT + '/index.html');
     await page.goto(URL, { waitUntil: 'networkidle0' });
     await page.evaluate(() => { try { localStorage.clear(); } catch (e) {} });
 
@@ -150,8 +150,8 @@ server.listen(PORT, async () => {
     check('#11 investimento personalizado', has('Investimento Personalizado para a CONSTRUTORA MERIDIANO'));
     check('#11 sem chips de módulos', !has('MO3') && !has('MOP') && !has('CPO'));
     check('#12 retorno projetado personalizado', has('Retorno Projetado para a CONSTRUTORA MERIDIANO'));
-    check('#12 cenário Base 50% + média das obras + payback', has('captura de 50%') && has('duração média das obras') && has('Payback'));
-    check('#12 cenário único (sem Agressivo/Pleno)', !has('AGRESSIVO') && !has('Agressivo'));
+    check('#12 exposição bruta × ganho capturável + payback', has('Exposição em Risco') && has('Ganho capturável com o programa') && has('fator de captura pela maturidade') && has('Payback'));
+    check('#12 sem duplo desconto (sem "captura de 50%")', !has('captura de 50%') && !has('AGRESSIVO') && !has('Agressivo'));
     check('#13 próximo passo consultivo (kick-off + orçamento das obras)', has('data do Kick-Off') && has('planejamento e o orçamento das obras'));
     check('sem título antigo "Proposta Comercial" na tela', !has('Proposta Comercial'));
     // documento único: a memória de cálculo (detalhado) está presente

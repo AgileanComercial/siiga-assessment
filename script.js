@@ -5430,7 +5430,7 @@ function buildPropostaRecap(mode) {
     propLead('Os três números que fecharam a 1ª reunião — a régua contra a qual mediremos o programa.') +
     '<div style="display:grid;grid-template-columns:repeat(3,1fr);gap:14px;margin-bottom:22px">' +
       propKpi('SIIGA Score', m.score+'<span style="font-size:15px;color:#94a3b8">/'+m.max+'</span>', 'Nível '+m.nivel+' — '+Math.round(m.pct*100)+'% da maturidade de referência.') +
-      propKpi('Exposição em Risco', fmtNum(roi.totalPortfolio), 'Perda estimada no portfólio pela falta de rastreabilidade e controle.', true) +
+      propKpi('Exposição em Risco', fmtNum(Math.round(roi.totalBase*(S.numObras||5))), 'Perda bruta estimada no portfólio, sem intervenção.', true) +
       propKpi('Payback Projetado', paybackTxt, 'Tempo para o programa se pagar com o valor recuperado.') +
     '</div>' +
     '<div style="font-size:10.5px;font-weight:700;text-transform:uppercase;letter-spacing:0.1em;color:#94a3b8;margin-bottom:12px">Maturidade por pilar <span style="font-weight:400;text-transform:none;letter-spacing:0">· marcador claro = benchmark de mercado</span></div>' +
@@ -5459,14 +5459,18 @@ function buildPropostaGaps(mode) {
     '</div>';
   }).join('');
 
-  var items = roi.items.slice().sort(function(a,b){ return b.portfolio - a.portfolio; });
-  var maxV = items.reduce(function(a,b){ return Math.max(a, b.portfolio); }, 1);
+  // Composição da EXPOSIÇÃO (perda bruta = baseValue × nº de obras, antes do fator
+  // de captura) — mesma base do "Perda bruta (portfólio)" do diagnóstico.
+  var nObras = S.numObras || 5;
+  var perdaBruta = Math.round(roi.totalBase * nObras);
+  var items = roi.items.slice().sort(function(a,b){ return b.baseValue - a.baseValue; });
+  var maxV = items.reduce(function(a,b){ return Math.max(a, b.baseValue); }, 1);
   var compRows = items.map(function(it){
-    var w = Math.max(3, Math.round((it.portfolio / maxV) * 100));
+    var w = Math.max(3, Math.round((it.baseValue / maxV) * 100));
     return '<div style="display:flex;align-items:center;gap:12px;margin-bottom:9px">' +
       '<div style="flex:0 0 210px;font-size:11.5px;color:#e2e8f0">'+it.label+'</div>' +
       '<div style="flex:1;height:16px;background:rgba(255,255,255,0.05);border-radius:5px;overflow:hidden"><div style="height:100%;width:'+w+'%;background:linear-gradient(90deg,#ea580c,#f97316);border-radius:5px"></div></div>' +
-      '<div style="flex:0 0 90px;text-align:right;font-size:11.5px;font-weight:700;color:#f8fafc;font-variant-numeric:tabular-nums">'+fmtNum(it.portfolio)+'</div>' +
+      '<div style="flex:0 0 90px;text-align:right;font-size:11.5px;font-weight:700;color:#f8fafc;font-variant-numeric:tabular-nums">'+fmtNum(it.baseValue*nObras)+'</div>' +
     '</div>';
   }).join('');
 
@@ -5475,7 +5479,7 @@ function buildPropostaGaps(mode) {
     propLead('A operação da '+emp+' escala mais rápido que os controles. Cada gap abaixo tem um custo que hoje passa despercebido.') +
     '<div style="display:grid;grid-template-columns:repeat(3,1fr);gap:14px;margin-bottom:24px">' + cards + '</div>' +
     '<div style="padding:18px 20px;background:#151824;border:1px solid rgba(255,255,255,0.06);border-radius:10px">' +
-      '<div style="font-size:12px;font-weight:700;color:#e2e8f0;margin-bottom:14px">Onde o '+fmtNum(roi.totalPortfolio)+' se forma — composição da exposição no portfólio</div>' +
+      '<div style="font-size:12px;font-weight:700;color:#e2e8f0;margin-bottom:14px">Onde o '+fmtNum(perdaBruta)+' se forma — composição da exposição no portfólio</div>' +
       compRows +
     '</div>';
 }
@@ -5814,9 +5818,17 @@ function buildPropostaRetorno(mode) {
   var precoObra = precoPorObraPadrao(S.numObras);
   var r = calcROIRealComMensalidade(ROI_CAPTURA_FIXA, precoObra);
   var pb = fmtPayback(r.estrategica.payback);
-  var valorCapturado = Math.round(roi.totalPortfolio * ROI_CAPTURA_FIXA);
   var prazo = r.prazo;
   var fmtH = function(n){ return (n||0).toLocaleString('pt-BR',{maximumFractionDigits:1}) + ' h'; };
+
+  // Perda bruta (exposição, sem intervenção) × ganho capturável com o SIIGA —
+  // mesmos conceitos do diagnóstico (seção "Da Perda ao Ganho Capturável"). O
+  // fator de captura (pela maturidade) já está embutido em roi.totalPortfolio;
+  // NÃO aplicar nenhum desconto adicional aqui.
+  var nObras = S.numObras || 5;
+  var perdaBruta = Math.round(roi.totalBase * nObras);
+  var capturavel = roi.totalPortfolio;
+  var fatorCapturaPct = perdaBruta ? Math.round(capturavel / perdaBruta * 100) : 0;
 
   // Documento único: "Como é calculado" sempre exibido (mantido por decisão do
   // Israel em 2026-09-28).
@@ -5824,25 +5836,26 @@ function buildPropostaRetorno(mode) {
     '<div style="margin-top:16px;padding-top:12px;border-top:1px solid rgba(255,255,255,0.08)">' +
       '<div style="font-size:10.5px;font-weight:700;text-transform:uppercase;letter-spacing:0.08em;color:#94a3b8;margin-bottom:8px">Como é calculado</div>' +
       '<table class="roi-table"><thead><tr><th>Item</th><th style="text-align:right">Valor</th></tr></thead><tbody>' +
-        '<tr><td>Exposição total no portfólio (Mapa de Perdas)</td><td style="text-align:right" class="roi-val">'+fmtNum(roi.totalPortfolio)+'</td></tr>' +
-        '<tr><td>Fração capturada — cenário Base (50%)</td><td style="text-align:right" class="roi-val">'+fmtNum(valorCapturado)+'</td></tr>' +
+        '<tr><td>Exposição bruta no portfólio (sem intervenção)</td><td style="text-align:right" class="roi-val">'+fmtNum(perdaBruta)+'</td></tr>' +
+        '<tr><td>Fator de captura (pela maturidade atual)</td><td style="text-align:right" class="roi-val">'+fatorCapturaPct+'%</td></tr>' +
+        '<tr class="roi-total"><td>Ganho capturável com o SIIGA</td><td style="text-align:right">'+fmtNum(capturavel)+'</td></tr>' +
         '<tr><td>Recuperação financeira + capacidade de gestão liberada ('+fmtH(r.estrategica.horasLib)+'/mês)</td><td style="text-align:right" class="roi-val">'+fmtNum(r.estrategica.recTotal + r.estrategica.valorCapacidade)+'/mês</td></tr>' +
         '<tr><td>Investimento (preço da plataforma por obra)</td><td style="text-align:right" class="roi-val">− '+fmtNum(precoObra)+'/mês</td></tr>' +
-        '<tr class="roi-total"><td>Duração considerada (média das obras)</td><td style="text-align:right">'+prazo+' meses</td></tr>' +
+        '<tr><td>Duração considerada (média das obras)</td><td style="text-align:right">'+prazo+' meses</td></tr>' +
       '</tbody></table>' +
     '</div>';
 
   c.innerHTML =
     propSecHead('10', 'Retorno Projetado para a ' + emp) +
-    propLead('Consultoria de resultado não promete número mágico. Partimos da exposição de '+fmtNum(roi.totalPortfolio)+' do diagnóstico e do <strong style="color:#f8fafc">cenário Base — captura de 50%</strong>, medido sobre a duração média das obras da '+emp+' ('+prazo+' meses), não sobre um ano travado.') +
+    propLead('Consultoria de resultado não promete número mágico. Partimos da exposição de <strong style="color:#f8fafc">'+fmtNum(perdaBruta)+'</strong> do diagnóstico; aplicando o fator de captura pela maturidade atual ('+fatorCapturaPct+'%), o ganho que o programa propõe recuperar é <strong style="color:#f8fafc">'+fmtNum(capturavel)+'</strong> — medido sobre a duração média das obras da '+emp+' ('+prazo+' meses).') +
     '<div style="display:grid;grid-template-columns:repeat(3,1fr);gap:14px">' +
-      propKpi('Valor recuperado · Base', fmtNum(valorCapturado), 'Captura de 50% da exposição sobre o ciclo das obras ('+prazo+' meses).', true) +
-      propKpi('ROI Mensal', Math.round(r.estrategica.roi*100)+'%', 'sobre o preço por obra da plataforma, por mês.') +
+      propKpi('Exposição em Risco', fmtNum(perdaBruta), 'Perda bruta no portfólio, sem intervenção.') +
+      propKpi('Ganho capturável com o programa', fmtNum(capturavel), 'O que o SIIGA propõe recuperar (fator de captura da maturidade).', true) +
       propKpi('Payback', pb.txt, pb.sub) +
     '</div>' +
     '<div style="display:grid;grid-template-columns:repeat(3,1fr);gap:12px;margin-top:12px">' +
+      propKpi('ROI Mensal', Math.round(r.estrategica.roi*100)+'%', 'sobre o preço por obra da plataforma, por mês.') +
       propKpi('Horas recuperadas/mês', fmtH(r.operacional.hMes), 'por obra') +
-      propKpi('Horas recuperadas/obra', fmtH(r.operacional.hObra), 'ao longo de '+prazo+' meses') +
       propKpi('% da jornada liberada', (Math.round(r.operacional.pctJornada*1000)/10)+'%', 'do time técnico') +
     '</div>' +
     memoria;
