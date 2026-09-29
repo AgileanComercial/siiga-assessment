@@ -5367,7 +5367,7 @@ function propModPreco(m, numObras){ return m.flat!=null ? m.flat : m.p[propFaixa
 // tabela — os testes E2E setam S.proposta parcialmente e o resto se resolve.
 function getPropostaCfg(){
   var u = S.proposta || {};
-  var n = S.numObras || 1;
+  var n = Math.max(1, Math.round(u.nObras || S.numObras || 1));   // nº de obras COTADO (vendedor pode ajustar)
   var plan = u.plan || 'maestria';
   if(!PROP_ATIVACAO[plan]) plan = 'maestria';
   var progMeses = u.progMeses || PROP_PROGRAMA_MESES;
@@ -5375,10 +5375,12 @@ function getPropostaCfg(){
   var precoObra = propPrecoPlanoObra(plan, n);
   var modsPerObra = 0;
   PROP_MODULOS.forEach(function(m){ if(mods[m.key]) modsPerObra += propModPreco(m, n); });
-  var mensalDe = (precoObra + modsPerObra) * n;
+  // Mensalidade SEMPRE por obra (De/Por por obra); a proposta informa "para N obras".
+  var mensalDe = precoObra + modsPerObra;
   var progDe   = PROP_PROGRAMA_MENSAL * progMeses;
   var ativDe   = PROP_ATIVACAO[plan].tab;
   return {
+    nObras:n, progNA:!!u.progNA,
     plan:plan, mods:mods, progMeses:progMeses,
     precoObra:precoObra, modsPerObra:modsPerObra,
     progDe:progDe,     progPor:  (u.progPor  !=null ? u.progPor  : progDe),
@@ -5419,7 +5421,7 @@ function propMetaPct(curPct) { return curPct + 0.5 * (1 - curPct); }
 // ── Helpers visuais (paleta Executive Dark, fixa) ───────────────────────────
 function propSecHead(num, titleUpper) {
   return '<div style="display:flex;align-items:center;gap:12px;padding:12px 16px;margin-bottom:18px;background:#151824;border-left:3px solid #ea580c;border-radius:8px">' +
-    '<span style="font-family:Bai Jamjuree;font-size:11px;font-weight:700;color:#ea580c;background:rgba(234,88,12,0.14);padding:3px 8px;border-radius:5px">'+num+'</span>' +
+    '<span class="prop-sec-num" style="font-family:Bai Jamjuree;font-size:11px;font-weight:700;color:#ea580c;background:rgba(234,88,12,0.14);padding:3px 8px;border-radius:5px">'+num+'</span>' +
     '<span style="font-size:13px;font-weight:700;letter-spacing:0.14em;text-transform:uppercase;color:#f8fafc">'+titleUpper+'</span>' +
   '</div>';
 }
@@ -5457,20 +5459,23 @@ function propBar(nome, curPct, right, benchPct) {
 function buildPropostaHero(mode) {
   var c = document.getElementById('prop-hero-container'); if (!c) return;
   var emp = S.empresa || 'sua empresa';
+  var soAtiv = !!getPropostaCfg().progNA;   // Redesenho "não se aplica": escopo só de Ativação SIIGA
   var dataEmissao = new Date().toLocaleDateString('pt-BR');
   c.innerHTML =
-    '<div style="padding:34px 30px 30px">' +
+    '<div style="padding:34px 30px 30px;'+(soAtiv?'':'min-height:1268px;display:flex;flex-direction:column')+'">' +
       '<div style="display:flex;justify-content:space-between;align-items:flex-start;flex-wrap:wrap;gap:10px;border-bottom:1px solid rgba(234,88,12,0.5);padding-bottom:16px;margin-bottom:22px">' +
         '<div style="font-family:Bai Jamjuree;font-size:22px;font-weight:700;color:#ea580c">Agilean</div>' +
-        '<div style="text-align:right;font-size:11px;color:#94a3b8;line-height:1.5"><div style="font-weight:700;letter-spacing:0.14em;text-transform:uppercase;color:#94a3b8">Proposta de Escopo · Programa SIIGA</div><div style="color:#e2e8f0;margin-top:2px">'+emp+' · '+dataEmissao+'</div></div>' +
+        '<div style="text-align:right;font-size:11px;color:#94a3b8;line-height:1.5"><div style="font-weight:700;letter-spacing:0.14em;text-transform:uppercase;color:#94a3b8">Proposta de Escopo · '+(soAtiv?'Ativação SIIGA':'Programa SIIGA')+'</div><div style="color:#e2e8f0;margin-top:2px">'+emp+' · '+dataEmissao+'</div></div>' +
       '</div>' +
-      '<div style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:0.16em;color:#ea580c;margin-bottom:14px">Programa de Redesenho SIIGA · Escopo de Projeto</div>' +
+      '<div style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:0.16em;color:#ea580c;margin-bottom:14px">'+(soAtiv?'Ativação SIIGA · Escopo de Projeto':'Programa de Redesenho SIIGA · Escopo de Projeto')+'</div>' +
       '<div style="font-family:Bai Jamjuree;font-size:34px;font-weight:700;line-height:1.15;color:#f8fafc;margin-bottom:18px">Proposta do Escopo de Projeto para a<br>Evolução da <span style="color:#ea580c">'+emp+'</span></div>' +
-      '<div style="font-size:14px;color:#cbd5e1;line-height:1.65;max-width:640px">Este escopo nasce diretamente do diagnóstico SIIGA da '+emp+'. Ele traduz os gaps identificados em um programa de '+PROP_PROGRAMA_MESES+' meses para redesenhar a forma de planejar e executar — destravando valor real na sua operação e deixando o time autônomo para sustentar o ganho.</div>' +
+      '<div style="font-size:14px;color:#cbd5e1;line-height:1.65;max-width:640px">Este escopo nasce diretamente do diagnóstico SIIGA da '+emp+'. '+(soAtiv
+        ? 'Ele coloca a plataforma SIIGA para rodar na sua operação, apoiando a gestão das obras com os dados do diagnóstico.'
+        : 'Ele traduz os gaps identificados em um programa de '+PROP_PROGRAMA_MESES+' meses para redesenhar a forma de planejar e executar — destravando valor real na sua operação e deixando o time autônomo para sustentar o ganho.')+'</div>' +
       // Faixa de fotos do Lean Experience no rodapé da capa (imagens em img/lean/,
       // da pág. 7 da proposta modelo WR Engenharia). O kick-off do programa é o
       // Workshop Lean Experience — a capa ancora essa prova visual.
-      '<div style="margin-top:26px;padding-top:20px;border-top:1px solid rgba(255,255,255,0.08)">' +
+      (soAtiv ? '' : '<div style="margin-top:auto;padding-top:20px;border-top:1px solid rgba(255,255,255,0.08)">' +
         '<div style="font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:0.14em;color:#ea580c;margin-bottom:12px">Workshop Lean Experience · o ponto de partida do programa</div>' +
         // 2 fotos tratadas (bordas de print removidas, upscale 2×) na proporção
         // nativa 16:9 — aspect-ratio casa com a imagem para object-fit:cover NÃO
@@ -5482,7 +5487,7 @@ function buildPropostaHero(mode) {
             '</div>';
           }).join('') +
         '</div>' +
-      '</div>' +
+      '</div>') +
     '</div>';
 }
 
@@ -5855,8 +5860,8 @@ function buildPropostaDepoimentos(mode) {
 function buildPropostaInvestimento(mode) {
   var c = document.getElementById('prop-investimento-container'); if (!c) return;
   var emp = S.empresa || 'sua empresa';
-  var n = S.numObras || 1;
   var cfg = getPropostaCfg();
+  var n = cfg.nObras;
   var plano = propPlanoInfo(cfg.plan);
   var ativInfo = PROP_ATIVACAO[cfg.plan];
 
@@ -5877,7 +5882,7 @@ function buildPropostaInvestimento(mode) {
   };
 
   // ── Card 1: Redesenho de Processos SIIGA (consultoria) ──
-  var cardRedesenho =
+  var cardRedesenho = cfg.progNA ? '' :
     '<div style="padding:20px 22px;background:rgba(234,88,12,0.10);border:1.5px solid rgba(234,88,12,0.45);border-radius:12px">' +
       '<div style="font-size:10.5px;font-weight:700;text-transform:uppercase;letter-spacing:0.07em;color:#ea580c;margin-bottom:8px">Produto 1 · Consultoria</div>' +
       '<div style="font-size:13.5px;font-weight:700;color:#f8fafc;margin-bottom:8px">Redesenho de Processos SIIGA</div>' +
@@ -5885,15 +5890,10 @@ function buildPropostaInvestimento(mode) {
       '<div style="font-size:11px;color:#94a3b8;margin-top:4px">'+fmtBRL(PROP_PROGRAMA_MENSAL)+'/mês × '+cfg.progMeses+' meses · valor total da consultoria</div>' +
     '</div>';
 
-  // ── Card 2: Ativação SIIGA (ou "não se aplica") ──
+  // ── Card 2: Ativação SIIGA (omitido quando "não se aplica") ──
   var cardAtivacao;
   if(cfg.ativNA){
-    cardAtivacao =
-      '<div style="padding:20px 22px;background:#1a1c26;border:1px dashed rgba(255,255,255,0.16);border-radius:12px;display:flex;flex-direction:column;justify-content:center">' +
-        '<div style="font-size:10.5px;font-weight:700;text-transform:uppercase;letter-spacing:0.07em;color:#94a3b8;margin-bottom:8px">Produto 2 · Plataforma</div>' +
-        '<div style="font-size:13.5px;font-weight:700;color:#cbd5e1;margin-bottom:6px">Ativação SIIGA</div>' +
-        '<div style="font-size:12px;color:#94a3b8;line-height:1.5">Não se aplica — escopo apenas de consultoria (Redesenho de Processos SIIGA).</div>' +
-      '</div>';
+    cardAtivacao = '';
   } else {
     cardAtivacao =
       '<div style="padding:20px 22px;background:#1a1c26;border:1px solid rgba(255,255,255,0.08);border-radius:12px">' +
@@ -5912,9 +5912,13 @@ function buildPropostaInvestimento(mode) {
     : '';
   var mensalRow =
     '<div style="margin-top:14px;display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:8px;padding:14px 18px;background:#151824;border:1px solid rgba(255,255,255,0.08);border-radius:10px">' +
-      '<div><div style="font-size:12.5px;font-weight:700;color:#f8fafc">Plataforma Agilean · '+plano.nome+' <span style="font-weight:400;color:#94a3b8">(pós-programa)</span>'+pilotoTag+'</div>' +
-        '<div style="font-size:10.5px;color:#94a3b8;margin-top:3px">Inclusa durante os '+cfg.progMeses+' meses do programa · assinatura recorrente começa depois'+(modsList.length? ' · módulos: '+modsList.join(', '):'')+'</div></div>' +
-      '<div style="font-family:Bai Jamjuree;font-size:22px;font-weight:700;color:#f8fafc;text-align:right">'+dePor(cfg.mensalDe, cfg.mensalPor)+'<span style="font-size:13px;color:#94a3b8">/mês</span></div>' +
+      '<div><div style="font-size:12.5px;font-weight:700;color:#f8fafc">Plataforma Agilean · '+plano.nome+' <span style="font-weight:400;color:#94a3b8">'+(cfg.progNA?'(assinatura mensal)':'(pós-programa)')+'</span>'+pilotoTag+'</div>' +
+        '<div style="font-size:10.5px;color:#94a3b8;margin-top:3px">'+(cfg.progNA
+          ? 'Cobrança a partir do 1º mês de uso · contratação padrão'
+          : 'Inclusa durante os '+cfg.progMeses+' meses do programa · assinatura recorrente começa depois')+
+          (modsList.length? ' · módulos: '+modsList.join(', '):'')+'</div></div>' +
+      '<div style="text-align:right"><div style="font-family:Bai Jamjuree;font-size:22px;font-weight:700;color:#f8fafc">'+dePor(cfg.mensalDe, cfg.mensalPor)+'<span style="font-size:13px;color:#94a3b8">/obra/mês</span></div>' +
+        '<div style="font-size:10.5px;color:#94a3b8;margin-top:2px">valor por obra · condição para '+n+' obra'+(n===1?'':'s')+'</div></div>' +
     '</div>';
 
   var pilotoObs = cfg.piloto
@@ -5922,11 +5926,12 @@ function buildPropostaInvestimento(mode) {
     : '';
 
   // Memória de cálculo (documento único — sempre exibida).
-  var memLinhas =
-    '• Redesenho de Processos SIIGA: '+money(PROP_PROGRAMA_MENSAL)+'/mês × '+cfg.progMeses+' meses = <strong style="color:#f8fafc">'+money(cfg.progPor)+'</strong>'+(cfg.progPor<cfg.progDe-0.5?' (de '+money(cfg.progDe)+')':'')+'<br>';
+  var memLinhas = '';
+  if(!cfg.progNA)
+    memLinhas += '• Redesenho de Processos SIIGA: '+money(PROP_PROGRAMA_MENSAL)+'/mês × '+cfg.progMeses+' meses = <strong style="color:#f8fafc">'+money(cfg.progPor)+'</strong>'+(cfg.progPor<cfg.progDe-0.5?' (de '+money(cfg.progDe)+')':'')+'<br>';
   if(!cfg.ativNA)
     memLinhas += '• Ativação SIIGA ('+plano.nome+'): setup único = <strong style="color:#f8fafc">'+money(cfg.ativPor)+'</strong>'+(cfg.ativPor<cfg.ativDe-0.5?' (de '+money(cfg.ativDe)+')':'')+'<br>';
-  memLinhas += '• Plataforma pós-programa: '+money(cfg.precoObra + cfg.modsPerObra)+'/obra/mês × '+n+' obra(s) = <strong style="color:#f8fafc">'+money(cfg.mensalPor)+'/mês</strong>'+(cfg.mensalPor<cfg.mensalDe-0.5?' (de '+money(cfg.mensalDe)+')':'');
+  memLinhas += '• Plataforma '+(cfg.progNA?'(mensalidade)':'pós-programa')+': <strong style="color:#f8fafc">'+money(cfg.mensalPor)+'/obra/mês</strong>'+(cfg.mensalPor<cfg.mensalDe-0.5?' (de '+money(cfg.mensalDe)+')':'')+' · condição válida para '+n+' obra'+(n===1?'':'s');
   if(cfg.piloto) memLinhas += '<br>• Modelo Piloto: '+cfg.pilotoMeses+' mensalidade(s) da plataforma isenta(s).';
   var memoria =
     '<div style="margin-top:16px;padding-top:12px;border-top:1px solid rgba(255,255,255,0.08)">' +
@@ -5936,8 +5941,12 @@ function buildPropostaInvestimento(mode) {
 
   c.innerHTML =
     propSecHead('09', 'Investimento Personalizado para a ' + emp) +
-    propLead('Dois produtos, uma jornada: o <strong style="color:#f8fafc">Redesenho de Processos SIIGA</strong> (consultoria) em destaque'+(cfg.ativNA?'':' e a <strong style="color:#f8fafc">Ativação SIIGA</strong> da plataforma')+'; a plataforma fica inclusa durante os '+cfg.progMeses+' meses e a assinatura recorrente entra depois, se a '+emp+' seguir.') +
-    '<div style="display:grid;grid-template-columns:1fr 1fr;gap:14px">' + cardRedesenho + cardAtivacao + '</div>' +
+    propLead(cfg.progNA
+      ? 'A <strong style="color:#f8fafc">Ativação SIIGA</strong> coloca a plataforma para rodar na '+emp+'; a assinatura mensal, calculada <strong style="color:#f8fafc">por obra</strong>, é cobrada a partir do 1º mês de uso.'
+      : (cfg.ativNA
+        ? 'O <strong style="color:#f8fafc">Redesenho de Processos SIIGA</strong> (consultoria) conduz a evolução da '+emp+'; a plataforma fica inclusa durante os '+cfg.progMeses+' meses e a assinatura recorrente, calculada <strong style="color:#f8fafc">por obra</strong>, entra depois, se a '+emp+' seguir.'
+        : 'Dois produtos, uma jornada: o <strong style="color:#f8fafc">Redesenho de Processos SIIGA</strong> (consultoria) em destaque e a <strong style="color:#f8fafc">Ativação SIIGA</strong> da plataforma; a plataforma fica inclusa durante os '+cfg.progMeses+' meses e a assinatura recorrente entra depois, se a '+emp+' seguir.')) +
+    '<div style="display:grid;grid-template-columns:'+((cfg.progNA||cfg.ativNA)?'1fr':'1fr 1fr')+';gap:14px">' + cardRedesenho + cardAtivacao + '</div>' +
     mensalRow + pilotoObs + memoria;
 }
 
@@ -6022,24 +6031,32 @@ function buildPropostaTermos(mode) {
 
   // Card 7 da spec: manter só Validade + sugestão de Kick-Off (Contrato e
   // Compromisso de Resultado removidos). Os dois produtos ficam nos termos.
-  var termoAtiv = cfg.ativNA ? 'Não se aplica' : fmtBRL(cfg.ativPor)+' · setup único';
+  var termoCards = [];
+  if(!cfg.progNA) termoCards.push(termo('Redesenho de Processos SIIGA', fmtBRL(PROP_PROGRAMA_MENSAL)+'/mês · '+cfg.progMeses+' meses'));
+  if(!cfg.ativNA) termoCards.push(termo('Ativação SIIGA', fmtBRL(cfg.ativPor)+' · setup único'));
+  termoCards.push(termo(cfg.progNA ? 'Plataforma' : 'Plataforma (após)', fmtBRL(cfg.mensalPor)+'/obra/mês · para '+cfg.nObras+' obra'+(cfg.nObras===1?'':'s')+(cfg.progNA?' · cobrança desde o 1º mês':'')));
+  termoCards.push(termo('Validade', dias+' dias — até '+validadeFmt));
   var pilotoObsBox = cfg.piloto
     ? '<div style="margin-top:14px;padding:12px 16px;background:rgba(251,191,36,0.08);border:1px solid rgba(251,191,36,0.28);border-radius:10px;font-size:12px;color:#fbbf24">📋 <strong>Modelo Piloto:</strong> '+propPilotoObs(cfg)+'</div>'
     : '';
 
   c.innerHTML =
     propSecHead('11', 'Termos & Próximo Passo') +
-    '<div style="display:grid;grid-template-columns:repeat(4,1fr);gap:12px;margin-bottom:16px">' +
-      termo('Redesenho de Processos SIIGA', fmtBRL(PROP_PROGRAMA_MENSAL)+'/mês · '+cfg.progMeses+' meses') +
-      termo('Ativação SIIGA', termoAtiv) +
-      termo('Plataforma (após)', 'Contrato anual · por obra') +
-      termo('Validade', dias+' dias — até '+validadeFmt) +
-    '</div>' + pilotoObsBox +
-    '<div style="margin-top:16px;padding:22px 24px;background:linear-gradient(135deg,rgba(234,88,12,0.14),rgba(234,88,12,0.04));border:1.5px solid rgba(234,88,12,0.4);border-radius:12px">' +
+    '<div style="display:grid;grid-template-columns:repeat('+termoCards.length+',1fr);gap:12px;margin-bottom:16px">' + termoCards.join('') + '</div>' + pilotoObsBox +
+    (cfg.progNA ? propProximoPassoAtivacao(kickTxt, validadeFmt, dias) : '<div style="margin-top:16px;padding:22px 24px;background:linear-gradient(135deg,rgba(234,88,12,0.14),rgba(234,88,12,0.04));border:1.5px solid rgba(234,88,12,0.4);border-radius:12px">' +
       '<div style="font-size:16px;font-weight:700;color:#f8fafc;margin-bottom:12px">Próximo passo</div>' +
       '<div style="font-size:13px;color:#e2e8f0;line-height:1.7">Para avançarmos, será necessário <strong style="color:#f8fafc">confirmarmos a data do Kick-Off</strong>'+(kickTxt? ' — nossa sugestão é <strong style="color:#ea580c">'+kickTxt+'</strong>' : '')+' e <strong style="color:#f8fafc">recebermos o planejamento e o orçamento das obras</strong> que serão contempladas no programa. Confirmada a data, a Agilean inicia a Fase 1 na semana seguinte, começando pelo Workshop Lean Experience.</div>' +
       '<div style="display:inline-block;margin-top:16px;padding:10px 20px;border:1px solid rgba(234,88,12,0.5);border-radius:8px;font-size:12px;color:#fbbf24">⏳ Validade até '+validadeFmt+' · '+dias+' dias'+(kickTxt? ' · Kick-Off sugerido: '+kickTxt : '')+'</div>' +
-    '</div>';
+    '</div>');
+}
+
+// Próximo passo quando o Redesenho não se aplica (escopo só de Ativação SIIGA).
+function propProximoPassoAtivacao(kickTxt, validadeFmt, dias) {
+  return '<div style="margin-top:16px;padding:22px 24px;background:linear-gradient(135deg,rgba(234,88,12,0.14),rgba(234,88,12,0.04));border:1.5px solid rgba(234,88,12,0.4);border-radius:12px">' +
+    '<div style="font-size:16px;font-weight:700;color:#f8fafc;margin-bottom:12px">Próximo passo</div>' +
+    '<div style="font-size:13px;color:#e2e8f0;line-height:1.7">Para avançarmos, será necessário <strong style="color:#f8fafc">confirmarmos a data de início da Ativação SIIGA</strong>'+(kickTxt? ' — nossa sugestão é <strong style="color:#ea580c">'+kickTxt+'</strong>' : '')+' e <strong style="color:#f8fafc">recebermos o planejamento e o orçamento das obras</strong> que serão contempladas. A assinatura da plataforma é cobrada a partir do 1º mês de uso.</div>' +
+    '<div style="display:inline-block;margin-top:16px;padding:10px 20px;border:1px solid rgba(234,88,12,0.5);border-radius:8px;font-size:12px;color:#fbbf24">⏳ Validade até '+validadeFmt+' · '+dias+' dias'+(kickTxt? ' · Início sugerido: '+kickTxt : '')+'</div>' +
+  '</div>';
 }
 
 // Constrói todas as seções da Proposta no DOM (#screen-proposta), na ordem
@@ -6058,6 +6075,19 @@ function buildProposta(mode) {
   buildPropostaInvestimento(mode);
   buildPropostaRetorno(mode);
   buildPropostaTermos(mode);
+  // Redesenho "Não se aplica": oculta as seções específicas do programa (03-07)
+  // e renumera as visíveis para não deixar buracos.
+  var progNA = !!getPropostaCfg().progNA;
+  ['objetivo','programa','resultados','jornada','metodo'].forEach(function(k){
+    var card = document.getElementById('prop-'+k+'-card');
+    if(card) card.style.display = progNA ? 'none' : '';
+  });
+  var num = 0;
+  Array.prototype.forEach.call(document.querySelectorAll('#screen-proposta .card'), function(card){
+    if(card.style.display === 'none') return;
+    var el = card.querySelector('.prop-sec-num');
+    if(el){ num++; el.textContent = (num < 10 ? '0' : '') + num; }
+  });
 }
 
 // ── MODAL DO VENDEDOR ───────────────────────────────────────────────────────
@@ -6069,8 +6099,8 @@ function openPropostaModal() {
   var n = S.numObras || 1;
   // Estado de trabalho do modal = cfg atual resolvida.
   var cfg = getPropostaCfg();
-  var w = { plan:cfg.plan, mods:Object.assign({}, cfg.mods),
-            progTouched:(cfg.progPor<cfg.progDe-0.5), progPor:cfg.progPor,
+  var w = { nObras:cfg.nObras, plan:cfg.plan, mods:Object.assign({}, cfg.mods),
+            progNA:cfg.progNA, progTouched:(cfg.progPor<cfg.progDe-0.5), progPor:cfg.progPor,
             ativNA:cfg.ativNA, ativTouched:(cfg.ativPor<cfg.ativDe-0.5), ativPor:cfg.ativPor,
             mensalTouched:(cfg.mensalPor<cfg.mensalDe-0.5), mensalPor:cfg.mensalPor,
             piloto:cfg.piloto, pilotoMeses:cfg.pilotoMeses, validade:cfg.validade, kickoff:cfg.kickoff };
@@ -6096,12 +6126,14 @@ function openPropostaModal() {
 
   var body = ov.querySelector('#pm-body');
   var fmtc = function(v){ return 'R$ ' + v.toLocaleString('pt-BR',{minimumFractionDigits:v%1?2:0, maximumFractionDigits:2}); };
-  var faixaLbl = ['1 obra','2 a 3 obras','4 a 5 obras','6 a 7 obras','8 a 10 obras','acima de 10 obras'][propFaixaIdx(n)];
+  var faixaLbl;
 
   function render(){
+    n = w.nObras;
+    faixaLbl = ['1 obra','2 a 3 obras','4 a 5 obras','6 a 7 obras','8 a 10 obras','acima de 10 obras'][propFaixaIdx(n)];
     var precoObra = propPrecoPlanoObra(w.plan, n);
     var modsPerObra = 0; PROP_MODULOS.forEach(function(m){ if(w.mods[m.key]) modsPerObra += propModPreco(m,n); });
-    var mensalDe = (precoObra + modsPerObra) * n;
+    var mensalDe = precoObra + modsPerObra;   // por obra
     if(!w.mensalTouched) w.mensalPor = mensalDe;
     var ativDe = PROP_ATIVACAO[w.plan].tab, ativPiso = PROP_ATIVACAO[w.plan].piso;
     if(!w.ativTouched) w.ativPor = ativDe;
@@ -6139,10 +6171,11 @@ function openPropostaModal() {
     var segBtn = function(m){ return '<button type="button" data-pm="'+m+'" style="background:'+(w.pilotoMeses===m?'#ea580c':'transparent')+';border:none;color:'+(w.pilotoMeses===m?'#fff':'#94a3b8')+';font-family:Bai Jamjuree;font-weight:700;padding:5px 12px;border-radius:6px;cursor:pointer">'+m+(m===1?' mês':' meses')+'</button>'; };
 
     body.innerHTML =
-      '<div style="font-size:11px;color:#94a3b8;margin-bottom:14px">Empresa <b style="color:#f8fafc">'+(S.empresa||'—')+'</b> · <b style="color:#f8fafc">'+n+'</b> obra(s) · faixa '+faixaLbl+'</div>' +
+      '<div style="font-size:11px;color:#94a3b8;margin-bottom:14px;display:flex;align-items:center;gap:10px;flex-wrap:wrap">Empresa <b style="color:#f8fafc">'+(S.empresa||'—')+'</b> · Nº de obras da proposta <input type="number" id="pm-nobras" min="1" step="1" value="'+n+'" style="width:70px;background:#0f1017;border:1px solid rgba(255,255,255,0.15);border-radius:7px;color:#f8fafc;font-family:Bai Jamjuree;font-weight:700;padding:5px 8px"> · faixa <b style="color:#f8fafc">'+faixaLbl+'</b>'+(n!==(S.numObras||1)?' <span style="color:#fbbf24">(diagnóstico: '+(S.numObras||1)+')</span>':'')+'</div>' +
 
       '<div style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:0.06em;color:#ea580c;margin-bottom:8px">1 · Redesenho de Processos SIIGA (consultoria)</div>' +
-      deporRow('Valor total', 'pm-prog', progDe, w.progPor, null) +
+      '<label style="display:flex;align-items:center;gap:9px;cursor:pointer;margin-bottom:8px" data-toggle="progNA"><span style="width:34px;height:20px;border-radius:20px;position:relative;background:'+(w.progNA?'#ea580c':'#1a1c26')+';border:1px solid rgba(255,255,255,0.2)"><span style="position:absolute;top:2px;left:'+(w.progNA?'16px':'2px')+';width:14px;height:14px;border-radius:50%;background:'+(w.progNA?'#fff':'#94a3b8')+'"></span></span><span style="font-size:12px">Não se aplica (escopo só de Ativação SIIGA)</span></label>' +
+      (w.progNA ? '' : deporRow('Valor total', 'pm-prog', progDe, w.progPor, null)) +
 
       '<div style="height:1px;background:rgba(255,255,255,0.08);margin:16px 0"></div>' +
       '<div style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:0.06em;color:#ea580c;margin-bottom:8px">2 · Plano da plataforma</div>' +
@@ -6156,7 +6189,8 @@ function openPropostaModal() {
 
       '<div style="height:1px;background:rgba(255,255,255,0.08);margin:16px 0"></div>' +
       '<div style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:0.06em;color:#ea580c;margin-bottom:8px">4 · Mensalidade da plataforma</div>' +
-      deporRow('Por mês ('+n+' obras)', 'pm-mensal', mensalDe, w.mensalPor, null) +
+      deporRow('Por obra/mês', 'pm-mensal', mensalDe, w.mensalPor, null) +
+      '<div style="font-size:11px;color:#94a3b8;margin-top:6px">Valor de 1 obra na faixa '+faixaLbl+'. A proposta informará que a condição vale para '+n+' obra'+(n===1?'':'s')+'.</div>' +
 
       '<div style="height:1px;background:rgba(255,255,255,0.08);margin:16px 0"></div>' +
       '<div style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:0.06em;color:#ea580c;margin-bottom:10px">5 · Termos</div>' +
@@ -6170,12 +6204,22 @@ function openPropostaModal() {
     // wiring
     body.querySelectorAll('[data-plan]').forEach(function(el){ el.addEventListener('click',function(){ w.plan=el.dataset.plan; w.ativTouched=false; w.mensalTouched=false; render(); }); });
     body.querySelectorAll('[data-mod]').forEach(function(el){ el.addEventListener('click',function(){ var k=el.dataset.mod; w.mods[k]=!w.mods[k]; w.mensalTouched=false; render(); }); });
-    body.querySelectorAll('[data-toggle]').forEach(function(el){ el.addEventListener('click',function(){ var k=el.dataset.toggle; w[k]=!w[k]; render(); }); });
+    body.querySelectorAll('[data-toggle]').forEach(function(el){ el.addEventListener('click',function(){ var k=el.dataset.toggle; w[k]=!w[k];
+      // os dois produtos não podem ficar "Não se aplica" ao mesmo tempo
+      if(k==='progNA' && w.progNA) w.ativNA=false;
+      if(k==='ativNA' && w.ativNA) w.progNA=false;
+      render(); }); });
     var seg=body.querySelector('#pm-seg'); if(seg) seg.querySelectorAll('[data-pm]').forEach(function(b){ b.addEventListener('click',function(){ w.pilotoMeses=+b.dataset.pm; render(); }); });
     var bindNum=function(id,setter){ var el=body.querySelector('#'+id); if(el) el.addEventListener('input',function(){ setter(+el.value||0); }); };
     bindNum('pm-prog', function(v){ w.progTouched=true; w.progPor=v; });
     bindNum('pm-ativ', function(v){ w.ativTouched=true; w.ativPor=v; });
     bindNum('pm-mensal', function(v){ w.mensalTouched=true; w.mensalPor=v; });
+    var nEl=body.querySelector('#pm-nobras');
+    if(nEl) nEl.addEventListener('change',function(){
+      w.nObras = Math.max(1, Math.round(+nEl.value || 1));
+      w.mensalTouched = false;   // a faixa muda o preço de tabela por obra
+      render();
+    });
     var vEl=body.querySelector('#pm-validade'); if(vEl) vEl.addEventListener('input',function(){ w.validade=+vEl.value||0; });
     var kEl=body.querySelector('#pm-kick'); if(kEl) kEl.addEventListener('input',function(){ w.kickoff=kEl.value; });
   }
@@ -6186,7 +6230,7 @@ function openPropostaModal() {
   ov.querySelector('#pm-cancel').addEventListener('click', close);
   ov.addEventListener('click', function(e){ if(e.target===ov) close(); });
   ov.querySelector('#pm-gen').addEventListener('click', function(){
-    S.proposta = { plan:w.plan, mods:w.mods, progPor:w.progPor, ativNA:w.ativNA,
+    S.proposta = { nObras:w.nObras, plan:w.plan, mods:w.mods, progPor:w.progPor, progNA:w.progNA, ativNA:w.ativNA,
       ativPor:w.ativPor, mensalPor:w.mensalPor, piloto:w.piloto, pilotoMeses:w.pilotoMeses,
       validade:w.validade, kickoff:w.kickoff };
     close();
@@ -6232,7 +6276,7 @@ function generateProposta(mode) {
     var reportEl = document.getElementById('screen-proposta');
     var wrapper = reportEl.querySelector(':scope > div');
     var sections = wrapper ? Array.prototype.slice.call(wrapper.children).filter(function(el){
-      return !el.matches('.no-print, .btn-row');
+      return !el.matches('.no-print, .btn-row') && el.style.display !== 'none';
     }) : [];
 
     if(sections.length === 0) {
