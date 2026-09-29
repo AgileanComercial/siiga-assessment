@@ -5324,6 +5324,81 @@ var PROP_PROGRAMA_MENSAL = 15000;
 var PROP_PROGRAMA_MESES  = 4;
 var PROP_PROGRAMA_TOTAL  = PROP_PROGRAMA_MENSAL * PROP_PROGRAMA_MESES;
 
+// ── Preços comerciais da Proposta (planilha Agilean_Preços Revisados_2026) ────
+// Os DOIS produtos da proposta: (1) Redesenho de Processos SIIGA = consultoria
+// (R$15k/mês × 4); (2) Ativação SIIGA = ex-"implantação" da plataforma, ticket
+// por plano. Ver [[project_siiga_proposta_reuniao2]].
+//
+// Assinatura por plano × faixa de obras (coluna "Tabela" da planilha). Faixas:
+// 1 / 2-3 / 4-5 / 6-7 / 8-10 / >10.
+var PROP_PLANOS = [
+  { key:'essencial', nome:'Essencial', escopo:'Planejamento + Controle básico',   p:[1587,1357,1242,1127,1012,897] },
+  { key:'escala',    nome:'Escala',    escopo:'Planejamento + Controle completo', p:[1817,1587,1472,1242,1012,897] },
+  { key:'maestria',  nome:'Maestria',  escopo:'Escala + Gestão da Qualidade',     p:[2392,2162,1932,1702,1472,1242] },
+  { key:'completo',  nome:'Completo',  escopo:'Maestria + Gestão da Mão de Obra',  p:[3680,3450,3162.5,2932.5,2587.5,2012.5] }
+];
+// Módulos à la carte (R$/obra/mês por faixa; CPO/Excel são flat).
+var PROP_MODULOS = [
+  { key:'mo3',  nome:'Gestão MO · terceirizada', p:[575,540.5,506,483,460,345] },
+  { key:'mop',  nome:'Gestão MO · própria',      p:[1150,1127,1092.5,1012,897,747.5] },
+  { key:'qq',   nome:'Gestão da Qualidade',      p:[661.25,632.5,529,506,483,379.5] },
+  { key:'cant', nome:'Agilean Canteiro',         p:[800,700,612.5,535.94,468.95,410.33] },
+  { key:'cpo',  nome:'CPO (avulso)',   flat:600 },
+  { key:'xls',  nome:'Excel (avulso)', flat:400 }
+];
+// Ativação SIIGA por plano — ticket padrão (De) e piso de negociação (Menor
+// Valor). Tickets atualizados por Israel 2026-09-28 (supersede o Setup cru da
+// planilha): Essencial=Escala=10k · Maestria=12,5k · Completo=20k. Essencial usa
+// a MESMA ativação do Escala; o plano na lista continua "Essencial".
+var PROP_ATIVACAO = {
+  essencial:{ tab:10000, piso:4950,  nome:'Ativação SIIGA Planejamento e Controle' },
+  escala:   { tab:10000, piso:4950,  nome:'Ativação SIIGA Planejamento e Controle' },
+  maestria: { tab:12500, piso:5500,  nome:'Ativação SIIGA Plan., Controle e Qualidade' },
+  completo: { tab:20000, piso:11500, nome:'Ativação SIIGA Plan., Controle, Qualidade e MO' }
+};
+function propFaixaIdx(n){ n=n||1; if(n<=1)return 0; if(n<=3)return 1; if(n<=5)return 2; if(n<=7)return 3; if(n<=10)return 4; return 5; }
+function propPlanoInfo(key){ for(var i=0;i<PROP_PLANOS.length;i++){ if(PROP_PLANOS[i].key===key) return PROP_PLANOS[i]; } return PROP_PLANOS[2]; }
+function propPrecoPlanoObra(key, numObras){ return propPlanoInfo(key).p[propFaixaIdx(numObras)]; }
+function propModPreco(m, numObras){ return m.flat!=null ? m.flat : m.p[propFaixaIdx(numObras)]; }
+
+// Configuração comercial preenchida pelo vendedor (modal openPropostaModal) e
+// gravada em S.proposta. getPropostaCfg() resolve os defaults de tabela a partir
+// do estado (S.numObras/plano); qualquer campo ausente cai no valor cheio de
+// tabela — os testes E2E setam S.proposta parcialmente e o resto se resolve.
+function getPropostaCfg(){
+  var u = S.proposta || {};
+  var n = S.numObras || 1;
+  var plan = u.plan || 'maestria';
+  if(!PROP_ATIVACAO[plan]) plan = 'maestria';
+  var progMeses = u.progMeses || PROP_PROGRAMA_MESES;
+  var mods = u.mods || {};
+  var precoObra = propPrecoPlanoObra(plan, n);
+  var modsPerObra = 0;
+  PROP_MODULOS.forEach(function(m){ if(mods[m.key]) modsPerObra += propModPreco(m, n); });
+  var mensalDe = (precoObra + modsPerObra) * n;
+  var progDe   = PROP_PROGRAMA_MENSAL * progMeses;
+  var ativDe   = PROP_ATIVACAO[plan].tab;
+  return {
+    plan:plan, mods:mods, progMeses:progMeses,
+    precoObra:precoObra, modsPerObra:modsPerObra,
+    progDe:progDe,     progPor:  (u.progPor  !=null ? u.progPor  : progDe),
+    ativNA:!!u.ativNA,
+    ativDe:ativDe,     ativPor:  (u.ativPor  !=null ? u.ativPor  : ativDe),
+    ativPiso:PROP_ATIVACAO[plan].piso,
+    mensalDe:mensalDe, mensalPor:(u.mensalPor!=null ? u.mensalPor: mensalDe),
+    piloto:!!u.piloto, pilotoMeses:(u.pilotoMeses||1),
+    validade:(u.validade!=null ? u.validade : 15),
+    kickoff:(u.kickoff||'')
+  };
+}
+// Observação do Modelo Piloto (isenção das N 1ªs mensalidades da plataforma).
+function propPilotoObs(cfg){
+  var pm = cfg.pilotoMeses;
+  return pm===1
+    ? 'A primeira mensalidade da plataforma será emitida somente no 2º mês de uso (Modelo Piloto).'
+    : 'As '+pm+' primeiras mensalidades da plataforma são isentas (Modelo Piloto); a cobrança começa no '+(pm+1)+'º mês de uso.';
+}
+
 // Nomes curtos dos pilares para a Proposta (mesmos do relatório, encurtados
 // como no protótipo revisado).
 var PROP_PILAR_NOMES = {
@@ -5397,9 +5472,12 @@ function buildPropostaHero(mode) {
       // Workshop Lean Experience — a capa ancora essa prova visual.
       '<div style="margin-top:26px;padding-top:20px;border-top:1px solid rgba(255,255,255,0.08)">' +
         '<div style="font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:0.14em;color:#ea580c;margin-bottom:12px">Workshop Lean Experience · o ponto de partida do programa</div>' +
-        '<div style="display:grid;grid-template-columns:repeat(3,1fr);gap:12px">' +
-          ['Foto%201.png','Foto%202.png','Foto%203.jpeg'].map(function(fn){
-            return '<div style="height:220px;border-radius:10px;overflow:hidden;border:1px solid rgba(255,255,255,0.10);background:#0f1015">' +
+        // 2 fotos tratadas (bordas de print removidas, upscale 2×) na proporção
+        // nativa 16:9 — aspect-ratio casa com a imagem para object-fit:cover NÃO
+        // cortar os textos das artes. Arquivos: img/lean/lean1.jpg, lean2.jpg.
+        '<div style="display:grid;grid-template-columns:1fr 1fr;gap:12px">' +
+          ['lean1.jpg','lean2.jpg'].map(function(fn){
+            return '<div style="aspect-ratio:1264/714;border-radius:10px;overflow:hidden;border:1px solid rgba(255,255,255,0.10);background:#0f1015">' +
               '<img src="img/lean/'+fn+'" alt="Workshop Lean Experience" style="width:100%;height:100%;object-fit:cover;display:block">' +
             '</div>';
           }).join('') +
@@ -5768,43 +5846,99 @@ function buildPropostaDepoimentos(mode) {
 }
 
 // ── SEÇÃO 09: INVESTIMENTO PERSONALIZADO (#11) ──────────────────────────────
-// #11: título com nome da empresa; REMOVIDOS os valores por módulo e as chips
-// de planos; expõe só o valor do programa (fixo R$60k) + o total do plano
-// escolhido da plataforma. Removida a observação "dois produtos…".
+// #11: título com nome da empresa. Os DOIS produtos da proposta com o valor
+// negociado pelo vendedor (De/Por, ancoragem): (1) Redesenho de Processos SIIGA
+// = consultoria; (2) Ativação SIIGA = ex-implantação da plataforma, ticket por
+// plano (pode "não se aplicar" p/ escopos só de consultoria). Mais a mensalidade
+// da plataforma pós-programa e, quando Modelo Piloto, a isenção das 1ªs
+// mensalidades. Valores em getPropostaCfg() (modal do vendedor / S.proposta).
 function buildPropostaInvestimento(mode) {
   var c = document.getElementById('prop-investimento-container'); if (!c) return;
   var emp = S.empresa || 'sua empresa';
-  var numObras = S.numObras || 1;
-  var precoObra = precoPorObraPadrao(numObras);
-  var plataformaMes = calcularMensalidadePadrao(numObras);
+  var n = S.numObras || 1;
+  var cfg = getPropostaCfg();
+  var plano = propPlanoInfo(cfg.plan);
+  var ativInfo = PROP_ATIVACAO[cfg.plan];
 
-  // Documento único: a memória de cálculo é sempre exibida (mantida por decisão
-  // do Israel em 2026-09-28).
+  // Moeda exata (não abreviada como o ROI); 2 casas só quando fracionado —
+  // "R$ 60.000", "R$ 15.812,50".
+  var money = function(v){ return 'R$ ' + Number(v||0).toLocaleString('pt-BR', { minimumFractionDigits:(v%1?2:0), maximumFractionDigits:2 }); };
+  // "De" riscado só quando há desconto real (Por < De). É a âncora comercial.
+  var dePor = function(de, por){
+    var strike = (por < de - 0.5)
+      ? '<span style="text-decoration:line-through;text-decoration-color:rgba(148,163,184,0.6);color:#94a3b8;font-size:14px;font-weight:500;margin-right:9px">'+money(de)+'</span>'
+      : '';
+    return strike + money(por);
+  };
+  var discTxt = function(de, por){
+    if(por >= de - 0.5) return '';
+    var pct = Math.round((1 - por/de)*100);
+    return ' <span style="font-size:11px;color:#34d399;font-weight:700"> · −'+pct+'%</span>';
+  };
+
+  // ── Card 1: Redesenho de Processos SIIGA (consultoria) ──
+  var cardRedesenho =
+    '<div style="padding:20px 22px;background:rgba(234,88,12,0.10);border:1.5px solid rgba(234,88,12,0.45);border-radius:12px">' +
+      '<div style="font-size:10.5px;font-weight:700;text-transform:uppercase;letter-spacing:0.07em;color:#ea580c;margin-bottom:8px">Produto 1 · Consultoria</div>' +
+      '<div style="font-size:13.5px;font-weight:700;color:#f8fafc;margin-bottom:8px">Redesenho de Processos SIIGA</div>' +
+      '<div style="font-family:Bai Jamjuree;font-size:28px;font-weight:700;color:#ea580c">'+dePor(cfg.progDe, cfg.progPor)+discTxt(cfg.progDe, cfg.progPor)+'</div>' +
+      '<div style="font-size:11px;color:#94a3b8;margin-top:4px">'+fmtBRL(PROP_PROGRAMA_MENSAL)+'/mês × '+cfg.progMeses+' meses · valor total da consultoria</div>' +
+    '</div>';
+
+  // ── Card 2: Ativação SIIGA (ou "não se aplica") ──
+  var cardAtivacao;
+  if(cfg.ativNA){
+    cardAtivacao =
+      '<div style="padding:20px 22px;background:#1a1c26;border:1px dashed rgba(255,255,255,0.16);border-radius:12px;display:flex;flex-direction:column;justify-content:center">' +
+        '<div style="font-size:10.5px;font-weight:700;text-transform:uppercase;letter-spacing:0.07em;color:#94a3b8;margin-bottom:8px">Produto 2 · Plataforma</div>' +
+        '<div style="font-size:13.5px;font-weight:700;color:#cbd5e1;margin-bottom:6px">Ativação SIIGA</div>' +
+        '<div style="font-size:12px;color:#94a3b8;line-height:1.5">Não se aplica — escopo apenas de consultoria (Redesenho de Processos SIIGA).</div>' +
+      '</div>';
+  } else {
+    cardAtivacao =
+      '<div style="padding:20px 22px;background:#1a1c26;border:1px solid rgba(255,255,255,0.08);border-radius:12px">' +
+        '<div style="font-size:10.5px;font-weight:700;text-transform:uppercase;letter-spacing:0.07em;color:#94a3b8;margin-bottom:8px">Produto 2 · Plataforma</div>' +
+        '<div style="font-size:13.5px;font-weight:700;color:#f8fafc;margin-bottom:8px">'+ativInfo.nome+'</div>' +
+        '<div style="font-family:Bai Jamjuree;font-size:28px;font-weight:700;color:#f8fafc">'+dePor(cfg.ativDe, cfg.ativPor)+discTxt(cfg.ativDe, cfg.ativPor)+'</div>' +
+        '<div style="font-size:11px;color:#94a3b8;margin-top:4px">Setup único · ativação da plataforma no plano '+plano.nome+'</div>' +
+      '</div>';
+  }
+
+  // ── Faixa da mensalidade da plataforma (pós-programa) ──
+  var modsList = [];
+  PROP_MODULOS.forEach(function(m){ if(cfg.mods[m.key]) modsList.push(m.nome); });
+  var pilotoTag = cfg.piloto
+    ? '<span style="display:inline-block;margin-left:8px;font-size:10px;font-weight:700;color:#fbbf24;border:1px solid rgba(251,191,36,0.4);border-radius:20px;padding:2px 9px;vertical-align:middle">'+(cfg.pilotoMeses===1?'1º mês isento':'1º ao '+cfg.pilotoMeses+'º mês isentos')+' · Piloto</span>'
+    : '';
+  var mensalRow =
+    '<div style="margin-top:14px;display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:8px;padding:14px 18px;background:#151824;border:1px solid rgba(255,255,255,0.08);border-radius:10px">' +
+      '<div><div style="font-size:12.5px;font-weight:700;color:#f8fafc">Plataforma Agilean · '+plano.nome+' <span style="font-weight:400;color:#94a3b8">(pós-programa)</span>'+pilotoTag+'</div>' +
+        '<div style="font-size:10.5px;color:#94a3b8;margin-top:3px">Inclusa durante os '+cfg.progMeses+' meses do programa · assinatura recorrente começa depois'+(modsList.length? ' · módulos: '+modsList.join(', '):'')+'</div></div>' +
+      '<div style="font-family:Bai Jamjuree;font-size:22px;font-weight:700;color:#f8fafc;text-align:right">'+dePor(cfg.mensalDe, cfg.mensalPor)+'<span style="font-size:13px;color:#94a3b8">/mês</span></div>' +
+    '</div>';
+
+  var pilotoObs = cfg.piloto
+    ? '<div style="margin-top:12px;font-size:11.5px;color:#fbbf24;background:rgba(251,191,36,0.08);border:1px solid rgba(251,191,36,0.28);border-radius:9px;padding:10px 13px">📋 '+propPilotoObs(cfg)+'</div>'
+    : '';
+
+  // Memória de cálculo (documento único — sempre exibida).
+  var memLinhas =
+    '• Redesenho de Processos SIIGA: '+money(PROP_PROGRAMA_MENSAL)+'/mês × '+cfg.progMeses+' meses = <strong style="color:#f8fafc">'+money(cfg.progPor)+'</strong>'+(cfg.progPor<cfg.progDe-0.5?' (de '+money(cfg.progDe)+')':'')+'<br>';
+  if(!cfg.ativNA)
+    memLinhas += '• Ativação SIIGA ('+plano.nome+'): setup único = <strong style="color:#f8fafc">'+money(cfg.ativPor)+'</strong>'+(cfg.ativPor<cfg.ativDe-0.5?' (de '+money(cfg.ativDe)+')':'')+'<br>';
+  memLinhas += '• Plataforma pós-programa: '+money(cfg.precoObra + cfg.modsPerObra)+'/obra/mês × '+n+' obra(s) = <strong style="color:#f8fafc">'+money(cfg.mensalPor)+'/mês</strong>'+(cfg.mensalPor<cfg.mensalDe-0.5?' (de '+money(cfg.mensalDe)+')':'');
+  if(cfg.piloto) memLinhas += '<br>• Modelo Piloto: '+cfg.pilotoMeses+' mensalidade(s) da plataforma isenta(s).';
   var memoria =
     '<div style="margin-top:16px;padding-top:12px;border-top:1px solid rgba(255,255,255,0.08)">' +
       '<div style="font-size:10.5px;font-weight:700;text-transform:uppercase;letter-spacing:0.08em;color:#94a3b8;margin-bottom:8px">Memória de cálculo</div>' +
-      '<div style="font-size:11px;color:#cbd5e1;line-height:1.7">' +
-        '• Programa de consultoria: '+fmtBRL(PROP_PROGRAMA_MENSAL)+'/mês × '+PROP_PROGRAMA_MESES+' meses = <strong style="color:#f8fafc">'+fmtNum(PROP_PROGRAMA_TOTAL)+'</strong><br>' +
-        '• Plataforma pós-programa: '+fmtBRL(precoObra)+'/obra/mês × '+numObras+' obra(s) = <strong style="color:#f8fafc">'+fmtNum(plataformaMes)+'/mês</strong>' +
-      '</div>' +
+      '<div style="font-size:11px;color:#cbd5e1;line-height:1.7">'+memLinhas+'</div>' +
     '</div>';
 
   c.innerHTML =
     propSecHead('09', 'Investimento Personalizado para a ' + emp) +
-    propLead('Dois produtos, uma jornada: o <strong style="color:#f8fafc">programa de consultoria</strong> em destaque, com a plataforma inclusa durante os '+PROP_PROGRAMA_MESES+' meses; a assinatura recorrente entra depois, se a '+emp+' seguir.') +
-    '<div style="display:grid;grid-template-columns:1fr 1fr;gap:14px;margin-bottom:8px">' +
-      '<div style="padding:20px 22px;background:rgba(234,88,12,0.10);border:1.5px solid rgba(234,88,12,0.45);border-radius:12px">' +
-        '<div style="font-size:10.5px;font-weight:700;text-transform:uppercase;letter-spacing:0.07em;color:#ea580c;margin-bottom:8px">Programa de Redesenho SIIGA · '+PROP_PROGRAMA_MESES+' meses</div>' +
-        '<div style="font-family:Bai Jamjuree;font-size:30px;font-weight:700;color:#ea580c">'+fmtNum(PROP_PROGRAMA_TOTAL)+'</div>' +
-        '<div style="font-size:11px;color:#94a3b8;margin-top:4px">'+fmtBRL(PROP_PROGRAMA_MENSAL)+'/mês × '+PROP_PROGRAMA_MESES+' meses · valor total do programa</div>' +
-      '</div>' +
-      '<div style="padding:20px 22px;background:#1a1c26;border:1px solid rgba(255,255,255,0.08);border-radius:12px">' +
-        '<div style="font-size:10.5px;font-weight:700;text-transform:uppercase;letter-spacing:0.07em;color:#94a3b8;margin-bottom:8px">Plataforma Agilean · pós-programa</div>' +
-        '<div style="font-family:Bai Jamjuree;font-size:30px;font-weight:700;color:#f8fafc">'+fmtNum(plataformaMes)+'<span style="font-size:14px;color:#94a3b8">/mês</span></div>' +
-        '<div style="font-size:11px;color:#94a3b8;margin-top:4px">Inclusa durante o programa · assinatura recorrente por obra começa após os '+PROP_PROGRAMA_MESES+' meses</div>' +
-      '</div>' +
-    '</div>' +
-    memoria;
+    propLead('Dois produtos, uma jornada: o <strong style="color:#f8fafc">Redesenho de Processos SIIGA</strong> (consultoria) em destaque'+(cfg.ativNA?'':' e a <strong style="color:#f8fafc">Ativação SIIGA</strong> da plataforma')+'; a plataforma fica inclusa durante os '+cfg.progMeses+' meses e a assinatura recorrente entra depois, se a '+emp+' seguir.') +
+    '<div style="display:grid;grid-template-columns:1fr 1fr;gap:14px">' + cardRedesenho + cardAtivacao + '</div>' +
+    mensalRow + pilotoObs + memoria;
 }
 
 // ── SEÇÃO 10: RETORNO PROJETADO (#12) ───────────────────────────────────────
@@ -5815,7 +5949,8 @@ function buildPropostaRetorno(mode) {
   var c = document.getElementById('prop-retorno-container'); if (!c) return;
   var emp = S.empresa || 'sua empresa';
   var roi = calculateROI();
-  var precoObra = precoPorObraPadrao(S.numObras);
+  var _pcfg = getPropostaCfg();
+  var precoObra = _pcfg.precoObra;   // preço/obra do plano selecionado (não mais só Maestria)
   var r = calcROIRealComMensalidade(ROI_CAPTURA_FIXA, precoObra);
   var pb = fmtPayback(r.estrategica.payback);
   var prazo = r.prazo;
@@ -5867,9 +6002,16 @@ function buildPropostaRetorno(mode) {
 function buildPropostaTermos(mode) {
   var c = document.getElementById('prop-termos-container'); if (!c) return;
   var emp = S.empresa || 'sua empresa';
+  var cfg = getPropostaCfg();
+  var dias = cfg.validade;
   var hoje = new Date();
-  var validade = new Date(hoje.getTime() + 15*24*60*60*1000);
+  var validade = new Date(hoje.getTime() + dias*24*60*60*1000);
   var validadeFmt = validade.toLocaleDateString('pt-BR');
+  var kickTxt = '';
+  if(cfg.kickoff){
+    var kd = new Date(cfg.kickoff + 'T00:00:00');
+    if(!isNaN(kd.getTime())) kickTxt = kd.toLocaleDateString('pt-BR');
+  }
 
   var termo = function(label, value) {
     return '<div style="padding:14px 16px;background:#1a1c26;border:1px solid rgba(255,255,255,0.08);border-radius:10px">' +
@@ -5878,18 +6020,25 @@ function buildPropostaTermos(mode) {
     '</div>';
   };
 
+  // Card 7 da spec: manter só Validade + sugestão de Kick-Off (Contrato e
+  // Compromisso de Resultado removidos). Os dois produtos ficam nos termos.
+  var termoAtiv = cfg.ativNA ? 'Não se aplica' : fmtBRL(cfg.ativPor)+' · setup único';
+  var pilotoObsBox = cfg.piloto
+    ? '<div style="margin-top:14px;padding:12px 16px;background:rgba(251,191,36,0.08);border:1px solid rgba(251,191,36,0.28);border-radius:10px;font-size:12px;color:#fbbf24">📋 <strong>Modelo Piloto:</strong> '+propPilotoObs(cfg)+'</div>'
+    : '';
+
   c.innerHTML =
     propSecHead('11', 'Termos & Próximo Passo') +
-    '<div style="display:grid;grid-template-columns:repeat(4,1fr);gap:12px;margin-bottom:20px">' +
-      termo('Programa', fmtBRL(PROP_PROGRAMA_MENSAL)+'/mês · '+PROP_PROGRAMA_MESES+' meses') +
+    '<div style="display:grid;grid-template-columns:repeat(4,1fr);gap:12px;margin-bottom:16px">' +
+      termo('Redesenho de Processos SIIGA', fmtBRL(PROP_PROGRAMA_MENSAL)+'/mês · '+cfg.progMeses+' meses') +
+      termo('Ativação SIIGA', termoAtiv) +
       termo('Plataforma (após)', 'Contrato anual · por obra') +
-      termo('Inclui', 'Plataforma inclusa durante o programa') +
-      termo('Validade', '15 dias — até '+validadeFmt) +
-    '</div>' +
-    '<div style="padding:22px 24px;background:linear-gradient(135deg,rgba(234,88,12,0.14),rgba(234,88,12,0.04));border:1.5px solid rgba(234,88,12,0.4);border-radius:12px">' +
+      termo('Validade', dias+' dias — até '+validadeFmt) +
+    '</div>' + pilotoObsBox +
+    '<div style="margin-top:16px;padding:22px 24px;background:linear-gradient(135deg,rgba(234,88,12,0.14),rgba(234,88,12,0.04));border:1.5px solid rgba(234,88,12,0.4);border-radius:12px">' +
       '<div style="font-size:16px;font-weight:700;color:#f8fafc;margin-bottom:12px">Próximo passo</div>' +
-      '<div style="font-size:13px;color:#e2e8f0;line-height:1.7">Para avançarmos, será necessário <strong style="color:#f8fafc">definirmos a data do Kick-Off</strong> e <strong style="color:#f8fafc">recebermos o planejamento e o orçamento das obras</strong> que serão contempladas no programa. Confirmada a data, a Agilean inicia a Fase 1 na semana seguinte, começando pelo Workshop Lean Experience.</div>' +
-      '<div style="display:inline-block;margin-top:16px;padding:10px 20px;border:1px solid rgba(234,88,12,0.5);border-radius:8px;font-size:12px;color:#fbbf24">⏳ Validade até '+validadeFmt+' · 15 dias (ajustável pelo vendedor)</div>' +
+      '<div style="font-size:13px;color:#e2e8f0;line-height:1.7">Para avançarmos, será necessário <strong style="color:#f8fafc">confirmarmos a data do Kick-Off</strong>'+(kickTxt? ' — nossa sugestão é <strong style="color:#ea580c">'+kickTxt+'</strong>' : '')+' e <strong style="color:#f8fafc">recebermos o planejamento e o orçamento das obras</strong> que serão contempladas no programa. Confirmada a data, a Agilean inicia a Fase 1 na semana seguinte, começando pelo Workshop Lean Experience.</div>' +
+      '<div style="display:inline-block;margin-top:16px;padding:10px 20px;border:1px solid rgba(234,88,12,0.5);border-radius:8px;font-size:12px;color:#fbbf24">⏳ Validade até '+validadeFmt+' · '+dias+' dias'+(kickTxt? ' · Kick-Off sugerido: '+kickTxt : '')+'</div>' +
     '</div>';
 }
 
@@ -5909,6 +6058,140 @@ function buildProposta(mode) {
   buildPropostaInvestimento(mode);
   buildPropostaRetorno(mode);
   buildPropostaTermos(mode);
+}
+
+// ── MODAL DO VENDEDOR ───────────────────────────────────────────────────────
+// Painel que o vendedor preenche antes de gerar a Proposta: plano, módulos,
+// De/Por da consultoria/ativação/mensalidade, Ativação "não se aplica", Modelo
+// Piloto (1-3 meses), validade e Kick-Off. Grava em S.proposta e chama
+// generateProposta(). O botão "Gerar Proposta" abre este modal.
+function openPropostaModal() {
+  var n = S.numObras || 1;
+  // Estado de trabalho do modal = cfg atual resolvida.
+  var cfg = getPropostaCfg();
+  var w = { plan:cfg.plan, mods:Object.assign({}, cfg.mods),
+            progTouched:(cfg.progPor<cfg.progDe-0.5), progPor:cfg.progPor,
+            ativNA:cfg.ativNA, ativTouched:(cfg.ativPor<cfg.ativDe-0.5), ativPor:cfg.ativPor,
+            mensalTouched:(cfg.mensalPor<cfg.mensalDe-0.5), mensalPor:cfg.mensalPor,
+            piloto:cfg.piloto, pilotoMeses:cfg.pilotoMeses, validade:cfg.validade, kickoff:cfg.kickoff };
+
+  var old = document.getElementById('proposta-modal'); if(old) old.remove();
+  var ov = document.createElement('div');
+  ov.id = 'proposta-modal';
+  ov.style.cssText = 'position:fixed;inset:0;background:rgba(8,9,13,0.82);z-index:2000;display:flex;align-items:flex-start;justify-content:center;overflow-y:auto;padding:24px;font-family:Inter,system-ui,sans-serif';
+  ov.innerHTML =
+    '<div style="width:100%;max-width:640px;background:#141621;border:1px solid rgba(255,255,255,0.12);border-radius:16px;overflow:hidden">' +
+      '<div style="display:flex;align-items:center;gap:12px;padding:18px 22px;border-bottom:1px solid rgba(255,255,255,0.08)">' +
+        '<div><div style="font-size:10px;font-weight:700;letter-spacing:0.14em;text-transform:uppercase;color:#ea580c">Agilean · SIIGA</div>' +
+        '<div style="font-family:Bai Jamjuree;font-size:19px;font-weight:700;color:#f8fafc">Configurar Proposta</div></div>' +
+        '<button id="pm-close" style="margin-left:auto;background:none;border:1px solid rgba(255,255,255,0.18);color:#94a3b8;border-radius:8px;padding:6px 10px;cursor:pointer">Fechar</button>' +
+      '</div>' +
+      '<div id="pm-body" style="padding:18px 22px;color:#e2e8f0;font-size:13px"></div>' +
+      '<div style="display:flex;gap:10px;justify-content:flex-end;padding:16px 22px;border-top:1px solid rgba(255,255,255,0.08)">' +
+        '<button id="pm-cancel" style="background:none;border:1px solid rgba(255,255,255,0.18);color:#cbd5e1;border-radius:9px;padding:10px 16px;cursor:pointer">Cancelar</button>' +
+        '<button id="pm-gen" style="background:#ea580c;border:none;color:#fff;border-radius:9px;padding:10px 20px;font-family:Bai Jamjuree;font-weight:700;font-size:13px;cursor:pointer">📝 Gerar Proposta</button>' +
+      '</div>' +
+    '</div>';
+  document.body.appendChild(ov);
+
+  var body = ov.querySelector('#pm-body');
+  var fmtc = function(v){ return 'R$ ' + v.toLocaleString('pt-BR',{minimumFractionDigits:v%1?2:0, maximumFractionDigits:2}); };
+  var faixaLbl = ['1 obra','2 a 3 obras','4 a 5 obras','6 a 7 obras','8 a 10 obras','acima de 10 obras'][propFaixaIdx(n)];
+
+  function render(){
+    var precoObra = propPrecoPlanoObra(w.plan, n);
+    var modsPerObra = 0; PROP_MODULOS.forEach(function(m){ if(w.mods[m.key]) modsPerObra += propModPreco(m,n); });
+    var mensalDe = (precoObra + modsPerObra) * n;
+    if(!w.mensalTouched) w.mensalPor = mensalDe;
+    var ativDe = PROP_ATIVACAO[w.plan].tab, ativPiso = PROP_ATIVACAO[w.plan].piso;
+    if(!w.ativTouched) w.ativPor = ativDe;
+    var progDe = PROP_PROGRAMA_MENSAL * PROP_PROGRAMA_MESES;
+    if(!w.progTouched) w.progPor = progDe;
+
+    var planRows = PROP_PLANOS.map(function(p){
+      var sel = p.key===w.plan;
+      return '<label style="display:flex;align-items:center;gap:10px;padding:9px 12px;margin-bottom:6px;border-radius:9px;cursor:pointer;border:1.5px solid '+(sel?'rgba(234,88,12,0.5)':'rgba(255,255,255,0.08)')+';background:'+(sel?'rgba(234,88,12,0.1)':'#1a1c26')+'" data-plan="'+p.key+'">' +
+        '<span style="width:14px;height:14px;border-radius:50%;border:1.5px solid '+(sel?'#ea580c':'rgba(255,255,255,0.25)')+';background:'+(sel?'#ea580c':'transparent')+';box-shadow:'+(sel?'inset 0 0 0 3px #1a1c26':'none')+'"></span>' +
+        '<span style="flex:1"><b style="color:#f8fafc">'+p.nome+'</b> <span style="color:#94a3b8;font-size:11px">· '+p.escopo+'</span></span>' +
+        '<span style="font-family:Bai Jamjuree;font-weight:700;color:'+(sel?'#ea580c':'#cbd5e1')+'">'+fmtc(p.p[propFaixaIdx(n)])+'<span style="font-size:9px;color:#94a3b8">/obra</span></span></label>';
+    }).join('');
+
+    var modRows = PROP_MODULOS.map(function(m){
+      var on = !!w.mods[m.key];
+      return '<label style="display:inline-flex;align-items:center;gap:7px;padding:7px 10px;margin:0 6px 6px 0;border-radius:8px;cursor:pointer;font-size:12px;border:1px solid '+(on?'rgba(234,88,12,0.5)':'rgba(255,255,255,0.08)')+';background:'+(on?'rgba(234,88,12,0.1)':'#1a1c26')+'" data-mod="'+m.key+'">' +
+        '<span style="width:14px;height:14px;border-radius:4px;display:grid;place-items:center;border:1.5px solid '+(on?'#ea580c':'rgba(255,255,255,0.25)')+';background:'+(on?'#ea580c':'transparent')+';color:#fff;font-size:10px">'+(on?'✓':'')+'</span>' +
+        m.nome+' <span style="color:#94a3b8">+'+fmtc(propModPreco(m,n))+'</span></label>';
+    }).join('');
+
+    var deporRow = function(cap, id, de, por, piso){
+      var disc = de>0 ? Math.round((1-por/de)*100) : 0;
+      var warn = (piso!=null && por<piso);
+      return '<div style="display:flex;align-items:center;gap:12px;flex-wrap:wrap;margin-top:6px">' +
+        '<span style="font-size:11px;color:#94a3b8;min-width:120px">'+cap+'</span>' +
+        '<span style="font-size:12px;color:#94a3b8;text-decoration:line-through">'+fmtc(de)+'</span>' +
+        '<span style="color:#ea580c;font-weight:700">R$</span>' +
+        '<input type="number" id="'+id+'" value="'+Math.round(por)+'" step="250" style="width:120px;background:#0f1017;border:1px solid rgba(255,255,255,0.15);border-radius:7px;color:#f8fafc;font-family:Bai Jamjuree;font-weight:700;padding:6px 9px">' +
+        '<span style="font-family:Bai Jamjuree;font-weight:700;font-size:12px;color:'+(warn?'#fbbf24':(disc>0?'#34d399':'#94a3b8'))+'">'+(disc>=0?'−':'+')+Math.abs(disc)+'%'+(warn?' ⚠ piso '+fmtc(piso):'')+'</span>' +
+      '</div>';
+    };
+
+    var ativInfo = PROP_ATIVACAO[w.plan];
+    var segBtn = function(m){ return '<button type="button" data-pm="'+m+'" style="background:'+(w.pilotoMeses===m?'#ea580c':'transparent')+';border:none;color:'+(w.pilotoMeses===m?'#fff':'#94a3b8')+';font-family:Bai Jamjuree;font-weight:700;padding:5px 12px;border-radius:6px;cursor:pointer">'+m+(m===1?' mês':' meses')+'</button>'; };
+
+    body.innerHTML =
+      '<div style="font-size:11px;color:#94a3b8;margin-bottom:14px">Empresa <b style="color:#f8fafc">'+(S.empresa||'—')+'</b> · <b style="color:#f8fafc">'+n+'</b> obra(s) · faixa '+faixaLbl+'</div>' +
+
+      '<div style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:0.06em;color:#ea580c;margin-bottom:8px">1 · Redesenho de Processos SIIGA (consultoria)</div>' +
+      deporRow('Valor total', 'pm-prog', progDe, w.progPor, null) +
+
+      '<div style="height:1px;background:rgba(255,255,255,0.08);margin:16px 0"></div>' +
+      '<div style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:0.06em;color:#ea580c;margin-bottom:8px">2 · Plano da plataforma</div>' +
+      planRows +
+      '<div style="font-size:11px;color:#94a3b8;margin:10px 0 6px">Módulos à la carte</div>' + modRows +
+
+      '<div style="height:1px;background:rgba(255,255,255,0.08);margin:16px 0"></div>' +
+      '<div style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:0.06em;color:#ea580c;margin-bottom:8px">3 · Ativação SIIGA <span style="color:#94a3b8;font-weight:400;text-transform:none">· '+ativInfo.nome+'</span></div>' +
+      '<label style="display:flex;align-items:center;gap:9px;cursor:pointer;margin-bottom:8px" data-toggle="ativNA"><span style="width:34px;height:20px;border-radius:20px;position:relative;background:'+(w.ativNA?'#ea580c':'#1a1c26')+';border:1px solid rgba(255,255,255,0.2)"><span style="position:absolute;top:2px;left:'+(w.ativNA?'16px':'2px')+';width:14px;height:14px;border-radius:50%;background:'+(w.ativNA?'#fff':'#94a3b8')+'"></span></span><span style="font-size:12px">Não se aplica (escopo só de consultoria)</span></label>' +
+      (w.ativNA ? '' : deporRow('Setup único', 'pm-ativ', ativDe, w.ativPor, ativPiso)) +
+
+      '<div style="height:1px;background:rgba(255,255,255,0.08);margin:16px 0"></div>' +
+      '<div style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:0.06em;color:#ea580c;margin-bottom:8px">4 · Mensalidade da plataforma</div>' +
+      deporRow('Por mês ('+n+' obras)', 'pm-mensal', mensalDe, w.mensalPor, null) +
+
+      '<div style="height:1px;background:rgba(255,255,255,0.08);margin:16px 0"></div>' +
+      '<div style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:0.06em;color:#ea580c;margin-bottom:10px">5 · Termos</div>' +
+      '<div style="display:flex;gap:14px;flex-wrap:wrap;margin-bottom:12px">' +
+        '<label style="font-size:12px;color:#94a3b8">Validade (dias)<br><input type="number" id="pm-validade" value="'+w.validade+'" style="margin-top:4px;width:90px;background:#0f1017;border:1px solid rgba(255,255,255,0.15);border-radius:7px;color:#f8fafc;padding:6px 9px"></label>' +
+        '<label style="font-size:12px;color:#94a3b8">Sugestão de Kick-Off<br><input type="date" id="pm-kick" value="'+(w.kickoff||'')+'" style="margin-top:4px;background:#0f1017;border:1px solid rgba(255,255,255,0.15);border-radius:7px;color:#f8fafc;padding:6px 9px"></label>' +
+      '</div>' +
+      '<label style="display:flex;align-items:center;gap:9px;cursor:pointer" data-toggle="piloto"><span style="width:34px;height:20px;border-radius:20px;position:relative;background:'+(w.piloto?'#ea580c':'#1a1c26')+';border:1px solid rgba(255,255,255,0.2)"><span style="position:absolute;top:2px;left:'+(w.piloto?'16px':'2px')+';width:14px;height:14px;border-radius:50%;background:'+(w.piloto?'#fff':'#94a3b8')+'"></span></span><span style="font-size:12px"><b style="color:#f8fafc">Modelo Piloto</b> — isenta o 1º mês do sistema (só plataforma)</span></label>' +
+      (w.piloto ? '<div style="display:flex;align-items:center;gap:10px;margin-top:10px"><span style="font-size:11px;color:#94a3b8">Duração da isenção</span><span style="display:inline-flex;gap:4px;background:#1a1c26;border:1px solid rgba(255,255,255,0.15);border-radius:8px;padding:3px" id="pm-seg">'+segBtn(1)+segBtn(2)+segBtn(3)+'</span></div>' : '');
+
+    // wiring
+    body.querySelectorAll('[data-plan]').forEach(function(el){ el.addEventListener('click',function(){ w.plan=el.dataset.plan; w.ativTouched=false; w.mensalTouched=false; render(); }); });
+    body.querySelectorAll('[data-mod]').forEach(function(el){ el.addEventListener('click',function(){ var k=el.dataset.mod; w.mods[k]=!w.mods[k]; w.mensalTouched=false; render(); }); });
+    body.querySelectorAll('[data-toggle]').forEach(function(el){ el.addEventListener('click',function(){ var k=el.dataset.toggle; w[k]=!w[k]; render(); }); });
+    var seg=body.querySelector('#pm-seg'); if(seg) seg.querySelectorAll('[data-pm]').forEach(function(b){ b.addEventListener('click',function(){ w.pilotoMeses=+b.dataset.pm; render(); }); });
+    var bindNum=function(id,setter){ var el=body.querySelector('#'+id); if(el) el.addEventListener('input',function(){ setter(+el.value||0); }); };
+    bindNum('pm-prog', function(v){ w.progTouched=true; w.progPor=v; });
+    bindNum('pm-ativ', function(v){ w.ativTouched=true; w.ativPor=v; });
+    bindNum('pm-mensal', function(v){ w.mensalTouched=true; w.mensalPor=v; });
+    var vEl=body.querySelector('#pm-validade'); if(vEl) vEl.addEventListener('input',function(){ w.validade=+vEl.value||0; });
+    var kEl=body.querySelector('#pm-kick'); if(kEl) kEl.addEventListener('input',function(){ w.kickoff=kEl.value; });
+  }
+  render();
+
+  function close(){ ov.remove(); }
+  ov.querySelector('#pm-close').addEventListener('click', close);
+  ov.querySelector('#pm-cancel').addEventListener('click', close);
+  ov.addEventListener('click', function(e){ if(e.target===ov) close(); });
+  ov.querySelector('#pm-gen').addEventListener('click', function(){
+    S.proposta = { plan:w.plan, mods:w.mods, progPor:w.progPor, ativNA:w.ativNA,
+      ativPor:w.ativPor, mensalPor:w.mensalPor, piloto:w.piloto, pilotoMeses:w.pilotoMeses,
+      validade:w.validade, kickoff:w.kickoff };
+    close();
+    generateProposta('detalhado');
+  });
 }
 
 // Gera o PDF da Proposta Comercial — documento SEPARADO do Diagnóstico

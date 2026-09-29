@@ -690,7 +690,7 @@ function maskPhone(input){var d=input.value.replace(/\D/g,'');if(d.length>11)d=d
         <button class="btn btn-s" onclick="window.print()">🖨 Imprimir</button>
         <button class="btn btn-p" onclick="generatePDF(false, window.reportPdfTheme, 'resumido')" style="background:#14161f;border:1.5px solid #ff5f1f;color:#ff5f1f;box-shadow:0 0 14px rgba(255,95,31,0.25)" title="Versão enxuta, para entregar ao cliente">📄 Gerar PDF Resumido</button>
         <button class="btn btn-p" onclick="generatePDF(false, window.reportPdfTheme, 'detalhado')" style="background:#14161f;border:1.5px solid #1B4F8A;color:#7fb0ff;box-shadow:0 0 14px rgba(27,79,138,0.25)" title="Versão completa, com tabelas e pressupostos, para apresentação ao vivo">🖥️ Gerar PDF Detalhado</button>
-        <button class="btn btn-p" onclick="generateProposta('detalhado')" style="background:#14161f;border:1.5px solid #10b981;color:#34d399;box-shadow:0 0 14px rgba(16,185,129,0.2)" title="Proposta do Escopo de Projeto (reunião 2) — documento único">📝 Gerar Proposta</button>
+        <button class="btn btn-p" onclick="openPropostaModal()" style="background:#14161f;border:1.5px solid #10b981;color:#34d399;box-shadow:0 0 14px rgba(16,185,129,0.2)" title="Configurar e gerar a Proposta do Escopo de Projeto (reunião 2)">📝 Gerar Proposta</button>
         <button class="btn btn-p" onclick="restartAssessment()">Novo Diagnóstico</button>
       </div>
     </div>
@@ -768,7 +768,7 @@ function maskPhone(input){var d=input.value.replace(/\D/g,'');if(d.length>11)d=d
     <div class="btn-row no-print" style="max-width:920px;justify-content:space-between">
       <button class="btn btn-s" onclick="showScreen('screen-report')">← Voltar ao Relatório</button>
       <div style="display:flex;gap:10px;flex-wrap:wrap;justify-content:flex-end">
-        <button class="btn btn-p" onclick="generateProposta('detalhado')" style="background:#14161f;border:1.5px solid #10b981;color:#34d399">📝 Gerar Proposta</button>
+        <button class="btn btn-p" onclick="openPropostaModal()" style="background:#14161f;border:1.5px solid #10b981;color:#34d399">📝 Reconfigurar Proposta</button>
       </div>
     </div>
   </div>
