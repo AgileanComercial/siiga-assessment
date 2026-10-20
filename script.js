@@ -30,7 +30,11 @@ var S = {
     folha: 0,
     hPlanejar: 0, hCurtoMedio: 0, hMedicao: 0, hQualidade: 0, hConsolidar: 0
   },
-  mensalidade: 2000, captura: 0.50, mensalidadeManual: false
+  mensalidade: 2000, captura: 0.50, mensalidadeManual: false,
+  // Dores declaradas pelo cliente na entrevista (botão ★ em cada pergunta):
+  // { 'F4.3': { star:true, frase:'...' } }. Alimenta a escolha dos gaps-âncora
+  // e o campo "Em suas palavras" do relatório.
+  dores: {}
 };
 
 var currentBlock = 'b0';
@@ -766,6 +770,38 @@ function getNavQs(bd, bk) {
   return list;
 }
 
+// Marcador ★ "dor declarada pelo cliente" + frase literal, por pergunta.
+// Mexe só no DOM ao alternar (sem re-render) para não perder o foco do campo.
+function escAttr(v) {
+  return String(v == null ? '' : v).replace(/&/g,'&amp;').replace(/"/g,'&quot;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+}
+function renderDorHtml(code) {
+  var d = (S.dores || {})[code] || {};
+  var on = !!d.star;
+  return '<div class="dor-box" id="dor-' + code + '">' +
+    '<button type="button" class="dor-toggle' + (on ? ' on' : '') + '" onclick="toggleDor(\'' + code + '\')">★ Dor declarada pelo cliente</button>' +
+    '<input class="text-input dor-frase" type="text" maxlength="180" placeholder="Frase do cliente, com as palavras dele (opcional)" value="' + escAttr(d.frase) + '" oninput="setDorFrase(\'' + code + '\', this.value)" style="display:' + (on ? 'block' : 'none') + '">' +
+  '</div>';
+}
+function toggleDor(code) {
+  if(!S.dores || typeof S.dores !== 'object') S.dores = {};
+  var d = S.dores[code] || (S.dores[code] = { star:false, frase:'' });
+  d.star = !d.star;
+  var box = document.getElementById('dor-' + code);
+  if(box) {
+    box.querySelector('.dor-toggle').classList.toggle('on', d.star);
+    var inp = box.querySelector('.dor-frase');
+    inp.style.display = d.star ? 'block' : 'none';
+    if(d.star) inp.focus();
+  }
+  saveDraft();
+}
+function setDorFrase(code, val) {
+  if(!S.dores || typeof S.dores !== 'object') S.dores = {};
+  var d = S.dores[code] || (S.dores[code] = { star:true, frase:'' });
+  d.frase = val;
+}
+
 function renderPhaseQ() {
   var bk = phaseOrder[currentPhaseIdx];
   var bd = PQ[bk];
@@ -841,6 +877,7 @@ function renderPhaseQ() {
   }
 
   html += '</div>';
+  html += renderDorHtml(q.code);
   if(q.anchor) html += '<div class="anchor"><strong>Ancoragem:</strong> "'+q.anchor+'"</div>';
   card.innerHTML = html;
 }
@@ -876,6 +913,7 @@ function renderComboSubHtml(bkTarget, code, label) {
     '<div class="combo-sub-label">' + label + ' <span class="combo-sub-code">' + code + '</span></div>' +
     '<div class="combo-sub-text">' + q.text + '</div>' +
     '<div class="options options-compact">' + optsHtml + '</div>' +
+    renderDorHtml(code) +
     '</div>';
 }
 
@@ -1303,6 +1341,7 @@ function renderFocusedQ() {
       '</div>';
   }
   html += '</div>';
+  html += renderDorHtml(q.code);
   if(q.anchor) html += '<div class="anchor"><strong>Ancoragem:</strong> "' + q.anchor + '"</div>';
   document.getElementById('focused-card').innerHTML = html;
 }
@@ -1504,6 +1543,7 @@ function buildAndShowRadar() {
   }
 
   RADAR_STATE = { clientPct: clientPct, benchmark: benchmark, reference: reference, labels: labels, worstIdx: worstIdx };
+  renderRadarStrong(clientPct, benchmark);
   if(radarChartInst) radarChartInst.destroy();
   radarChartInst = drawRadarChart(document.getElementById('radarChart'), RADAR_STATE, false);
 
@@ -1625,29 +1665,70 @@ function renderNextSteps() {
   var tipologiaLabel = tipologiaMap[S.tipologia] || 'Construção Civil';
   var moLabel = S.modeloMO === 'propria' ? 'mão de obra própria' : (S.modeloMO === 'mista' ? 'mão de obra mista' : 'mão de obra terceirizada');
 
+  // Cada ato indica o(s) gap(s)-âncora que resolve (ver atoDoGap()). Ato sem
+  // âncora cita até 2 gaps críticos do mesmo ato; sem nenhum, não mostra a linha.
+  var plan = getGapPlan(calculateROI());
+  var resolve = {1:[], 2:[], 3:[]};
+  plan.anchors.forEach(function(o, i){ resolve[atoDoGap(o.code)].push('Gap-âncora ' + (i+1) + ' (' + o.gap + ')'); });
+  [1,2,3].forEach(function(n) {
+    if(resolve[n].length) return;
+    plan.rest.filter(function(o){ return atoDoGap(o.code) === n; }).slice(0, 2).forEach(function(o){ resolve[n].push(o.gap.charAt(0).toLowerCase() + o.gap.slice(1)); });
+  });
+  var resolveHtml = function(n) {
+    return resolve[n].length ? '<div style="font-size:11.5px;color:#fdba74;margin-top:4px">Resolve: ' + resolve[n].join(' e ') + '</div>' : '';
+  };
+  var ato = function(n, titulo, texto) {
+    return '<div style="display:flex;align-items:flex-start;gap:14px;font-size:13px;color:#e2e8f0;line-height:1.55">' +
+      '<span style="font-family:\'Bai Jamjuree\';color:#ea580c;font-weight:700;font-size:13px;padding-top:2px">0' + n + '</span>' +
+      '<span><strong style="color:#ffffff">' + titulo + '</strong> — ' + texto + resolveHtml(n) + '</span>' +
+    '</div>';
+  };
+
+  // "O que ouvimos de vocês": contexto do Bloco 0 + frases das dores ★.
+  var momentoTxt = {
+    crescimento: '<strong style="color:#ffffff">Crescimento:</strong> a empresa está abrindo novas frentes — o processo precisa estar pronto antes da escala.',
+    consolidacao: '<strong style="color:#ffffff">Consolidação:</strong> o foco é melhorar processos e rentabilidade do volume atual.',
+    estavel: '<strong style="color:#ffffff">Operação estável:</strong> o foco é eficiência operacional com o volume atual.'
+  };
+  var ouvimos = [];
+  if (momentoTxt[S.momento]) ouvimos.push(momentoTxt[S.momento]);
+  ouvimos.push('<strong style="color:#ffffff">Operação:</strong> ' + obras + ' obra(s), orçamento médio de ' + fmtNum(S.orcamentoMedio || 0) + ' e prazo médio de ' + (S.prazoMedio || 0) + ' meses, com ' + moLabel + '.');
+  var f = S.ferramentas || {};
+  var ferr = [['planejamento','planejamento'],['medicao','medição'],['qualidade','qualidade'],['contratos','contratos'],['folha','folha']]
+    .filter(function(p){ return f[p[0]] && String(f[p[0]]).trim(); })
+    .map(function(p){ return p[1] + ' em ' + String(f[p[0]]).trim(); });
+  if (ferr.length) ouvimos.push('<strong style="color:#ffffff">Ferramentas hoje:</strong> ' + ferr.join(', ') + ' — o SIIGA se integra ao ERP, sem trocá-lo.');
+  plan.anchors.filter(function(o){ return o.frase; }).slice(0, 2).forEach(function(o) {
+    ouvimos.push('<strong style="color:#ffffff">Nas palavras de vocês:</strong> <em>“' + repEsc(o.frase) + '”</em>');
+  });
+
   container.innerHTML =
     '<div>' +
-      '<div class="rep-sec-title" style="margin-bottom:8px"><span class="rep-sec-num">09</span>Plano de Ação Executivo</div>' +
+      '<div class="rep-sec-title" style="margin-bottom:8px"><span class="rep-sec-num">06</span>Plano de Ação Executivo</div>' +
       '<div style="font-family:\'Bai Jamjuree\';font-size:17px;font-weight:700;color:#ffffff;margin-bottom:14px">Apresentação do Projeto de Solução para a ' + empresa + '</div>' +
       '<p style="font-size:13px;color:#cbd5e1;line-height:1.75;margin-bottom:20px">' +
         'Com base no diagnóstico da <strong>' + empresa + '</strong> (' + obras + ' obra(s) no perfil <em>' + tipologiaLabel + '</em> com <em>' + moLabel + '</em>), estruturamos uma demonstração executiva focada nos 3 atos de transformação operacional:' +
       '</p>' +
       '<div style="display:flex;flex-direction:column;gap:16px;margin-bottom:22px">' +
-        '<div style="display:flex;align-items:flex-start;gap:14px;font-size:13px;color:#e2e8f0;line-height:1.55">' +
-          '<span style="font-family:\'Bai Jamjuree\';color:#ea580c;font-weight:700;font-size:13px;padding-top:2px">01</span>' +
-          '<span><strong style="color:#ffffff">Metodologia & Copilotos de Planejamento</strong> — Linha de Balanço e automação de cronograma com cruzamento orçamentário direto do ERP em minutos.</span>' +
-        '</div>' +
-        '<div style="display:flex;align-items:flex-start;gap:14px;font-size:13px;color:#e2e8f0;line-height:1.55">' +
-          '<span style="font-family:\'Bai Jamjuree\';color:#ea580c;font-weight:700;font-size:13px;padding-top:2px">02</span>' +
-          '<span><strong style="color:#ffffff">Canteiro Ágil & Gestão Operacional</strong> — Apontamentos diários em campo, remoção preventiva de restrições com 4 semanas de antecedência e FVS vinculada à medição.</span>' +
-        '</div>' +
-        '<div style="display:flex;align-items:flex-start;gap:14px;font-size:13px;color:#e2e8f0;line-height:1.55">' +
-          '<span style="font-family:\'Bai Jamjuree\';color:#ea580c;font-weight:700;font-size:13px;padding-top:2px">03</span>' +
-          '<span><strong style="color:#ffffff">Fechamento Blindado & Performance HUB</strong> — Inteligência executiva em tempo real e integração bidirecional com ERP para fechar medições e folha em horas.</span>' +
-        '</div>' +
+        ato(1, 'Metodologia & Copilotos de Planejamento', 'Linha de Balanço e automação de cronograma com cruzamento orçamentário direto do ERP em minutos.') +
+        ato(2, 'Canteiro Ágil & Gestão Operacional', 'Apontamentos diários em campo, remoção preventiva de restrições com 4 semanas de antecedência e FVS vinculada à medição.') +
+        ato(3, 'Fechamento Blindado & Performance HUB', 'Inteligência executiva em tempo real e integração bidirecional com ERP para fechar medições e folha em horas.') +
       '</div>' +
       '<div style="padding:16px 18px;background:rgba(234,88,12,0.06);border-radius:6px;border-left:2.5px solid #ea580c">' +
         '<span style="font-size:13px;color:#cbd5e1;font-style:italic;line-height:1.6">"Identificamos oportunidades claras de ganho de eficiência e estancamento de perdas na sua operação. Na reunião executiva, demonstraremos a metodologia SIIGA capturando esses resultados desde o primeiro ciclo."</span>' +
+      '</div>' +
+      '<div style="margin-top:20px;padding:16px 18px;background:#151720;border:1px solid rgba(255,255,255,0.08);border-radius:10px">' +
+        '<div style="font-size:9.5px;font-weight:700;text-transform:uppercase;letter-spacing:0.1em;color:#ea580c;margin-bottom:8px">O que ouvimos de vocês e vai orientar o escopo</div>' +
+        '<ul style="margin:0 0 0 18px;font-size:12.5px;line-height:1.7;color:#e2e8f0">' + ouvimos.map(function(t){ return '<li>' + t + '</li>'; }).join('') + '</ul>' +
+      '</div>' +
+      // Próximo passo: preenchido à mão/na tela durante a reunião (data e decisor).
+      '<div style="margin-top:16px;padding:16px 18px;background:rgba(234,88,12,0.07);border:1px solid rgba(234,88,12,0.4);border-radius:10px">' +
+        '<div style="font-size:9.5px;font-weight:700;text-transform:uppercase;letter-spacing:0.1em;color:#ea580c;margin-bottom:8px">Próximo passo · reunião de escopo</div>' +
+        '<div style="font-size:13px;color:#e2e8f0;margin-bottom:12px">Desenhamos juntos o escopo e o investimento, com quem aprova a contratação.</div>' +
+        '<div style="display:grid;grid-template-columns:1fr 1fr;gap:18px">' +
+          '<div><div style="font-size:10.5px;color:#94a3b8">Data e hora</div><div style="border-bottom:1px solid #64748b;height:22px"></div></div>' +
+          '<div><div style="font-size:10.5px;color:#94a3b8">Participantes (incluindo quem aprova)</div><div style="border-bottom:1px solid #64748b;height:22px"></div></div>' +
+        '</div>' +
       '</div>' +
     '</div>';
 }
@@ -1984,11 +2065,230 @@ function renderExecutiveSnapshot(totalScore, totalMax, roi, rEstrategica) {
   el.innerHTML =
     '<div class="rep-sec-title"><span class="rep-sec-num">01</span>Síntese Executiva</div>' +
     '<div style="font-size:12px;color:var(--rep-text-mut,#94a3b8);margin-bottom:14px">Síntese de diretoria — os indicadores que definem a urgência e o retorno da decisão.</div>' +
-    '<div style="display:grid;grid-template-columns:repeat(2,1fr);gap:14px">' +
+    '<div style="display:grid;grid-template-columns:repeat(3,1fr);gap:14px">' +
       kpi('Score de Maturidade', totalScore+'/'+totalMax, nivel, pct, reportStatusColor(pct)) +
       kpi('Exposição em Risco', fmtNum(roi ? roi.totalBase*(S.numObras||5) : 0), 'Perda estimada no portfólio, sem intervenção') +
+      kpi('Ganho Capturável', '<span style="color:#0d7c4f">'+fmtNum(roi ? roi.totalPortfolio : 0)+'</span>', 'Estimativa conservadora com o SIIGA') +
     '</div>';
 }
+
+// ═══════════════════════════════════════════
+//  RELATÓRIO — padrão de apresentação (gaps-âncora, síntese, ROI em 4 passos)
+// ═══════════════════════════════════════════
+var REP_TXT_STRONG = 'var(--rep-text-strong,#f8fafc)';
+var REP_TXT = 'var(--rep-text,#e2e8f0)';
+var REP_TXT_MUT = 'var(--rep-text-mut,#94a3b8)';
+var REP_TILE = 'background:var(--rep-card-bg,#151720);border:1px solid var(--rep-border,rgba(255,255,255,0.08));border-radius:10px';
+function repLbl(t, color) {
+  return '<div style="font-size:9.5px;font-weight:700;text-transform:uppercase;letter-spacing:0.1em;color:'+(color||REP_TXT_MUT)+';margin-bottom:6px">'+t+'</div>';
+}
+function repBig(t, color, size) {
+  return '<div style="font-family:Bai Jamjuree,sans-serif;font-variant-numeric:tabular-nums;font-size:'+(size||24)+'px;font-weight:700;color:'+(color||REP_TXT_STRONG)+'">'+t+'</div>';
+}
+function repEsc(t) {
+  return String(t == null ? '' : t).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+}
+function repConfirm(t) {
+  return '<div style="margin-top:12px;padding:9px 13px;background:rgba(234,88,12,0.08);border:1px solid rgba(234,88,12,0.3);border-radius:7px;font-size:12px;color:#ea580c">'+t+'</div>';
+}
+var REP_STAR = ' <span style="color:#eab308;font-weight:700">★</span>';
+function fmtMilBR(v, dec) {
+  return 'R$ ' + (v/1000).toLocaleString('pt-BR', {minimumFractionDigits: dec||0, maximumFractionDigits: dec||0}) + ' mil';
+}
+function fmtRefBRL(v) {
+  return 'R$ ' + Math.round(v).toLocaleString('pt-BR');
+}
+
+// Página 2 · Síntese Executiva (cont.): os gaps-âncora em uma linha cada.
+function renderSinteseAnchors(plan, roi) {
+  var el = document.getElementById('exec-anchors-card');
+  if(!el) return;
+  if(!plan.anchors.length) { el.style.display = 'none'; el.innerHTML = ''; return; }
+  el.style.display = '';
+  var obras = S.numObras || 5;
+  var item = {}; roi.items.forEach(function(i){ item[i.key] = i; });
+  var rows = plan.anchors.map(function(o, i) {
+    var sub = o.frase ? '“' + repEsc(o.frase) + '”' : repEsc(answerLabelFor(o.bk, o.code, o.score));
+    var it = item[o.fonte];
+    return '<tr>' +
+      '<td style="color:#ea580c;font-weight:700">'+(i+1)+'</td>' +
+      '<td><strong style="color:'+REP_TXT_STRONG+'">'+o.gap+'</strong>'+(o.star ? REP_STAR : '') +
+        '<div style="font-size:11px;color:'+REP_TXT_MUT+';font-style:italic;margin-top:2px">'+sub+'</div></td>' +
+      '<td>'+FONTE_LABEL[o.fonte]+'</td>' +
+      '<td style="text-align:right;font-weight:700;white-space:nowrap">'+(it ? fmtNum(it.baseValue*obras) : '—')+'</td>' +
+    '</tr>';
+  }).join('');
+  var outros = plan.all.length - plan.anchors.length;
+  el.innerHTML = repLbl('Onde o dinheiro vaza — ' + plan.anchors.length + ' gaps-âncora', '#ea580c') +
+    '<table class="opp-table"><thead><tr><th>#</th><th>Gap-âncora</th><th>Fonte de perda</th><th style="text-align:right">Perda bruta</th></tr></thead><tbody>' + rows + '</tbody></table>' +
+    (outros > 0 ? '<div style="font-size:11px;color:'+REP_TXT_MUT+';margin-top:8px">Os outros ' + outros + ' pontos estão nas páginas seguintes, para a equipe ler com calma.</div>' : '');
+}
+
+// Página 2 · Síntese Executiva (cont.): o retorno em uma linha.
+function renderSinteseRetorno(rr) {
+  var el = document.getElementById('exec-retorno-card');
+  if(!el) return;
+  var op = rr && rr.operacional, es = rr && rr.estrategica;
+  var arrow = ' <span style="color:#ea580c">→</span> ';
+  if(!op || !op.horasInformadas) {
+    el.innerHTML = repLbl('Retorno em uma linha', '#ea580c') +
+      '<div style="font-size:13px;color:'+REP_TXT+'">As horas da equipe de gestão não foram informadas neste diagnóstico — o retorno é calculado com elas na reunião de escopo.</div>';
+    return;
+  }
+  var tot = es.valorCapacidade + es.recTotal;
+  var mult = rr.mensalidade > 0 ? tot / rr.mensalidade : 0;
+  el.innerHTML = repLbl('Retorno em uma linha', '#ea580c') +
+    '<div style="font-size:15px;line-height:1.6;color:'+REP_TXT_STRONG+'"><strong>'+fmtHorasBR(op.horasInformadas)+' h/mês</strong> informadas por vocês' + arrow +
+      '<strong>'+fmtHorasBR(op.hMes)+' h/mês</strong> voltam para decisão' + arrow +
+      '<strong>'+fmtMilBR(tot, 2)+'/mês</strong>' + arrow +
+      '<strong style="color:#0d7c4f">'+mult.toLocaleString('pt-BR',{maximumFractionDigits:1})+'× a mensalidade de referência</strong></div>' +
+    '<div style="font-size:11px;color:'+REP_TXT_MUT+';margin-top:6px">Cenário conservador ('+Math.round(rr.fator*100)+'%). A mensalidade de referência de '+fmtRefBRL(rr.mensalidade)+' por obra serve apenas ao cálculo; o valor final depende do escopo desenhado em conjunto.</div>';
+}
+
+// Página 3 · cards dos gaps-âncora — filhos diretos do wrapper do relatório
+// (o PDF pagina por eles), logo depois do card "Gaps do Processo atual".
+function renderAnchorGapCards(plan, roi) {
+  var summary = document.getElementById('gaps-summary-stats');
+  var summaryCard = summary ? summary.closest('.card') : null;
+  if(!summaryCard) return;
+  var wrapper = summaryCard.parentNode;
+  Array.prototype.forEach.call(wrapper.querySelectorAll(':scope > .anchor-gap-card'), function(c){ wrapper.removeChild(c); });
+  var lead = document.getElementById('gaps-anchor-lead');
+  if(lead) lead.textContent = plan.anchors.length ?
+    'Os ' + plan.anchors.length + ' pontos abaixo foram escolhidos pela fonte de perda mais cara e pelo que vocês mesmos relataram. Os demais gaps estão na sequência.' : '';
+  var obras = S.numObras || 5;
+  var item = {}; roi.items.forEach(function(i){ item[i.key] = i; });
+  var pilarLabel = {F1:'Pilar 1', F2:'Pilar 2', F3:'Pilar 3', F4:'Pilar 4', MO:'Mão de obra'};
+  var anchorAfter = summaryCard;
+  plan.anchors.forEach(function(o, i) {
+    var it = item[o.fonte];
+    var cs = FONTE_CASE[o.fonte] || {};
+    var caseHtml = cs.quote ?
+      '<div style="font-size:11.5px;font-style:italic;color:'+REP_TXT+';line-height:1.5">“'+cs.quote+'”</div>' +
+      '<div style="font-size:10.5px;color:'+REP_TXT_MUT+';margin-top:3px"><strong style="color:'+REP_TXT_STRONG+'">'+cs.nome+'</strong> · '+cs.papel+'</div>' :
+      '<div style="font-size:11.5px;color:'+REP_TXT+';line-height:1.5">'+(cs.mercado || '')+'</div>';
+    var baseTxt = (o.fonte === 'time' && roi.horasDoCliente === false) ?
+      'referência de mercado de horas de gestão e hora técnica de referência (R$ 115/h).' : FONTE_BASE_TXT[o.fonte];
+    var resposta = repEsc(answerLabelFor(o.bk, o.code, o.score));
+    var voz = o.frase ?
+      repLbl('Em suas palavras') + '<div style="font-style:italic;color:'+REP_TXT+';border-left:2.5px solid #ea580c;padding-left:10px;margin-bottom:6px;font-size:13px;line-height:1.5">“'+repEsc(o.frase)+'”</div>' +
+        '<div style="font-size:10.5px;color:'+REP_TXT_MUT+';line-height:1.5">Resposta registrada: '+resposta+'.</div>' :
+      repLbl('O que vocês responderam') + '<div style="font-style:italic;color:'+REP_TXT+';border-left:2.5px solid #ea580c;padding-left:10px;font-size:12.5px;line-height:1.5">'+resposta.charAt(0).toUpperCase()+resposta.slice(1)+'.</div>';
+    var card = document.createElement('div');
+    card.className = 'card card-wide rep-mb anchor-gap-card';
+    card.setAttribute('data-section', 'gaps');
+    card.setAttribute('data-keep-group', 'gaps');
+    card.style.cssText = 'padding:18px 24px;margin-bottom:10px';
+    card.innerHTML =
+      '<div style="display:flex;justify-content:space-between;align-items:flex-start;gap:14px;margin-bottom:10px">' +
+        '<div><div style="font-size:9.5px;font-weight:700;letter-spacing:0.1em;text-transform:uppercase;color:#ea580c">Gap-âncora '+(i+1)+' · '+(pilarLabel[o.phase]||o.phase) +
+          (o.star ? ' · <span style="color:#eab308">★ dor declarada</span>' : '') + '</div>' +
+          '<div style="font-family:Bai Jamjuree,sans-serif;font-size:17px;font-weight:700;color:'+REP_TXT_STRONG+';margin-top:2px">'+o.gap+'</div></div>' +
+        '<div style="text-align:right;font-size:10.5px;color:'+REP_TXT_MUT+';white-space:nowrap">Fonte de perda<br><strong style="color:'+REP_TXT_STRONG+'">'+FONTE_LABEL[o.fonte]+'</strong></div>' +
+      '</div>' +
+      '<div style="display:grid;grid-template-columns:1fr 1fr;gap:18px">' +
+        '<div>' + voz + '<div style="height:10px"></div>' + repLbl('O que isso causa') +
+          '<div style="font-size:12px;color:'+REP_TXT+';line-height:1.55">'+o.impact+'</div></div>' +
+        '<div>' + repLbl('Quanto custa') +
+          '<div style="display:flex;gap:18px;align-items:baseline"><div>'+repBig(it ? fmtNum(it.baseValue*obras) : '—', '#ea580c', 22)+'<div style="font-size:10px;color:'+REP_TXT_MUT+'">perda bruta</div></div>' +
+          '<div>'+repBig(it ? fmtNum(it.portfolio) : '—', '#0d7c4f', 22)+'<div style="font-size:10px;color:'+REP_TXT_MUT+'">capturável</div></div></div>' +
+          '<div style="font-size:10.5px;color:'+REP_TXT_MUT+';margin-top:4px;line-height:1.45">Base: '+baseTxt+'</div>' +
+          '<div style="height:8px"></div>' + repLbl(cs.quote ? 'Quem resolveu' : 'Referência') + caseHtml + '</div>' +
+      '</div>' +
+      repConfirm('Isso bate com a realidade de vocês?');
+    wrapper.insertBefore(card, anchorAfter.nextSibling);
+    anchorAfter = card;
+  });
+}
+
+// Página 4 · Gaps Identificados (demais críticos, com Prioridade) + Pontos de atenção.
+function renderGapsIdentificados(plan) {
+  var oppTableCard = document.getElementById('opp-table-card');
+  var attnCard = document.getElementById('opp-attn-card');
+  var pil = {F1:'P1',F2:'P2',F3:'P3',F4:'P4',MO:'MO'};
+  if(oppTableCard) {
+    if(!plan.all.length) {
+      oppTableCard.innerHTML = '<div style="padding:14px 16px;text-align:center;color:#888;font-size:12px">' +
+        'Nenhum gap crítico ou oportunidade de melhoria identificada nesta fase do diagnóstico.</div>';
+    } else {
+      var start = plan.anchors.length;
+      var pill = function(p) {
+        var a = (p === 'Alta');
+        return '<span style="display:inline-block;padding:1px 9px;border-radius:10px;font-size:10px;font-weight:700;background:'+(a?'rgba(239,68,68,0.14)':'rgba(234,179,8,0.16)')+';color:'+(a?'#dc2626':'#ca8a04')+'">'+p+'</span>';
+      };
+      var rows = plan.rest.length ? plan.rest.map(function(r, idx) {
+        return '<tr><td style="color:var(--rep-text-mut, #999)">'+String(start+idx+1).padStart(2,'0')+'</td>' +
+          '<td><strong>'+r.gap+'</strong></td>' +
+          '<td style="color:var(--rep-text-mut, #999)">'+(pil[r.phase]||r.phase)+'</td>' +
+          '<td style="font-size:11px">'+FONTE_LABEL[r.fonte]+'</td>' +
+          '<td style="font-size:11px">'+(r.score === 0 ? 'Sem prática' : 'Informal')+'</td>' +
+          '<td>'+pill(r.prioridade)+'</td></tr>';
+      }).join('') : '<tr><td colspan="6" style="color:var(--rep-text-mut, #999)">Nenhum outro gap crítico além dos gaps-âncora.</td></tr>';
+      oppTableCard.innerHTML = '<div class="rep-sec-title"><span class="rep-sec-num">03</span>Gaps Identificados</div>' +
+        '<p style="font-size:12px;color:#666;margin-bottom:10px">Não precisam ser comentados na reunião. Prioridade <strong>Alta</strong>: a fonte de perda está entre as 3 mais caras e a prática é inexistente ou informal. <strong>Média</strong>: demais casos.</p>' +
+        '<table class="opp-table" id="opp-table-el"><thead><tr><th>#</th><th>Gap Identificado</th><th>Pilar</th><th>Fonte de perda</th><th>Situação</th><th>Prioridade</th></tr></thead><tbody id="opp-body">'+rows+'</tbody></table>';
+    }
+  }
+  if(attnCard) {
+    if(!plan.attention.length) { attnCard.style.display = 'none'; attnCard.innerHTML = ''; return; }
+    attnCard.style.display = '';
+    attnCard.innerHTML = repLbl('Pontos de atenção · a prática existe, mas é informal (' + plan.attention.length + ')') +
+      '<div style="display:grid;grid-template-columns:1fr 1fr;gap:2px 22px">' + plan.attention.map(function(a) {
+        return '<div style="font-size:11.5px;color:'+REP_TXT+';padding:5px 0;border-bottom:1px solid var(--rep-border,rgba(255,255,255,0.05))">'+a.gap+' <span style="color:'+REP_TXT_MUT+'">· '+(pil[a.phase]||a.phase)+'</span></div>';
+      }).join('') + '</div>';
+  }
+}
+
+// Página 6 · ROI em 4 passos (dado do cliente → horas → R$ → retorno) + KPIs.
+function renderRoiChain(rr) {
+  var el = document.getElementById('roi-chain-card');
+  if(!el) return;
+  var op = rr && rr.operacional, es = rr && rr.estrategica;
+  if(!op || !op.horasInformadas) {
+    el.innerHTML = '<div style="font-size:13px;color:'+REP_TXT+'">As horas da equipe de gestão não foram informadas neste diagnóstico — o retorno em horas e em R$ é calculado com elas na reunião de escopo.</div>';
+    return;
+  }
+  var tot = es.valorCapacidade + es.recTotal;
+  var mult = rr.mensalidade > 0 ? tot / rr.mensalidade : 0;
+  var step = function(l, big, sub, extra) {
+    return '<div style="padding:16px 14px;'+REP_TILE+';'+(extra||'')+'">'+repLbl(l)+big+'<div style="font-size:10.5px;color:'+REP_TXT_MUT+';margin-top:6px;line-height:1.45">'+sub+'</div></div>';
+  };
+  var arr = '<div style="display:flex;align-items:center;justify-content:center;color:#ea580c;font-size:14px">▶</div>';
+  var compos = 'por mês: ' + fmtMilBR(es.valorCapacidade, 2) + ' de capacidade liberada' +
+    (es.recTotal > 0 ? ' + ' + fmtMilBR(es.recTotal, 1) + ' de retrabalho e pagamentos indevidos evitados' : '');
+  var pb = fmtPayback(es.payback);
+  var kp = function(l, v, s) { return '<div style="padding:14px 16px;'+REP_TILE+'">'+repLbl(l)+repBig(v, null, 20)+'<div style="font-size:10.5px;margin-top:4px;color:'+REP_TXT_MUT+'">'+s+'</div></div>'; };
+  var folha = (S.roi2 && S.roi2.folha) ? S.roi2.folha : 0;
+  el.innerHTML =
+    '<div style="display:grid;grid-template-columns:1fr 18px 1fr 18px 1fr 18px 1fr;align-items:stretch">' +
+      step('1 · Dado de vocês', repBig(fmtHorasBR(op.horasInformadas)+' h'), 'por mês nas 5 rotinas de gestão de uma obra') + arr +
+      step('2 · O que volta', repBig(fmtHorasBR(op.hMes)+' h', '#ea580c'), 'por mês voltam para decisão (cenário conservador, '+Math.round(rr.fator*100)+'%) · '+fmtHorasBR(op.hObra)+' h na obra') + arr +
+      step('3 · O que vale', repBig(fmtMilBR(tot, 2), '#ea580c', 21), compos) + arr +
+      step('4 · O retorno', repBig(mult.toLocaleString('pt-BR',{maximumFractionDigits:1})+'×', '#0d7c4f'), 'a mensalidade de referência de '+fmtRefBRL(rr.mensalidade)+' por obra · ROI líquido de '+Math.round(es.roi*100)+'% ao mês', 'border-color:rgba(16,185,129,0.5)') +
+    '</div>' +
+    repConfirm('Esses números refletem a rotina de vocês? Se estiverem certos, faz sentido desenharmos o escopo juntos?') +
+    '<div style="display:grid;grid-template-columns:repeat(3,1fr);gap:12px;margin-top:12px">' +
+      kp('% da jornada liberada', (op.pctJornada*100).toLocaleString('pt-BR',{maximumFractionDigits:1})+'%', 'do time técnico') +
+      kp('Payback', pb.txt, pb.sub) +
+      kp('Folha considerada', folha ? fmtNum(folha) : '—', folha ? 'por mês, média da obra' : 'sem folha própria informada') +
+    '</div>';
+}
+
+// Radar · "Ponto forte": o pilar mais acima (ou mais próximo) da média de mercado.
+function renderRadarStrong(clientPct, benchmark) {
+  var el = document.getElementById('radar-strong-label');
+  if(!el) return;
+  var nomes = ['Planejamento Estratégico','Proteção da Execução','Gestão da Produção','Controle e Performance'];
+  var best = -1, bestDiff = -Infinity;
+  clientPct.forEach(function(p, i){ var d = p - benchmark[i]; if(p > 0 && d > bestDiff) { bestDiff = d; best = i; } });
+  if(best < 0) { el.style.display = 'none'; el.textContent = ''; return; }
+  var pc = Math.round(clientPct[best]*100), bm = Math.round(benchmark[best]*100);
+  el.style.display = '';
+  el.textContent = bestDiff >= 0 ?
+    '✅ Ponto forte: Pilar ' + (best+1) + ' — ' + nomes[best] + ' está em ' + pc + '%, acima da média de mercado (' + bm + '%).' :
+    '✅ Ponto mais forte hoje: Pilar ' + (best+1) + ' — ' + nomes[best] + ', em ' + pc + '% (média de mercado: ' + bm + '%).';
+}
+
 
 // Score de maturidade agregado — FONTE ÚNICA do score total (0-57: soma dos 4
 // pilares, sem a B0.3 nem o Bloco MO). Radar, relatório, Proposta Comercial,
@@ -2091,37 +2391,14 @@ function buildReport() {
   var repInsEl = document.getElementById('rep-ins');
   if (repInsEl) repInsEl.innerHTML = insHtml;
 
-  // Section 2: opportunities
-  var opps = generateOpportunities();
-  var SEVERITY_INFO = {
-    critico: { label: 'Crítico', fg: '#dc2626' },
-    oportunidade: { label: 'Oportunidade', fg: '#c2680d' }
-  };
-  var oppTableCard = document.getElementById('opp-table-card');
-  if(opps.length === 0) {
-    // Cliente de alta maturidade, sem gaps críticos nem oportunidades de melhoria
-    // identificadas: reservar o layout inteiro de uma tabela vazia (só cabeçalhos)
-    // deixava metade da página em branco no PDF. Colapsa para uma mensagem curta.
-    if(oppTableCard) {
-      oppTableCard.innerHTML = '<div style="padding:14px 16px;text-align:center;color:#888;font-size:12px">' +
-        'Nenhum gap crítico ou oportunidade de melhoria identificada nesta fase do diagnóstico.</div>';
-    }
-  } else {
-    var oppHtml = '';
-    opps.forEach(function(r, idx) {
-      var sevInfo = SEVERITY_INFO[r.severity] || SEVERITY_INFO.oportunidade;
-      oppHtml += '<tr><td style="color:var(--rep-text-mut, #999)">'+String(idx+1).padStart(2,'0')+'</td><td>'+r.gap+'</td>' +
-        '<td style="color:'+sevInfo.fg+';font-weight:600">'+sevInfo.label+'</td>' +
-        '<td style="color:var(--rep-text-mut, #999)">'+r.phase+'</td>' +
-        '<td>'+r.impact+'</td></tr>';
-    });
-    // Recria a tabela sempre (idempotente) — buildReport() pode rodar mais de
-    // uma vez na mesma sessão e um render anterior sem gaps pode ter
-    // substituído este card pela mensagem curta acima.
-    if(oppTableCard) {
-      oppTableCard.innerHTML = '<div class="rep-sec-title"><span class="rep-sec-num">04</span>Gaps Identificados</div><table class="opp-table" id="opp-table-el"><thead><tr><th>#</th><th>Gap Identificado</th><th>Severidade</th><th>Pilar</th><th>Impacto</th></tr></thead><tbody id="opp-body">'+oppHtml+'</tbody></table>';
-    }
-  }
+  // Section 2: gaps — plano de gaps-âncora (ver getGapPlan()). Os cards dos
+  // âncoras, a Síntese e a tabela dependem do ROI (fonte de perda de cada gap).
+  var gapRoi = calculateROI();
+  var gapPlan = getGapPlan(gapRoi);
+  var opps = gapPlan.all;
+  renderGapsIdentificados(gapPlan);
+  renderAnchorGapCards(gapPlan, gapRoi);
+  renderSinteseAnchors(gapPlan, gapRoi);
 
   // Resumo executivo dos gaps — card próprio (ver nota no index.html sobre a
   // quebra do card único de Gaps em Card A/B). Reaproveita os MESMOS dados já
@@ -2188,7 +2465,10 @@ function buildReport() {
     '<th style="text-align:right">Perda bruta (portfólio)</th>' +
     '<th style="text-align:center">Fator de captura</th>' +
     '<th style="text-align:right">Ganho capturável (portfólio)</th>' +
+    '<th>Gap-âncora</th>' +
     '</tr></thead><tbody>';
+  var anchorPorFonte = {};
+  gapPlan.anchors.forEach(function(o){ if(!anchorPorFonte[o.fonte]) anchorPorFonte[o.fonte] = o.gap; });
   roi.items.forEach(function(item) {
     var fp = Math.round((item.fator||1)*100);
     roiHtml += '<tr>' +
@@ -2196,6 +2476,7 @@ function buildReport() {
       '<td style="text-align:right" class="roi-val">'+fmtNum(item.baseValue*obrasAtual)+'</td>' +
       '<td style="text-align:center;font-weight:700;font-size:12px">'+fp+'%</td>' +
       '<td style="text-align:right;font-weight:600" class="roi-val">'+fmtNum(item.portfolio)+'</td>' +
+      '<td style="font-size:11px;'+(anchorPorFonte[item.key] ? 'color:#ea580c' : 'color:#999')+'">'+(anchorPorFonte[item.key] ? '● '+anchorPorFonte[item.key] : '—')+'</td>' +
       '</tr>';
   });
   roiHtml += '<tr class="roi-total" style="background:#f4f4f6;border-top:2px solid #ddd">' +
@@ -2203,6 +2484,7 @@ function buildReport() {
     '<td style="text-align:right;color:#555;font-weight:700;white-space:nowrap;padding:10px 12px">'+fmtNum(roi.totalBase*obrasAtual)+'</td>' +
     '<td style="text-align:center;color:#999;padding:10px 12px">—</td>' +
     '<td style="text-align:right;color:var(--orange);font-weight:700;white-space:nowrap;padding:10px 12px">'+fmtNum(roi.totalPortfolio)+'</td>' +
+    '<td style="padding:10px 12px"></td>' +
     '</tr></tbody>';
   document.getElementById('roi-table-el').innerHTML = roiHtml;
   renderPerdasFonteGanho(roi);
@@ -2256,6 +2538,8 @@ function buildReport() {
   // (calcROIReal) guardado em window._lastROIReal por buildROIReal().
   var snapScore = getMaturityScoreSummary();
   renderExecutiveSnapshot(snapScore.score, snapScore.max, roi, window._lastROIReal);
+  renderSinteseRetorno(window._lastROIReal);
+  renderRoiChain(window._lastROIReal);
 
   // Bases do Diagnóstico (Resumido, página 6): dados do cliente coletados no
   // diagnóstico — sem fórmulas (PI da Agilean). Preenchido após buildROIReal()
@@ -2537,11 +2821,15 @@ function buildROIReal() {
 var GAP_INFO = {
   'F1.1':{title:'Formalidade do planejamento', impact:'Sem aprovação formal antes do início, a obra herda decisões de última hora que já deveriam estar travadas na largada.'},
   'F1.2':{title:'Técnica de planejamento', impact:'Sem Linha de Balanço por lotes, é impossível visualizar gargalos antecipadamente — decisões de equipe são feitas no feeling.'},
-  'F1.3':{title:'Dimensionamento de equipes', impact:'Equipes dimensionadas por estimativa geram folga ou furo de mão de obra que só aparece quando o atraso já aconteceu.'},
+  // F1.3/F1.5/F1.6/F1.7 seguem o CÓDIGO da pergunta em PQ.f1 (F1.3 = duração
+  // dos pacotes, F1.5 = suprimentos, F1.6 = Curva S, F1.7 = cronograma
+  // bancário). Antes os títulos estavam deslocados em relação às perguntas e o
+  // relatório mostrava o gap errado sempre que o Pilar 1 tinha notas mistas.
+  'F1.3':{title:'Duração dos pacotes por produtividade', impact:'Sem quantidade × produtividade, a duração de cada pacote nasce de estimativa — o cronograma perde aderência e o desvio só aparece quando o atraso já aconteceu.'},
   'F1.4':{title:'Integração orçamento × planejamento', impact:'Orçamento e planejamento desconectados escondem desvio de custo até o fechamento — quando já é tarde para agir.'},
-  'F1.5':{title:'Acompanhamento da Curva S', impact:'Desvios de prazo são identificados semanas depois. Sem projeção de término, não há decisão estruturada de recuperação.'},
-  'F1.6':{title:'Cronograma bancário', impact:'Retrabalho duplo em toda reprogramação. Exposição de caixa invisível gera risco financeiro não mapeado.'},
-  'F1.7':{title:'Integração planejamento × suprimentos', impact:'Compras emergenciais têm custo 15–25% maior. Paradas por material faltante são evitáveis.'},
+  'F1.5':{title:'Integração planejamento × suprimentos', impact:'Compras emergenciais têm custo 15–25% maior. Paradas por material faltante são evitáveis.'},
+  'F1.6':{title:'Acompanhamento da Curva S', impact:'Desvios de prazo são identificados semanas depois. Sem projeção de término, não há decisão estruturada de recuperação.'},
+  'F1.7':{title:'Cronograma bancário', impact:'Retrabalho duplo em toda reprogramação. Exposição de caixa invisível gera risco financeiro não mapeado.'},
   'F2.1':{title:'Lookahead / antecipação de restrições', impact:'Restrições aparecem quando já atrasaram. Antecipação reduz paradas não planejadas em até 40%.'},
   'F2.2':{title:'Planejamento de MO no médio prazo', impact:'Equipe não confirmada para as próximas semanas é risco imediato de parada por falta de mão de obra.'},
   'F2.3':{title:'Ciclo de reprogramação', impact:'Sem ciclo formal de reprogramação, os mesmos desvios se acumulam de mês em mês sem correção estrutural.'},
@@ -2586,7 +2874,7 @@ function generateOpportunities() {
       var sev = severityOf(score);
       if(sev) {
         var info = GAP_INFO[q.code] || { title: q.code, impact: q.reveals || '' };
-        opps.push({ gap: info.title, phase: bk.toUpperCase(), color: PQ[bk].colorHex, impact: info.impact, score: score, severity: sev });
+        opps.push({ code: q.code, bk: bk, gap: info.title, phase: bk.toUpperCase(), color: PQ[bk].colorHex, impact: info.impact, score: score, severity: sev, order: opps.length });
       }
     });
   }
@@ -2603,12 +2891,116 @@ function generateOpportunities() {
     var sev = severityOf(score);
     if(sev) {
       var info = GAP_INFO[q.code] || { title: q.code, impact: q.reveals || '' };
-      opps.push({ gap: info.title, phase: 'MO', color: PQ.mo.colorHex, impact: info.impact, score: score, severity: sev });
+      opps.push({ code: q.code, bk: 'mo', gap: info.title, phase: 'MO', color: PQ.mo.colorHex, impact: info.impact, score: score, severity: sev, order: opps.length });
     }
   });
 
-  opps.sort(function(a,b){ return a.score - b.score; }); // pior score primeiro (críticos antes de oportunidades)
-  return opps.slice(0, 14);
+  // Pior score primeiro (críticos antes de oportunidades); empate mantém a
+  // ordem dos pilares. Sem corte: o limite antigo de 14 escondia gaps reais do
+  // relatório (quem precisa de menos, como a Proposta, faz o próprio slice).
+  opps.sort(function(a,b){ return (a.score - b.score) || (a.order - b.order); });
+  return opps;
+}
+
+// ═══════════════════════════════════════════
+//  GAPS-ÂNCORA (padrão de apresentação do relatório)
+// ═══════════════════════════════════════════
+// Cada gap é ligado a UMA fonte de perda de calculateROI() (time, retrabalho,
+// velocidade, erros, mo). A fonte define o custo mostrado no card do gap e a
+// prioridade dele na tabela de Gaps Identificados.
+var GAP_FONTE = {
+  'F1.1':'velocidade', 'F1.2':'velocidade', 'F1.3':'velocidade', 'F1.4':'time', 'F1.5':'velocidade', 'F1.6':'time', 'F1.7':'time',
+  'F2.1':'velocidade', 'F2.2':'mo', 'F2.3':'velocidade',
+  'F3.1':'velocidade', 'F3.2':'retrabalho', 'F3.3':'time', 'F3.4':'retrabalho', 'F3.5':'velocidade',
+  'F4.1':'time', 'F4.2':'time', 'F4.3':'time', 'F4.4':'erros',
+  'MO.1':'mo', 'MO.2':'mo', 'MO.3':'mo', 'MO.4':'erros', 'MO.5':'velocidade', 'MO.6':'retrabalho', 'MO.7':'erros'
+};
+var FONTE_LABEL = {
+  time:'Otimização do time de gestão', retrabalho:'Redução de retrabalhos', velocidade:'Ganho em velocidade de produção',
+  erros:'Erros de medição e folha', mo:'Estouro de mão de obra'
+};
+// Base de cada fonte SEM fórmula (o Resumido vai ao cliente e as fórmulas são
+// PI da Agilean): só dados informados e taxas de referência de mercado.
+var FONTE_BASE_TXT = {
+  time:'horas de gestão informadas por vocês e hora técnica de referência (R$ 115/h).',
+  retrabalho:'orçamento da obra informado e referência de mercado de retrabalho (10%).',
+  velocidade:'orçamento da obra informado e referência de mercado de ganho de prazo (10%).',
+  erros:'orçamento da obra informado, mão de obra como 45% do custo e desvio médio de medição e folha (5%).',
+  mo:'orçamento da obra informado, mão de obra como 45% do custo e estouro médio de mercado (15%).'
+};
+// Prova social por fonte: depoimentos institucionais (os mesmos da Proposta)
+// ou, quando não há case, uma referência de mercado.
+var FONTE_CASE = {
+  time:{ quote:'…rastrear e monitorar o progresso das nossas obras em tempo real, permitindo decisões rápidas com dados confiáveis de canteiro.', nome:'Alessandra Silva', papel:'Coord. de Planejamento e Controle · CONX' },
+  retrabalho:{ quote:'O Agilean mudou a conversa com os empreiteiros: o que está pendente de qualidade fica claro antes do pagamento, e passamos a corrigir o retrabalho na obra, não no fechamento do mês.', nome:'Leonardo Aidar', papel:'Tack Empreendimentos' },
+  velocidade:{ quote:'…nossos engenheiros passavam meses no processo. Com o Agilean fazemos em questão de horas, simulando múltiplos cenários e planos de ataque.', nome:'Claudio Barreira', papel:'Diretor de Engenharia · Dasart' },
+  mo:{ quote:'…era um desafio gerenciar e integrar todos os recursos. Agora tenho tempo para analisar, criar estratégias e focar no que agrega valor.', nome:'Natalia V. de Dios', papel:'Gerência de Processos e Qualidade · Dimas Construções' },
+  erros:{ mercado:'Referência de mercado: 65% das construtoras apresentam desvio de custo e 89% desvio de prazo na execução das obras.' }
+};
+
+// Rótulo da opção que o cliente escolheu (a "resposta registrada" do card).
+function answerLabelFor(bk, code, score) {
+  var q = findQ(bk, code);
+  if(!q || !q.opts) return '';
+  var opt = q.opts.filter(function(o){ return o.score === score; })[0];
+  if(!opt) return '';
+  return opt.l.charAt(0).toLowerCase() + opt.l.slice(1) + (opt.s ? ' — ' + opt.s.charAt(0).toLowerCase() + opt.s.slice(1) : '');
+}
+
+// Plano de gaps do relatório:
+//   anchors   — 3 gaps-âncora (até 5): 1 por fonte de perda, das fontes mais
+//               caras para as mais baratas; dentro da fonte, o gap marcado com
+//               ★ (dor declarada na entrevista) vem primeiro, depois a menor nota.
+//               ★ críticos de outras fontes entram até o teto de 5.
+//   rest      — demais gaps críticos, com Prioridade Alta (fonte entre as 3
+//               mais caras) ou Média.
+//   attention — notas 1,5 (prática existe, mas informal).
+function getGapPlan(roi) {
+  roi = roi || calculateROI();
+  var opps = generateOpportunities();
+  var base = {};
+  roi.items.forEach(function(i){ base[i.key] = i.baseValue; });
+  var dores = S.dores || {};
+  opps.forEach(function(o) {
+    var f = GAP_FONTE[o.code] || 'velocidade';
+    if(base[f] === undefined) f = 'velocidade'; // ex.: MO terceirizada não tem a fonte "mo"
+    o.fonte = f;
+    o.star = !!(dores[o.code] && dores[o.code].star);
+    o.frase = (dores[o.code] && dores[o.code].frase) ? String(dores[o.code].frase).trim() : '';
+  });
+  var fontesOrd = Object.keys(base).sort(function(a,b){ return base[b] - base[a]; });
+  var top3 = fontesOrd.slice(0, 3);
+  var byPick = function(a,b){ return (b.star - a.star) || (a.score - b.score) || (a.order - b.order); };
+  var crit = opps.filter(function(o){ return o.severity === 'critico'; });
+  var anchors = [];
+  fontesOrd.forEach(function(f) {
+    if(anchors.length >= 3) return;
+    var c = crit.filter(function(o){ return o.fonte === f; }).sort(byPick)[0];
+    if(c) anchors.push(c);
+  });
+  crit.filter(function(o){ return o.star && anchors.indexOf(o) < 0; }).sort(byPick).forEach(function(o) {
+    if(anchors.length < 5) anchors.push(o);
+  });
+  if(anchors.length < 3) {
+    opps.filter(function(o){ return anchors.indexOf(o) < 0; }).sort(byPick).forEach(function(o) {
+      if(anchors.length < 3) anchors.push(o);
+    });
+  }
+  var rest = crit.filter(function(o){ return anchors.indexOf(o) < 0; }).map(function(o) {
+    o.prioridade = top3.indexOf(o.fonte) >= 0 ? 'Alta' : 'Média';
+    return o;
+  }).sort(function(a,b){ return ((a.prioridade === 'Alta' ? 0 : 1) - (b.prioridade === 'Alta' ? 0 : 1)) || (a.order - b.order); });
+  var attention = opps.filter(function(o){ return o.severity === 'oportunidade' && anchors.indexOf(o) < 0; })
+    .sort(function(a,b){ return a.order - b.order; });
+  return { all: opps, anchors: anchors, rest: rest, attention: attention, top3: top3, base: base };
+}
+
+// Ato do Plano de Ação que resolve cada gap (1 planejamento, 2 canteiro,
+// 3 fechamento/performance).
+function atoDoGap(code) {
+  if(/^F1\./.test(code)) return 1;
+  if(/^F[23]\./.test(code) || code === 'MO.5' || code === 'MO.6') return 2;
+  return 3;
 }
 
 function fmtHorasBR(h) {
@@ -3167,7 +3559,7 @@ function restartAssessment() {
     ferramentas:{planejamento:'',medicao:'',qualidade:'',contratos:'',folha:''},
     scores:{b03:0,f1:[0,0,0,0,0,0,0,0],f2:[0,0,0,0],f3:[0,0,0,0,0,0],mo:{},f4:[0,0,0,0,0]},showMO:false,
     roi2:{folha:0,hPlanejar:0,hCurtoMedio:0,hMedicao:0,hQualidade:0,hConsolidar:0},
-    mensalidade:2000, captura:0.50, mensalidadeManual:false};
+    mensalidade:2000, captura:0.50, mensalidadeManual:false, dores:{}};
   currentBlock='b0'; currentQIdx=0; currentPhaseIdx=0; phaseOrder=['f1','f2','f3','f4'];
   radarChartInst=null;
   document.getElementById('c-empresa').value='';

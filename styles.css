@@ -301,3 +301,10 @@ select.text-input option:disabled{color:#999}
   .rep-sec-title{color:#ff5f1f!important}
   @page{margin:15mm;size:A4}
 }
+
+/* Marcador ★ "dor declarada pelo cliente" (entrevista) */
+.dor-box{margin-top:14px;display:flex;flex-direction:column;gap:8px}
+.dor-toggle{align-self:flex-start;background:transparent;border:1.5px dashed rgba(250,204,21,0.45);color:#facc15;border-radius:20px;padding:6px 14px;font-size:12px;font-weight:600;cursor:pointer;font-family:inherit;transition:all 0.18s}
+.dor-toggle:hover{background:rgba(250,204,21,0.08)}
+.dor-toggle.on{background:rgba(250,204,21,0.16);border-style:solid}
+.combo-sub .dor-box{margin-top:10px}
