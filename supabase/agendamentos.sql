@@ -9,7 +9,7 @@
 -- tem o SQL de "assessments"; pelo código, o admin lê, insere, atualiza e exclui
 -- assessments com a chave anon (admin.js: select/insert/upsert/delete), então a
 -- política efetiva lá é de acesso total para anon. As políticas abaixo dão o
--- mesmo acesso a "agendamentos". Se as políticas de "assessments" forem mais
+-- mesmo acesso a "agendamentos", exceto DELETE (a tela não exclui). Se as políticas de "assessments" forem mais
 -- restritas do que isso, ajuste estas para ficarem iguais.
 
 create table if not exists public.agendamentos (
@@ -48,4 +48,5 @@ drop policy if exists "agendamentos_delete" on public.agendamentos;
 create policy "agendamentos_select" on public.agendamentos for select to anon, authenticated using (true);
 create policy "agendamentos_insert" on public.agendamentos for insert to anon, authenticated with check (true);
 create policy "agendamentos_update" on public.agendamentos for update to anon, authenticated using (true) with check (true);
-create policy "agendamentos_delete" on public.agendamentos for delete to anon, authenticated using (true);
+-- Sem política de DELETE de propósito: a aba não exclui agendamentos (cancelar = status "cancelado").
+-- Com RLS ligado e sem política, ninguém exclui pela chave anon.
