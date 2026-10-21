@@ -1637,6 +1637,7 @@ function agOptions(select, lista, rotulo) {
 function initAgendamentos() {
   agOptions(agEl('ag-consultor'), CONSULTORES, function (c) { return c.nome + (c.cargo ? ' · ' + c.cargo : ''); });
   agOptions(agEl('ag-prevendedor'), PRE_VENDEDORES);
+  fetchModelos();
   fetchAgendamentos();
 }
 
@@ -1876,8 +1877,10 @@ function agWaLink(fone, texto) {
   return 'https://wa.me/' + n + '?text=' + encodeURIComponent(texto);
 }
 
+var agUltimo = null; // { dados, form, nome } da última geração, para regenerar ao salvar os modelos
 function mostrarMensagens(dados, form, nomeArquivo) {
-  var m = mpvMensagens(dados);
+  agUltimo = { dados: dados, form: form, nome: nomeArquivo };
+  var m = mpvMensagens(dados, agModelosTextos());
   var box = agEl('ag-msgs');
   box.innerHTML = '';
   agEl('ag-msgs-sub').textContent = 'PDF baixado: ' + nomeArquivo + '. Anexe o arquivo no e-mail e no WhatsApp.';
@@ -1907,4 +1910,176 @@ function mostrarMensagens(dados, form, nomeArquivo) {
     box.appendChild(div);
   });
   agEl('ag-msgs-card').style.display = '';
+}
+
+// ═══════════════════════════════════════════
+//  MODELOS DE MENSAGEM (tabela mensagens_modelos; vale para todos)
+// ═══════════════════════════════════════════
+// Sem linha para uma chave, ou sem a tabela, a geração usa os padrões de
+// material-previo.js (MPV_MODELOS_PADRAO). Nunca bloqueia a geração.
+var agModelos = {};            // chave -> { texto, updated_at, updated_by }
+var agModelosTabelaOk = true;
+var AG_MSG_SEM_TABELA_MOD = 'Tabela ainda não criada — aplique supabase/mensagens_modelos.sql. Enquanto isso valem os textos padrão e não dá para salvar alterações.';
+
+function agModelosTextos() {
+  var o = {};
+  MPV_MODELOS_CHAVES.forEach(function (k) { if (agModelos[k]) o[k] = agModelos[k].texto; });
+  return o;
+}
+function agModelosTabelaFaltando(err) {
+  var t = (err && (err.code + ' ' + err.message)) || '';
+  return /PGRST205|42P01/.test(t) || (/mensagens_modelos/i.test(t) && /does not exist|could not find|schema cache/i.test(t));
+}
+async function fetchModelos() {
+  if (!supabaseClient) return;
+  try {
+    var r = await supabaseClient.from('mensagens_modelos').select('*');
+    if (r.error) throw r.error;
+    agModelosTabelaOk = true; agModelos = {};
+    (r.data || []).forEach(function (x) {
+      if (MPV_MODELOS_CHAVES.indexOf(x.chave) >= 0 && typeof x.texto === 'string') agModelos[x.chave] = { texto: x.texto, updated_at: x.updated_at, updated_by: x.updated_by };
+    });
+  } catch (err) {
+    agModelos = {};
+    if (agModelosTabelaFaltando(err)) agModelosTabelaOk = false;
+    else console.error('Erro ao carregar modelos de mensagem:', err);
+  }
+}
+
+var modFoco = null;
+function modEl(k) { return document.getElementById('mod-campo-' + k); }
+function modExemplo() {
+  var d = new Date(); d.setDate(d.getDate() + 7);
+  return { empresa: 'Construtora Exemplo', contato: 'Marina Lopes Cavalcante', cargo: '', data: d.getFullYear() + '-' + ('0' + (d.getMonth() + 1)).slice(-2) + '-' + ('0' + d.getDate()).slice(-2),
+    hora: '14:00', link: 'https://meet.google.com/abc-defg-hij', decisor: '', decisor_cargo: '',
+    consultor: { nome: 'Felipe Façanha' }, pre_vendedor: { nome: 'Thifany Araujo' } };
+}
+// Dados da prévia: agendamento aberto no formulário (se completo) > última geração > exemplo.
+function modDadosPrevia() {
+  var ex = modExemplo();
+  if (agEl('ag-form-card').style.display !== 'none') {
+    var f = agLerForm();
+    if (f.empresa && f.contato && f.data_reuniao && f.hora_reuniao) {
+      var c = CONSULTORES.filter(function (x) { return x.nome === f.consultor; })[0];
+      var pv = PRE_VENDEDORES.filter(function (x) { return x.nome === f.pre_vendedor; })[0];
+      return { fonte: 'o agendamento aberto (' + f.empresa + ')', dados: { empresa: f.empresa, contato: f.contato, cargo: f.cargo, data: f.data_reuniao, hora: f.hora_reuniao,
+        link: f.link, decisor: f.decisor, decisor_cargo: f.decisor_cargo, consultor: { nome: c ? c.nome : ex.consultor.nome }, pre_vendedor: { nome: pv ? pv.nome : ex.pre_vendedor.nome } } };
+    }
+  }
+  if (agUltimo) return { fonte: 'o último material gerado (' + agUltimo.dados.empresa + ')', dados: agUltimo.dados };
+  return { fonte: 'um exemplo fixo (' + ex.empresa + ')', dados: ex };
+}
+
+function modInserirVariavel(nome) {
+  var el = modFoco && document.body.contains(modFoco) ? modFoco : modEl('email_corpo');
+  var ini = el.selectionStart == null ? el.value.length : el.selectionStart;
+  var fim = el.selectionEnd == null ? ini : el.selectionEnd;
+  var ins = '{' + nome + '}';
+  el.value = el.value.slice(0, ini) + ins + el.value.slice(fim);
+  el.focus(); el.setSelectionRange(ini + ins.length, ini + ins.length);
+  modAtualizar();
+}
+
+function modMeta() {
+  var ult = null;
+  MPV_MODELOS_CHAVES.forEach(function (k) { var m = agModelos[k]; if (m && m.updated_at && (!ult || m.updated_at > ult.updated_at)) ult = m; });
+  agEl('mod-meta').textContent = ult
+    ? 'Última alteração em ' + new Date(ult.updated_at).toLocaleString('pt-BR', { dateStyle: 'short', timeStyle: 'short' }) + (ult.updated_by ? ' por ' + ult.updated_by : '') + '.'
+    : 'Nenhuma alteração ainda: valem os textos padrão.';
+}
+
+function modAtualizar() {
+  var pv = modDadosPrevia();
+  agEl('mod-prev-fonte').textContent = 'Prévia com ' + pv.fonte + '.';
+  var textos = {};
+  MPV_MODELOS_CHAVES.forEach(function (k) {
+    var t = modEl(k).value; textos[k] = t;
+    var ruins = mpvVariaveisDesconhecidas(t);
+    modEl(k).parentNode.querySelector('.err').textContent = ruins.length ? 'Variável desconhecida: ' + ruins.map(function (n) { return '{' + n + '}'; }).join(', ') + '.' : '';
+  });
+  var m = mpvMensagens(pv.dados, textos);
+  var box = agEl('mod-prev'); box.innerHTML = '';
+  [['E-mail de agendamento', 'Assunto: ' + m.assunto + '\n\n' + m.email], ['WhatsApp de agendamento', m.whats], ['WhatsApp de lembrete', m.lembrete]].forEach(function (b) {
+    var div = document.createElement('div'); div.className = 'ag-msg';
+    var h = document.createElement('div'); h.className = 'ag-msg-head';
+    var t = document.createElement('b'); t.textContent = b[0]; h.appendChild(t);
+    var pre = document.createElement('pre'); pre.textContent = b[1];
+    div.appendChild(h); div.appendChild(pre); box.appendChild(div);
+  });
+}
+
+async function abrirModelos() {
+  await fetchModelos();
+  var av = agEl('mod-aviso'); av.innerHTML = '';
+  if (!agModelosTabelaOk) { var d = document.createElement('div'); d.className = 'ag-aviso'; d.textContent = AG_MSG_SEM_TABELA_MOD; av.appendChild(d); }
+  var chips = agEl('mod-chips'); chips.innerHTML = '';
+  MPV_VARIAVEIS.forEach(function (v) {
+    var b = document.createElement('button'); b.type = 'button'; b.className = 'ag-chip'; b.textContent = '{' + v[0] + '}'; b.title = v[1];
+    b.onmousedown = function (e) { e.preventDefault(); };
+    b.onclick = function () { modInserirVariavel(v[0]); };
+    chips.appendChild(b);
+  });
+  var campos = agEl('mod-campos'); campos.innerHTML = '';
+  MPV_MODELOS_CHAVES.forEach(function (k) {
+    var wrap = document.createElement('div'); wrap.className = 'ag-mod-campo';
+    var lab = document.createElement('div'); lab.className = 'lab';
+    var l = document.createElement('label'); l.className = 'filter-label'; l.textContent = MPV_MODELOS_ROTULOS[k]; lab.appendChild(l);
+    var r = document.createElement('button'); r.type = 'button'; r.className = 'btn btn-sm btn-ghost'; r.textContent = 'Restaurar padrão'; r.id = 'mod-rest-' + k;
+    r.onclick = function () { modEl(k).value = MPV_MODELOS_PADRAO[k]; modAtualizar(); };
+    lab.appendChild(r); wrap.appendChild(lab);
+    var inp = document.createElement(k === 'email_assunto' ? 'input' : 'textarea');
+    if (k === 'email_assunto') inp.type = 'text'; else inp.rows = k === 'email_corpo' ? 12 : 6;
+    inp.className = 'filter-input'; inp.id = 'mod-campo-' + k;
+    inp.value = agModelos[k] ? agModelos[k].texto : MPV_MODELOS_PADRAO[k];
+    inp.onfocus = function () { modFoco = inp; };
+    inp.oninput = modAtualizar;
+    wrap.appendChild(inp);
+    var er = document.createElement('div'); er.className = 'err'; wrap.appendChild(er);
+    campos.appendChild(wrap);
+  });
+  modFoco = null;
+  var por = '';
+  try { por = localStorage.getItem('siiga_mod_por') || ''; } catch (e) {}
+  agEl('mod-por').value = por;
+  agEl('mod-erros').textContent = '';
+  modMeta(); modAtualizar();
+  agEl('mod-modal').style.display = 'flex';
+}
+function fecharModelos() { agEl('mod-modal').style.display = 'none'; }
+
+async function salvarModelos() {
+  var box = agEl('mod-erros'); box.innerHTML = '';
+  function erro(m) { var p = document.createElement('div'); p.textContent = m; box.appendChild(p); }
+  var novos = {};
+  MPV_MODELOS_CHAVES.forEach(function (k) {
+    var t = modEl(k).value;
+    novos[k] = k === 'email_assunto' ? t.replace(/\s*\n\s*/g, ' ').trim() : t.replace(/\r\n?/g, '\n').replace(/\s+$/, '');
+    if (!novos[k].trim()) erro(MPV_MODELOS_ROTULOS[k] + ': o texto não pode ficar vazio (use "Restaurar padrão").');
+    mpvVariaveisDesconhecidas(novos[k]).forEach(function (n) { erro(MPV_MODELOS_ROTULOS[k] + ': variável desconhecida {' + n + '}.'); });
+  });
+  var por = agEl('mod-por').value.trim();
+  if (!por) erro('Informe seu nome (fica registrado como autor da alteração).');
+  if (box.childNodes.length) return;
+  if (!agModelosTabelaOk) { erro(AG_MSG_SEM_TABELA_MOD); return; }
+  try { localStorage.setItem('siiga_mod_por', por); } catch (e) {}
+  var btn = agEl('mod-btn-salvar'); btn.disabled = true; btn.style.opacity = '0.6';
+  try {
+    for (var i = 0; i < MPV_MODELOS_CHAVES.length; i++) {
+      var k = MPV_MODELOS_CHAVES[i];
+      var atual = agModelos[k] ? agModelos[k].texto : MPV_MODELOS_PADRAO[k];
+      if (novos[k] === atual) continue;
+      var campos = { texto: novos[k], updated_at: new Date().toISOString(), updated_by: por };
+      var res = agModelos[k] ? await supabaseClient.from('mensagens_modelos').update(campos).eq('chave', k)
+                             : await supabaseClient.from('mensagens_modelos').insert([Object.assign({ chave: k }, campos)]);
+      if (res.error) throw res.error;
+      agModelos[k] = { texto: campos.texto, updated_at: campos.updated_at, updated_by: por };
+    }
+    fecharModelos();
+    if (agUltimo) mostrarMensagens(agUltimo.dados, agUltimo.form, agUltimo.nome);
+  } catch (err) {
+    console.error('Erro ao salvar modelos:', err);
+    if (agModelosTabelaFaltando(err)) { agModelosTabelaOk = false; erro(AG_MSG_SEM_TABELA_MOD); }
+    else erro('Não foi possível salvar: ' + (err.message || err));
+  }
+  btn.disabled = false; btn.style.opacity = '';
 }

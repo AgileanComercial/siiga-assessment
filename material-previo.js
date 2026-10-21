@@ -191,7 +191,8 @@ function mpvImagensProntas(root) {
 }
 
 function mpvNomeArquivo(a) {
-  var emp = String(a.empresa).normalize('NFD').replace(/[̀-ͯ]/g, '').replace(/[^A-Za-z0-9]+/g, '_').replace(/^_+|_+$/g, '');
+  var emp = String(a.empresa).normalize('NFD').replace(/[̀-ͯ]/g, '').replace(/[^A-Za-z0-9]+/g, '_').replace(/^_+|_+$/g, '')
+    .slice(0, 40).replace(/_+$/, '');
   return 'SIIGA_Preparacao_Diagnostico_' + (emp || 'Empresa') + '_' + a.data + '.pdf';
 }
 
@@ -245,28 +246,71 @@ function gerarMaterialPrevio(a, opts) {
 }
 
 // ---------- mensagens (aprovadas no GATE 3; assinadas pelo pré-vendedor) ----------
-// a.pre_vendedor = { nome }
-function mpvMensagens(a) {
-  var nome = mpvPrimeiroNome(a.contato);
-  var quando = mpvDataLonga(a.data, false);
-  var hora = mpvHora(a.hora);
-  var cons = a.consultor.nome;
-  var pv = a.pre_vendedor.nome;
-  var decisorEmail = a.decisor || ('quem aprova a contratação na ' + a.empresa);
-  var decisorCurto = a.decisor || 'quem aprova a contratação';
-
-  var assunto = 'Diagnóstico SIIGA — ' + a.empresa + ', ' + mpvDataCurta(a.data) + ' às ' + hora;
-  var email = nome + ', confirmado o Diagnóstico SIIGA da ' + a.empresa + ' para ' + quando + ', às ' + hora +
-      (a.link ? ', por videochamada: ' + a.link : '.') + '\n' +
-    'A reunião será conduzida por ' + cons + ', consultor da Agilean.\n\n' +
+// Os textos abaixo são os PADRÕES. Na aba Agendamentos o time pode editá-los
+// ("Modelos de mensagem"); o texto editado fica na tabela mensagens_modelos do
+// Supabase e vale para todos. Variáveis entre chaves, trocadas sempre em texto puro.
+// Linha que contém {link} some inteira quando o agendamento não tem link.
+var MPV_MODELOS_CHAVES = ['email_assunto', 'email_corpo', 'whatsapp_agendamento', 'whatsapp_lembrete'];
+var MPV_MODELOS_ROTULOS = {
+  email_assunto: 'E-mail · assunto', email_corpo: 'E-mail · corpo',
+  whatsapp_agendamento: 'WhatsApp de agendamento', whatsapp_lembrete: 'WhatsApp de lembrete (24 h antes)'
+};
+var MPV_MODELOS_PADRAO = {
+  email_assunto: 'Diagnóstico SIIGA — {empresa}, {data_curta} às {hora}',
+  email_corpo: '{contato}, confirmado o Diagnóstico SIIGA da {empresa} para {data_longa}, às {hora}.\n' +
+    'Videochamada: {link}\n' +
+    'A reunião será conduzida por {consultor}, consultor da Agilean.\n\n' +
     'Em anexo está a Preparação para o Diagnóstico: quem é a Agilean, como funciona a reunião e o que vocês recebem depois dela. A leitura leva 3 minutos e nos deixa a reunião inteira para falar das obras de vocês.\n\n' +
-    'Um pedido: que ' + decisorEmail + ' participe dos 15 minutos finais. É nesse momento que definimos juntos a data da reunião de escopo.\n\n' +
-    pv + '\nAgilean';
-  var whats = nome + ', confirmado o Diagnóstico SIIGA da ' + a.empresa + ': ' + quando + ', às ' + hora + '.' +
-      (a.link ? ' Link: ' + a.link : '') + '\n' +
-    'Segue a preparação em PDF (3 minutos de leitura). Peço que ' + decisorCurto + ' participe dos 15 minutos finais, para definirmos a reunião de escopo. Quem conduz é ' + cons + ', consultor da Agilean.\n' +
-    pv + ', Agilean';
-  var lembrete = nome + ', amanhã às ' + hora + ' é o Diagnóstico SIIGA da ' + a.empresa + '.' + (a.link ? ' Link: ' + a.link : '') + '\n' +
-    'Conto com ' + decisorCurto + ' nos 15 minutos finais. Até amanhã. ' + pv + ', Agilean';
-  return { assunto: assunto, email: email, whats: whats, lembrete: lembrete };
+    'Um pedido: que {quem_aprova_na_empresa} participe dos 15 minutos finais. É nesse momento que definimos juntos a data da reunião de escopo.\n\n' +
+    '{pre_vendedor}\nAgilean',
+  whatsapp_agendamento: '{contato}, confirmado o Diagnóstico SIIGA da {empresa}: {data_longa}, às {hora}.\n' +
+    'Link: {link}\n' +
+    'Segue a preparação em PDF (3 minutos de leitura). Peço que {quem_aprova} participe dos 15 minutos finais, para definirmos a reunião de escopo. Quem conduz é {consultor}, consultor da Agilean.\n' +
+    '{pre_vendedor}, Agilean',
+  whatsapp_lembrete: '{contato}, amanhã às {hora} é o Diagnóstico SIIGA da {empresa}.\n' +
+    'Link: {link}\n' +
+    'Conto com {quem_aprova} nos 15 minutos finais. Até amanhã. {pre_vendedor}, Agilean'
+};
+var MPV_VARIAVEIS = [
+  ['contato', 'primeiro nome do contato'], ['contato_completo', 'nome completo do contato'], ['empresa', 'empresa'],
+  ['data_longa', 'quinta-feira, 29 de outubro'], ['data_curta', '29/10/2026'], ['hora', '14h'], ['link', 'link da videochamada'],
+  ['consultor', 'consultor especialista'], ['pre_vendedor', 'quem assina e envia'],
+  ['quem_aprova', 'decisor ou "quem aprova a contratação"'],
+  ['quem_aprova_na_empresa', 'decisor ou "quem aprova a contratação na {empresa}"']
+];
+
+function mpvVariaveis(a) {
+  return {
+    contato: mpvPrimeiroNome(a.contato), contato_completo: String(a.contato || '').trim(), empresa: a.empresa,
+    data_longa: mpvDataLonga(a.data, false), data_curta: mpvDataCurta(a.data), hora: mpvHora(a.hora), link: a.link || '',
+    consultor: a.consultor.nome, pre_vendedor: a.pre_vendedor.nome,
+    quem_aprova: a.decisor || 'quem aprova a contratação',
+    quem_aprova_na_empresa: a.decisor || ('quem aprova a contratação na ' + a.empresa)
+  };
+}
+// Nomes de variável usados no texto que não existem. [] = modelo válido.
+function mpvVariaveisDesconhecidas(texto) {
+  var conhecidas = MPV_VARIAVEIS.map(function (v) { return v[0]; }), ruins = [];
+  String(texto || '').replace(/\{([^{}]*)\}/g, function (m, nome) {
+    if (conhecidas.indexOf(nome) < 0 && ruins.indexOf(nome) < 0) ruins.push(nome);
+    return m;
+  });
+  return ruins;
+}
+// Troca em uma só passagem (o valor inserido nunca é reinterpretado). Variável
+// desconhecida fica como está. Sem link, a linha com {link} é removida.
+function mpvRender(modelo, vars) {
+  var linhas = String(modelo || '').replace(/\r\n?/g, '\n').split('\n');
+  if (!vars.link) linhas = linhas.filter(function (l) { return l.indexOf('{link}') < 0; });
+  return linhas.join('\n').replace(/\{([^{}]*)\}/g, function (m, nome) {
+    return Object.prototype.hasOwnProperty.call(vars, nome) ? vars[nome] : m;
+  });
+}
+// a.pre_vendedor = { nome }; modelos = { chave: texto } (os que faltam usam o padrão).
+function mpvMensagens(a, modelos) {
+  modelos = modelos || {};
+  var vars = mpvVariaveis(a);
+  function m(ch) { return mpvRender(typeof modelos[ch] === 'string' && modelos[ch].trim() ? modelos[ch] : MPV_MODELOS_PADRAO[ch], vars); }
+  return { assunto: m('email_assunto').replace(/\s*\n\s*/g, ' ').trim(), email: m('email_corpo'),
+    whats: m('whatsapp_agendamento'), lembrete: m('whatsapp_lembrete') };
 }
