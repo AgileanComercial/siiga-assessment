@@ -1,0 +1,281 @@
+/* SIIGA report PDF - Direction A "Prancha tecnica" with the agilean.com.br identity
+   (approved pilot v3b: revisao_relatorio/piloto_v3b, rationale in 07_identidade_site.md).
+   Everything is scoped under .ptr so the on-screen app styles are never affected.
+   Rendered to PDF by html2canvas + jsPDF (relatorio-prancha.js).
+   Fonts: Bai Jamjuree + Manrope (SIL OFL 1.1, licenses in fonts/), static TTF served locally. */
+@import url("fonts/fonts.css");
+
+/* ===================================================================
+   DESIGN TOKENS - single source for colors, type families, title weight/case,
+   type sizes, spacing and grid. Changing the visual identity = editing only
+   this block. relatorio-prancha.js reads --papel from here for the canvas
+   background, so no color is duplicated in JS.
+   =================================================================== */
+.ptr{
+  /* color: agilean.com.br palette */
+  --tinta:#2B2733;      /* main text, strong rules, client series */
+  --texto2:#4A4450;     /* supporting text */
+  --texto3:#6B6570;     /* notes, sources, table heads */
+  --fio-forte:#2B2733;  /* strong rules */
+  --hair:#CFCAD6;       /* table hairlines */
+  --fio:#E2DEE8;        /* chart grid */
+  --faixa:#F3F1F6;      /* bar track, group row background */
+  --papel:#FFFFFF;      /* paper */
+  --marca:#D9480F;      /* brand orange: graphics only (rules, section numbers, square), large text on cover */
+  --marca-txt:#B23B0C;  /* brand orange for small text and white-on-orange */
+  --pessego:#FFEEE5;    /* Agilean recommendation only: adopted scenario row, action card */
+  --critico:#A0153E; --atencao:#7A5C00; --ok:#1E7A4C;
+  --critico-t:#EBC4CE; --ok-t:#BFE0CE; --ok-d:#17603C;   /* light tint segment, dark label on green tint */
+  --critico-m:#C8708A; --ok-m:#6FA98B;                   /* second stripe of hatched segment */
+  --hatch-neutro:#6B6570;                                /* second stripe of hatched timeline bar */
+  --fundo-tela:#D9DCDF;                                  /* off-screen staging background (never printed) */
+
+  /* type families and title treatment */
+  --f-sans:"Manrope",sans-serif;       /* text and data */
+  --f-disp:"Bai Jamjuree",sans-serif;  /* titles, labels, table heads, section numbers, KPIs */
+  --f-mono:var(--f-sans);              /* former mono role (sources, formulas) now in Manrope */
+  --f-titulo:var(--f-disp);
+  --f-numero:var(--f-disp);
+  --w-titulo:700;        /* section title, cover title, section number, KPIs */
+  --w-subtitulo:600;     /* chart/block titles (H2) */
+  --w-rotulo:700;        /* labels, table heads */
+  --w-forte:700;         /* emphasis in text and tables (Manrope 600 is too close to 400 in print) */
+  --w-medio:500;
+  --tt-titulo:uppercase; /* section title and cover title case */
+  --tt-rotulo:uppercase; /* labels, table heads */
+  --ls-titulo:.01em; --ls-rot:.09em; --ls-run:.1em;
+  --fs-cit:normal;       /* quotes upright (Manrope has no italic) */
+
+  /* type sizes (v3b: 0.3 to 0.6 pt below v3 to keep the 10 mm stamp clearance) */
+  --t-corpo:9pt; --t-celula:8.2pt; --t-nota:7.5pt; --t-src:6.5pt; --t-rotulo:6.4pt; --t-th:6.2pt;
+  --t-h1:15.5pt; --t-h2:10.5pt; --t-lead:12.2pt; --t-num:20pt; --t-big:16pt; --t-capa:27pt;
+
+  /* grid and spacing */
+  --pg-w:210mm; --pg-h:297mm; --m-top:14mm; --m-right:16mm; --m-left:20mm;
+  --col-rotulo:38mm; --gap-col:6mm; --sec-gap:9mm; --carimbo-bottom:9mm;
+  --pad-cel:1.6mm; --pad-cel-x:2mm;
+  --hatch:12px;          /* tile size of hatched patterns; painted by ptHatch() in JS from the color tokens */
+}
+
+/* ---------- base ---------- */
+.ptr{position:fixed;left:-99999px;top:0;width:var(--pg-w);background:var(--fundo-tela);z-index:-1}
+.ptr *{box-sizing:border-box;margin:0;padding:0}
+.ptr .page{width:var(--pg-w);height:var(--pg-h);background:var(--papel);position:relative;overflow:hidden;
+  padding:var(--m-top) var(--m-right) 0 var(--m-left);margin:0 0 6mm 0;
+  font-family:var(--f-sans);color:var(--tinta);font-size:var(--t-corpo);line-height:14pt;
+  font-feature-settings:normal;font-variant-numeric:normal;text-align:left;letter-spacing:0}
+.ptr h1,.ptr h3{font-family:var(--f-titulo)}
+.ptr .mono{font-family:var(--f-mono)}
+.ptr i,.ptr em{font-style:normal}
+.ptr .it{font-weight:var(--w-subtitulo);color:var(--tinta)}
+
+/* running header */
+.ptr .run{display:flex;justify-content:space-between;align-items:baseline;font-family:var(--f-mono);
+  font-size:var(--t-rotulo);line-height:10pt;color:var(--texto2);padding-bottom:2mm;border-bottom:.5pt solid var(--hair)}
+.ptr .run b{font-weight:var(--w-medio);color:var(--tinta)}
+
+/* grid: label column (3/12) + content column (9/12) */
+.ptr .row{display:grid;grid-template-columns:var(--col-rotulo) minmax(0,1fr);column-gap:var(--gap-col)}
+.ptr .sec{margin-top:var(--sec-gap)}
+.ptr .sec.first{margin-top:7mm}
+.ptr .secnum{font-family:var(--f-numero);font-size:var(--t-num);line-height:22pt;font-weight:var(--w-medio);color:var(--marca);
+  border-top:2pt solid var(--marca);padding-top:2mm;width:var(--col-rotulo)}
+.ptr .sectit{font-family:var(--f-titulo);font-size:var(--t-h1);line-height:22pt;font-weight:var(--w-titulo);letter-spacing:var(--ls-titulo);
+  text-transform:var(--tt-titulo);border-top:.75pt solid var(--fio-forte);padding-top:2.6mm}
+.ptr .lbl{font-family:var(--f-mono);font-size:var(--t-rotulo);line-height:10pt;letter-spacing:.04em;color:var(--texto2);text-transform:uppercase}
+.ptr .lbl.rule{border-top:.75pt solid var(--tinta);padding-top:2mm}
+.ptr .lead{font-size:var(--t-lead);line-height:18pt;font-weight:400;max-width:128mm}
+.ptr .lead b{font-weight:var(--w-forte)}
+.ptr .note{font-size:var(--t-nota);line-height:10.5pt;color:var(--texto2)}
+.ptr .src{font-family:var(--f-mono);font-size:var(--t-src);line-height:9pt;color:var(--texto3);margin-top:1.4mm}
+.ptr .meta div{margin-bottom:2.3mm;font-size:8.4pt;line-height:11.5pt}
+.ptr .meta .lbl{display:block}
+.ptr .b6{font-weight:var(--w-forte)}
+
+/* tables: horizontal hairlines only */
+.ptr table{width:100%;border-collapse:collapse;background:none}
+.ptr th{font-family:var(--f-mono);font-weight:400;font-size:var(--t-th);line-height:9pt;letter-spacing:.03em;text-transform:uppercase;
+  color:var(--texto2);text-align:left;padding:0 var(--pad-cel-x) 1.4mm 0;border-bottom:.75pt solid var(--fio-forte);vertical-align:bottom;background:none}
+.ptr td{padding:var(--pad-cel) var(--pad-cel-x) var(--pad-cel) 0;border-bottom:.4pt solid var(--hair);vertical-align:top;font-size:var(--t-celula);line-height:12pt;color:var(--tinta);background:none}
+.ptr td.n,.ptr th.n{text-align:right;padding-right:0;padding-left:3mm;white-space:nowrap}
+.ptr th.wrap{white-space:normal}
+.ptr tr.tot td{border-top:.75pt solid var(--fio-forte);border-bottom:none;font-weight:var(--w-forte)}
+.ptr tr.sel td{font-weight:var(--w-forte)}
+.ptr tr.grp td{background:var(--faixa);border-bottom:.75pt solid var(--fio-forte);padding:1.6mm 2mm;font-size:8.4pt}
+.ptr tr.grp td .gl{font-family:var(--f-mono);font-size:var(--t-th);letter-spacing:.03em;text-transform:uppercase;color:var(--texto2);margin-right:2mm}
+.ptr tr.grp td .gsub{font-family:var(--f-mono);font-size:var(--t-th);color:var(--texto3);margin-top:.4mm}
+.ptr .q{display:block;font-style:italic;color:var(--texto2);font-size:8pt;line-height:11pt;margin-top:.6mm}
+.ptr .perda{color:var(--critico)} .ptr .ganho{color:var(--ok)}
+
+/* status markers: shape + word (legible in B&W) */
+.ptr .st{display:inline-flex;align-items:center;gap:1.2mm;white-space:nowrap}
+.ptr .st i{display:inline-block;width:2.2mm;height:2.2mm;border:.8pt solid currentColor}
+.ptr .st.c{color:var(--critico)} .ptr .st.c i{background:var(--critico)}
+.ptr .st.a{color:var(--atencao)} .ptr .st.a i{background:linear-gradient(135deg,var(--atencao) 50%,transparent 50%)}
+.ptr .st.o{color:var(--ok)}
+
+/* stamp (footer) */
+.ptr .carimbo{position:absolute;left:var(--m-left);right:var(--m-right);bottom:var(--carimbo-bottom);display:grid;
+  grid-template-columns:22mm minmax(0,1fr) 33mm 12mm 19mm 17mm;border:.75pt solid var(--fio-forte);background:var(--papel)}
+.ptr .carimbo>div{padding:1.2mm 2mm;border-left:.4pt solid var(--hair);font-size:var(--t-nota);line-height:10pt}
+.ptr .carimbo>div:first-child{border-left:none;display:flex;align-items:center}
+.ptr .carimbo .k{display:block;font-family:var(--f-mono);font-size:5.8pt;line-height:7.5pt;color:var(--texto3);text-transform:uppercase;letter-spacing:.04em}
+.ptr .carimbo img{height:4.2mm;width:auto}
+.ptr .carimbo b{font-weight:var(--w-forte)}
+
+/* cover */
+.ptr .cover .logo{height:9mm;width:auto;display:block}
+.ptr .cover .ctit{margin-top:34mm;border-top:2pt solid var(--marca);padding-top:4mm}
+.ptr .cover h1{font-size:var(--t-capa);line-height:34pt;font-weight:var(--w-titulo);letter-spacing:var(--ls-titulo);color:var(--tinta)}
+.ptr .cover .cco{font-size:var(--t-h1);line-height:24pt;font-weight:400;margin-top:1mm}
+.ptr .cover .idt{margin-top:12mm;max-width:140mm}
+.ptr .cover .classif{margin-top:8mm;max-width:140mm;border:.75pt solid var(--fio-forte);padding:2mm 3mm;
+  font-family:var(--f-mono);font-size:7.6pt;letter-spacing:.04em;text-transform:uppercase}
+.ptr .cover .toc{position:absolute;left:var(--m-left);right:var(--m-right);bottom:18mm}
+.ptr .toc td:first-child{font-family:var(--f-mono);color:var(--marca-txt);width:10mm}
+.ptr .toc td.n{width:14mm}
+
+/* resumo: score, bars, strip */
+.ptr .score{font-size:30pt;line-height:32pt;font-weight:var(--w-titulo);letter-spacing:-.02em;margin-top:2mm}
+.ptr .score small{font-size:var(--t-lead);color:var(--texto2);font-weight:400}
+.ptr .chart-t{font-size:var(--t-h2);line-height:14pt;font-weight:var(--w-titulo);margin-bottom:3mm}
+.ptr .bar{display:grid;grid-template-columns:36mm minmax(0,1fr) 9mm 20mm;align-items:center;column-gap:3mm;height:10mm;border-bottom:.4pt solid var(--fio)}
+.ptr .bar .nm{font-size:8.6pt;line-height:11pt}
+.ptr .bar .nm .pn{display:block;font-family:var(--f-sans);font-size:8.6pt;color:var(--tinta)}
+.ptr .bar .nm .ps{display:block;font-family:var(--f-mono);font-size:var(--t-th);color:var(--texto2)}
+.ptr .trk{position:relative;height:3.4mm;background:var(--faixa);border-right:.75pt solid var(--tinta)}
+.ptr .fill{position:absolute;left:0;top:0;bottom:0;background:var(--tinta)}
+.ptr .mkt{position:absolute;top:-1.4mm;bottom:-1.4mm;width:0;border-left:1.2pt solid var(--marca-txt)}
+.ptr .bar .val{font-size:9pt}
+.ptr .bar .stt{font-size:7.4pt}
+.ptr .axis{display:grid;grid-template-columns:36mm minmax(0,1fr) 9mm 20mm;column-gap:3mm;margin-top:1mm}
+.ptr .ticks{position:relative;height:4mm;font-family:var(--f-mono);font-size:6.3pt;color:var(--texto3)}
+.ptr .ticks span{position:absolute;transform:translateX(-50%)}
+.ptr .leg{display:flex;flex-wrap:wrap;gap:1mm 5mm;font-size:7pt;line-height:10pt;color:var(--texto2);margin-top:1mm}
+.ptr .leg i{display:inline-block;vertical-align:middle;margin-right:1.2mm}
+.ptr .leg .sw-cli{width:5mm;height:2.4mm;background:var(--tinta)}
+.ptr .leg .sw-mkt{width:0;height:3.4mm;border-left:1.2pt solid var(--marca-txt)}
+.ptr .leg .sw-ref{width:2mm;height:3.4mm;border-right:.75pt solid var(--tinta);background:var(--faixa)}
+.ptr .strip{display:grid;grid-template-columns:1fr 1fr 1fr;border-top:.75pt solid var(--tinta);border-bottom:.4pt solid var(--hair)}
+.ptr .strip>div{padding:2mm 3mm 2.4mm 0}
+.ptr .strip>div+div{padding-left:3mm;border-left:.4pt solid var(--hair)}
+.ptr .strip.two{grid-template-columns:1fr 1fr}
+.ptr .big{font-size:var(--t-big);line-height:20pt;font-weight:var(--w-titulo);white-space:nowrap}
+.ptr .big.xl{font-size:24pt;line-height:28pt;letter-spacing:-.02em}
+.ptr .big.p{color:var(--critico)} .ptr .big.g{color:var(--ok)}
+
+/* perda x ganho stacked bars */
+.ptr .sb{display:grid;grid-template-columns:22mm minmax(0,1fr);column-gap:3mm;align-items:center;margin-bottom:4mm}
+.ptr .sb .nm{font-size:8.6pt;line-height:11pt;font-weight:var(--w-forte)}
+.ptr .sb .nm span{display:block;font-weight:400;font-family:var(--f-mono);font-size:var(--t-th);color:var(--texto2)}
+.ptr .plot{position:relative;height:11mm}
+.ptr .seg{position:absolute;top:0;bottom:0;border-right:1pt solid var(--papel);display:flex;align-items:center;justify-content:center;
+  font-size:7.6pt;color:var(--papel);font-weight:var(--w-medio);overflow:hidden}
+.ptr .seg b{font-weight:var(--w-medio)}
+.ptr .r1,.ptr .sw.r1{background:var(--critico)}
+.ptr .r2,.ptr .sw.r2{background:repeating-linear-gradient(135deg,var(--critico) 0px,var(--critico) var(--hatch),var(--critico-m) var(--hatch),var(--critico-m) calc(var(--hatch) * 2))}
+.ptr .r3,.ptr .sw.r3{background:var(--critico-t)} .ptr .seg.r3{color:var(--critico)}
+.ptr .g1,.ptr .sw.g1{background:var(--ok)}
+.ptr .g2,.ptr .sw.g2{background:repeating-linear-gradient(135deg,var(--ok) 0px,var(--ok) var(--hatch),var(--ok-m) var(--hatch),var(--ok-m) calc(var(--hatch) * 2))}
+.ptr .g3,.ptr .sw.g3{background:var(--ok-t)} .ptr .seg.g3{color:var(--ok)}
+.ptr .seg.r2 b,.ptr .seg.g2 b{background:var(--papel);color:var(--tinta);padding:0 .9mm;line-height:10pt}
+.ptr .ticks2{position:relative;margin-left:25mm;height:4mm;font-family:var(--f-mono);font-size:6.3pt;color:var(--texto3)}
+.ptr .ticks2 span{position:absolute;transform:translateX(-50%)}
+.ptr .leg2{margin:2.5mm 0 0 0;font-size:7.2pt;line-height:10pt;color:var(--texto2)}
+.ptr .leg2>div{display:flex;flex-wrap:wrap;gap:1mm 5mm;align-items:center}
+.ptr .leg2 .sw{display:inline-block;width:4mm;height:2.6mm;vertical-align:middle;margin-right:.6mm;border:.4pt solid var(--papel)}
+.ptr .leg2 .pair{white-space:nowrap}
+
+/* pontos criticos blocks */
+.ptr .pc{border-top:.75pt solid var(--tinta);padding-top:2mm;margin-bottom:2.2mm}
+.ptr .pc .in{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);column-gap:6mm}
+.ptr .pc .tt{font-size:var(--t-h2);line-height:14pt;font-weight:var(--w-titulo);margin-bottom:1.6mm}
+.ptr .pc .kv{margin-bottom:1.6mm}
+.ptr .pc .kv .lbl{display:block;margin-bottom:.4mm}
+.ptr .pc .txt{font-size:8.8pt;line-height:12pt}
+.ptr .pc .vals{display:flex;gap:6mm;margin:.8mm 0 .6mm}
+.ptr .pc .vals>div{font-size:13pt;line-height:16pt;font-weight:var(--w-titulo)}
+.ptr .pc .vals small{display:block;font-family:var(--f-mono);font-weight:400;font-size:6.3pt;line-height:8pt;color:var(--texto2);text-transform:uppercase;letter-spacing:.04em}
+.ptr .pc .dep{font-style:italic;font-size:8.4pt;line-height:11.5pt;color:var(--tinta)}
+.ptr .pc .dep-a{font-size:7.4pt;line-height:10pt;color:var(--texto2);margin-top:.6mm}
+.ptr .pc .mes{font-size:8.2pt;line-height:11pt;color:var(--critico);margin:.4mm 0 1mm}
+.ptr .pc .mes b{font-weight:var(--w-forte)}
+
+/* action card (preserved from MANTER COMO CARD FINAL.png, light version) */
+.ptr .plano{border-left:2pt solid var(--marca);padding:1mm 0 1mm 5mm}
+.ptr .plano .kk{font-family:var(--f-mono);font-size:var(--t-th);letter-spacing:.06em;text-transform:uppercase;color:var(--marca-txt)}
+.ptr .plano h3{font-size:var(--t-h2);line-height:15pt;font-weight:var(--w-titulo);margin:1mm 0 1.4mm;color:var(--tinta)}
+.ptr .plano p{font-size:9pt;line-height:12.5pt;color:var(--texto2);margin-bottom:2.4mm}
+.ptr .plano p b{color:var(--tinta);font-weight:var(--w-forte)}
+.ptr .fr{display:grid;grid-template-columns:8mm minmax(0,1fr);margin-bottom:2.4mm}
+.ptr .fr .nn{font-family:var(--f-mono);font-size:12pt;line-height:15pt;font-weight:var(--w-medio);color:var(--marca-txt)}
+.ptr .fr .ft{font-size:9pt;line-height:12.5pt;font-weight:var(--w-forte)}
+.ptr .fr .fd{font-size:8.8pt;line-height:12pt}
+.ptr .fr .fz{font-size:7.8pt;line-height:11pt;color:var(--texto2);margin-top:.4mm}
+.ptr .sign{display:grid;grid-template-columns:1fr 1fr;column-gap:12mm;margin-top:8mm}
+.ptr .sign>div{border-top:.75pt solid var(--tinta);padding-top:1.6mm;font-size:8.6pt;line-height:11.5pt}
+.ptr .sign .lbl{display:block}
+
+/* detalhado: annex tables */
+.ptr .ax td{font-size:8.5pt;line-height:11.5pt}
+.ptr .ax td.f{font-family:var(--f-mono);font-size:7.4pt;line-height:10.5pt;color:var(--texto2)}
+
+/* page density variants (as in the pilot) */
+.ptr .tight .sec{margin-top:6mm}
+.ptr .dense td{padding-top:1mm;padding-bottom:1mm}
+
+/* phase timeline */
+.ptr .tl{display:grid;grid-template-columns:44mm minmax(0,1fr);column-gap:3mm;align-items:center;height:9mm;border-bottom:.4pt solid var(--fio)}
+.ptr .tl .nm{font-size:8.2pt;line-height:11pt}
+.ptr .tp{position:relative;height:4.6mm;margin-right:5mm}
+.ptr .tb{position:absolute;top:0;bottom:0;color:var(--papel);font-size:7pt;line-height:4.6mm;padding-left:1.6mm;white-space:nowrap;overflow:hidden}
+.ptr .tb.a{background:var(--tinta)}
+.ptr .tb.b{background:repeating-linear-gradient(135deg,var(--tinta) 0px,var(--tinta) var(--hatch),var(--hatch-neutro) var(--hatch),var(--hatch-neutro) calc(var(--hatch) * 2))}
+.ptr .tb.c{background:var(--marca-txt)}
+.ptr .tgrid{position:absolute;left:47mm;right:5mm;top:0;bottom:0;pointer-events:none}
+.ptr .tgrid i{position:absolute;top:0;bottom:0;border-left:.4pt dotted var(--hair)}
+.ptr .tticks{position:relative;margin-left:47mm;margin-right:5mm;height:4mm;margin-top:1mm;font-family:var(--f-mono);font-size:6.3pt;color:var(--texto3)}
+.ptr .tticks span{position:absolute;transform:translateX(-50%)}
+
+/* flow helpers */
+.ptr .body{position:relative}
+.ptr .contsub{text-transform:none;letter-spacing:0;font-family:var(--f-sans);font-size:9pt}
+
+/* ===================== identity layer (agilean.com.br, pilot v3b) ===================== */
+.ptr .run,.ptr .lbl,.ptr th,.ptr .carimbo .k,.ptr .plano .kk,.ptr tr.grp td .gl,.ptr .pc .vals small,.ptr .cover .classif{
+  font-family:var(--f-disp);font-weight:var(--w-rotulo);letter-spacing:var(--ls-rot);text-transform:var(--tt-rotulo)}
+.ptr .run{font-size:6.6pt;font-weight:var(--w-subtitulo);letter-spacing:var(--ls-run)}
+.ptr .run b{font-weight:var(--w-rotulo)}
+.ptr th{font-size:var(--t-th);color:var(--texto3)}
+.ptr .carimbo .k{font-size:5.4pt;letter-spacing:var(--ls-run)}
+.ptr .secnum,.ptr .toc td:first-child,.ptr .fr .nn{font-family:var(--f-numero);font-weight:var(--w-titulo)}
+.ptr .sectit{font-family:var(--f-titulo);font-weight:var(--w-titulo);text-transform:var(--tt-titulo);letter-spacing:var(--ls-titulo);line-height:20pt}
+.ptr .chart-t,.ptr .pc .tt,.ptr .plano h3{font-family:var(--f-disp);font-weight:var(--w-subtitulo);letter-spacing:0}
+.ptr .cover h1{font-family:var(--f-titulo);font-weight:var(--w-titulo);text-transform:var(--tt-titulo);letter-spacing:.005em;line-height:31pt}
+.ptr .cover h1 .o{color:var(--marca)}   /* the only orange word in a title: product name on the cover */
+.ptr .score,.ptr .big{font-family:var(--f-disp);font-weight:var(--w-titulo);letter-spacing:-.01em}
+/* site eyebrow square: only on the cover kicker and the action card label */
+.ptr .sq::before{content:"";display:inline-block;width:1.5mm;height:1.5mm;background:var(--marca);margin-right:1.8mm;vertical-align:.25mm}
+.ptr .cover .ctit>.lbl{color:var(--marca-txt)}
+/* Agilean recommendation highlight */
+.ptr tr.sel td{background:var(--pessego)}
+.ptr tr.sel td:first-child{border-left:2pt solid var(--marca);padding-left:2mm;white-space:nowrap}  /* border, not inset shadow: html2canvas paints inset shadows as a fill */
+.ptr .plano{background:var(--pessego);border-left:2pt solid var(--marca);padding:3mm 4mm 2mm 5mm}
+.ptr .secnum{border-top-width:2.2pt}
+/* no italic: quotes upright */
+.ptr .q,.ptr .pc .dep{font-style:var(--fs-cit)}
+.ptr .bar .nm .ps,.ptr .sb .nm span{font-size:6.8pt}
+/* Tabular figures are NOT used in the PDF: html2canvas positions text with DOM metrics but draws it
+   with canvas fillText, which ignores OpenType features, so tnum produced gaps inside numbers. */
+.ptr .seg.g3{color:var(--ok-d)}
+/* size compensation (Manrope/Bai are wider than Plex) */
+.ptr .bar .nm .pn{font-size:8.1pt}
+.ptr .q{font-size:7.6pt;line-height:10.5pt}
+.ptr .carimbo>div{font-size:7pt;line-height:9.4pt}
+.ptr .meta div{font-size:8.2pt}
+.ptr .pc .txt{font-size:8.4pt;line-height:11.6pt}
+.ptr .pc .dep{font-size:8pt;line-height:11pt}
+.ptr .ax td{font-size:8.1pt;line-height:11pt}
+.ptr .ax td.f{font-size:7.1pt;line-height:10pt}
+.ptr .b6,.ptr tr.tot td,.ptr tr.sel td,.ptr .lead b,.ptr .plano p b,.ptr .sign b,.ptr td b,.ptr .bar .val b,.ptr .fr .ft,.ptr .carimbo b{font-weight:var(--w-forte)}
+.ptr .lbl.contsub{font-family:var(--f-sans);font-weight:var(--w-medio);font-size:9pt;text-transform:none;letter-spacing:0;color:var(--tinta)}

@@ -13,6 +13,7 @@
 function maskPhone(input){var d=input.value.replace(/\D/g,'');if(d.length>11)d=d.substring(0,11);var r='';if(d.length===0){r='';}else if(d.length<=2){r='('+d;}else if(d.length<=7){r='('+d.substring(0,2)+') '+d.substring(2);}else if(d.length<=10){r='('+d.substring(0,2)+') '+d.substring(2,6)+'-'+d.substring(6);}else{r='('+d.substring(0,2)+') '+d.substring(2,7)+'-'+d.substring(7);}input.value=r;}
 </script>
 <link rel="stylesheet" href="styles.css">
+<link rel="stylesheet" href="relatorio-prancha.css?v=1">
 </head>
 <body>
 
@@ -639,13 +640,11 @@ function maskPhone(input){var d=input.value.replace(/\D/g,'');if(d.length>11)d=d
     <div class="btn-row no-print" style="max-width:920px;justify-content:space-between;flex-wrap:wrap;gap:12px">
       <button class="btn btn-s" onclick="showScreen('screen-radar')">← Voltar ao Radar</button>
       <div style="display:flex;gap:10px;flex-wrap:wrap;justify-content:flex-end;align-items:center">
-        <!-- Seletor de tema do PDF: o vendedor escolhe Escuro/Claro antes de gerar —
-             generatePDF() lê o valor selecionado (window.reportPdfTheme) em vez de
-             um tema fixo por botão. Escuro é o padrão (design system "Executive
-             Charcoal & Copper"); Claro é a alternativa explícita, agora disponível
-             para os dois modos (Resumido/Detalhado), não só o Detalhado. -->
+        <!-- Seletor de tema da TELA (Escuro/Claro) do relatório ao vivo. O PDF não
+             depende mais dele: generatePDF() sempre gera a direção A "Prancha
+             técnica" em tema claro (relatorio-prancha.js). -->
         <div id="pdf-theme-toggle" style="display:flex;align-items:center;gap:6px;background:rgba(255,255,255,0.03);border:1px solid rgba(255,255,255,0.1);border-radius:8px;padding:4px;margin-right:2px">
-          <span style="font-size:10px;color:#888;padding:0 4px 0 6px;text-transform:uppercase;letter-spacing:0.05em">Tema do PDF</span>
+          <span style="font-size:10px;color:#888;padding:0 4px 0 6px;text-transform:uppercase;letter-spacing:0.05em">Tema da tela</span>
           <button type="button" id="pdf-theme-btn-dark" class="pdf-theme-opt" onclick="changeReportTheme('dark')" style="padding:6px 12px;border-radius:6px;border:none;cursor:pointer;font-family:'Bai Jamjuree';font-size:11.5px;font-weight:700">🌙 Escuro</button>
           <button type="button" id="pdf-theme-btn-light" class="pdf-theme-opt" onclick="changeReportTheme('light')" style="padding:6px 12px;border-radius:6px;border:none;cursor:pointer;font-family:'Bai Jamjuree';font-size:11.5px;font-weight:700">☀️ Claro</button>
         </div>
@@ -1424,6 +1423,7 @@ function maskPhone(input){var d=input.value.replace(/\D/g,'');if(d.length>11)d=d
   </div>
 </div>
 
-<script src="script.js?v=7"></script>
+<script src="script.js?v=8"></script>
+<script src="relatorio-prancha.js?v=1"></script>
 </body>
 </html>

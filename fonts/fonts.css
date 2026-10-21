@@ -1,0 +1,10 @@
+/* Bai Jamjuree (Cadson Demak) + Manrope (Mikhail Sharanda), SIL OFL 1.1. Static TTF, local.
+   Manrope static weights instanced from Manrope[wght].ttf with fontTools (avoids Type 3 in the PDF). */
+@font-face{font-family:'Bai Jamjuree';font-style:normal;font-weight:400;font-display:block;src:url(BaiJamjuree-Regular.ttf) format('truetype')}
+@font-face{font-family:'Bai Jamjuree';font-style:normal;font-weight:500;font-display:block;src:url(BaiJamjuree-Medium.ttf) format('truetype')}
+@font-face{font-family:'Bai Jamjuree';font-style:normal;font-weight:600;font-display:block;src:url(BaiJamjuree-SemiBold.ttf) format('truetype')}
+@font-face{font-family:'Bai Jamjuree';font-style:normal;font-weight:700;font-display:block;src:url(BaiJamjuree-Bold.ttf) format('truetype')}
+@font-face{font-family:'Manrope';font-style:normal;font-weight:400;font-display:block;src:url(Manrope-Regular.ttf) format('truetype')}
+@font-face{font-family:'Manrope';font-style:normal;font-weight:500;font-display:block;src:url(Manrope-Medium.ttf) format('truetype')}
+@font-face{font-family:'Manrope';font-style:normal;font-weight:600;font-display:block;src:url(Manrope-SemiBold.ttf) format('truetype')}
+@font-face{font-family:'Manrope';font-style:normal;font-weight:700;font-display:block;src:url(Manrope-Bold.ttf) format('truetype')}
