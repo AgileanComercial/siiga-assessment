@@ -528,8 +528,13 @@ function ptRotinas(M) {
   };
 }
 var PT_PLANO_THEAD = '<thead><tr><th style="width:34mm">Rotina</th><th style="width:30mm">Ferramenta hoje</th><th>Situação observada</th><th>Entrega prevista</th></tr></thead>';
-function ptFaseGroup(fase, linhas) {
-  return '<tr class="grp"><td colspan="4"><span class="gl">Fase de Implementação ' + fase.id + '</span><b class="b6">' + fase.nome + '</b>' +
+// Phase II drops the ERP wording when the client explicitly has no ERP
+function ptFaseNome(fase, M) {
+  if (fase.id === 'II' && M && (M.ferr || {}).erp === 'nenhum') return 'Integração com o Sistema de Gestão e Qualidade';
+  return fase.nome;
+}
+function ptFaseGroup(fase, linhas, M) {
+  return '<tr class="grp"><td colspan="4"><span class="gl">Fase de Implementação ' + fase.id + '</span><b class="b6">' + ptFaseNome(fase, M) + '</b>' +
     '<div class="gsub">' + fase.rot + ' · ' + fase.dur + '</div></td></tr>' +
     linhas.map(function(l){ return '<tr><td class="b6">' + l[0] + '</td><td>' + l[1] + '</td><td>' + l[2] + '</td><td>' + l[3] + '</td></tr>'; }).join('');
 }
@@ -570,14 +575,14 @@ function ptSecFontes(M) {
   var blocks = [{ sec:'05', html:b5 }];
   // Phases I+II, timeline, Phase III, action card, signatures (pilot order)
   blocks.push({ sec:'06', head:ptSec('06', ptPlano06(M)), rows:[0, 1], render:function(rows) {
-    return '<div style="margin-top:5mm"><table>' + PT_PLANO_THEAD + '<tbody>' + rows.map(function(i){ return ptFaseGroup(PT_FASES[i], R[PT_FASES[i].id]); }).join('') + '</tbody></table></div>';
+    return '<div style="margin-top:5mm"><table>' + PT_PLANO_THEAD + '<tbody>' + rows.map(function(i){ return ptFaseGroup(PT_FASES[i], R[PT_FASES[i].id], M); }).join('') + '</tbody></table></div>';
   }});
   blocks.push({ sec:'06', html:'<div style="margin-top:7mm">' + ptRegua() + '</div>' });
-  blocks.push({ sec:'06', html:'<div style="margin-top:7mm"><table>' + PT_PLANO_THEAD + '<tbody>' + ptFaseGroup(PT_FASES[2], R.III) + '</tbody></table></div>' });
+  blocks.push({ sec:'06', html:'<div style="margin-top:7mm"><table>' + PT_PLANO_THEAD + '<tbody>' + ptFaseGroup(PT_FASES[2], R.III, M) + '</tbody></table></div>' });
   var perfil = [ptObrasTxt(M) + (M.tipologia ? ' no perfil <i class="it">' + M.tipologia + '</i>' : ''), M.moLongo ? 'com <i class="it">' + M.moLongo + '</i>' : ''].filter(Boolean).join(', ');
   var frentes = PT_FASES.map(function(fz, i) {
     var res = ptResolve(M, fz.id);
-    return '<div class="fr"><div class="nn">0' + (i + 1) + '</div><div><div class="ft">Fase de Implementação ' + fz.id + ' · ' + fz.nome + '</div><div class="fd">' + fz.fd + '</div>' + (res ? '<div class="fz">' + res + '</div>' : '') + '</div></div>';
+    return '<div class="fr"><div class="nn">0' + (i + 1) + '</div><div><div class="ft">Fase de Implementação ' + fz.id + ' · ' + ptFaseNome(fz, M) + '</div><div class="fd">' + fz.fd + '</div>' + (res ? '<div class="fz">' + res + '</div>' : '') + '</div></div>';
   }).join('');
   blocks.push({ sec:'06', html:'<div style="margin-top:9mm" class="plano"><div class="kk sq">Plano de ação executivo</div><h3>Fases de Implementação e pontos atendidos</h3>' +
     '<p>Com base no diagnóstico ' + (M.art ? 'da ' : 'de ') + '<b>' + ptEsc(M.empresa) + '</b> (' + perfil + '), o plano de ação se organiza em três Fases de Implementação.</p>' + frentes + '</div>' });
