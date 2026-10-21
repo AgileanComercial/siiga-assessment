@@ -133,7 +133,7 @@ function mpvDocumentoHtml(a) {
       '<div class="m"><h3>Relatório do diagnóstico</h3><div class="q">Enviado após a Reunião 1</div>' +
         '<ul><li>A avaliação por pilar.</li><li>Os pontos críticos, com a prioridade de cada um.</li><li>A perda por mês sem tratamento.</li><li>O Plano de Transformação Operacional.</li></ul></div>' +
       '<div class="m sec2"><h3>Reunião 2 · Escopo</h3><div class="q">Data definida na Reunião 1</div>' +
-        '<ul><li>Desenho do escopo do programa junto com vocês, a partir dos pontos críticos do diagnóstico.</li>' +
+        '<ul><li>Apresentação do desenho do escopo do programa, para validação com vocês, a partir dos pontos críticos do diagnóstico.</li>' +
         '<li>' + quemAprovaR2 + ' participa.</li></ul></div>' +
     '</div>' +
     '<div class="sec row"><div class="secnum">04</div><div><div class="sectit">Depoimentos de clientes Agilean</div></div></div>' +
