@@ -1420,6 +1420,25 @@ function handleAction(action, index) {
   }
 }
 
+// Máscara do telefone (mesma do script.js), usada no campo do modal Editar
+function maskPhone(input) {
+  var digits = input.value.replace(/\D/g, '');
+  if (digits.length > 11) digits = digits.substring(0, 11);
+  var result = '';
+  if (digits.length === 0) {
+    result = '';
+  } else if (digits.length <= 2) {
+    result = '(' + digits;
+  } else if (digits.length <= 7) {
+    result = '(' + digits.substring(0, 2) + ') ' + digits.substring(2);
+  } else if (digits.length <= 10) {
+    result = '(' + digits.substring(0, 2) + ') ' + digits.substring(2, 6) + '-' + digits.substring(6);
+  } else {
+    result = '(' + digits.substring(0, 2) + ') ' + digits.substring(2, 7) + '-' + digits.substring(7);
+  }
+  input.value = result;
+}
+
 // Close menus when clicking anywhere else
 document.addEventListener('click', function () {
   closeAllActionMenus();
