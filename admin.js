@@ -1569,3 +1569,342 @@ async function deleteRow(id, name) {
     alert('Erro ao excluir registro: ' + err.message);
   }
 }
+
+// ═══════════════════════════════════════════
+//  ABAS
+// ═══════════════════════════════════════════
+var agCarregado = false;
+function showTab(nome) {
+  ['diagnosticos', 'agendamentos'].forEach(function (t) {
+    document.getElementById('tab-' + t).style.display = t === nome ? '' : 'none';
+    document.getElementById('tabbtn-' + t).classList.toggle('active', t === nome);
+  });
+  Array.prototype.forEach.call(document.querySelectorAll('.diag-only'), function (b) {
+    b.style.display = nome === 'diagnosticos' ? '' : 'none';
+  });
+  if (nome === 'agendamentos' && !agCarregado) { agCarregado = true; initAgendamentos(); }
+}
+
+// ═══════════════════════════════════════════
+//  AGENDAMENTOS (material prévio do diagnóstico)
+// ═══════════════════════════════════════════
+// O pré-vendedor registra a reunião agendada, gera o PDF "Preparação para o
+// Diagnóstico SIIGA" (material-previo.js) e copia as mensagens de envio.
+// Tabela Supabase: agendamentos (migração em supabase/agendamentos.sql).
+
+// Consultores especialistas. WhatsApp só com dígitos (DDI + DDD + número); a
+// exibição formata com mpvFone(). O cargo é só informativo na lista: PDF e
+// mensagens tratam todos como "consultor da Agilean". Um consultor sem e-mail ou
+// WhatsApp bloqueia a geração do PDF (o contato vai na capa do documento).
+var CONSULTORES = [
+  { nome: 'Felipe Façanha', cargo: '', email: 'felipe@agilean.com.br', whatsapp: '5585999183131' },
+  { nome: 'Adailton Azevedo', cargo: '', email: 'adailton@agilean.com.br', whatsapp: '5511959679191' },
+  { nome: 'Israel Chacon', cargo: 'Head Comercial', email: 'israel@agilean.com.br', whatsapp: '5511978119471' }
+];
+// Quem assina as mensagens de envio.
+var PRE_VENDEDORES = [
+  { nome: 'Thifany Araujo' },
+  { nome: 'Hermeson Xavier' }
+];
+
+var agData = [];
+var agTabelaOk = true;
+var AG_STATUS = { agendado: 'Agendado', realizado: 'Realizado', cancelado: 'Cancelado' };
+
+function agEl(id) { return document.getElementById(id); }
+function agVal(id) { return agEl(id).value.trim(); }
+
+function agMaskPhone(input) {
+  var d = input.value.replace(/\D/g, '').slice(0, 11);
+  if (d.length > 10) input.value = '(' + d.slice(0, 2) + ') ' + d.slice(2, 7) + '-' + d.slice(7);
+  else if (d.length > 6) input.value = '(' + d.slice(0, 2) + ') ' + d.slice(2, 6) + '-' + d.slice(6);
+  else if (d.length > 2) input.value = '(' + d.slice(0, 2) + ') ' + d.slice(2);
+  else input.value = d;
+}
+
+function agOptions(select, lista, rotulo) {
+  select.innerHTML = '';
+  var vazio = document.createElement('option');
+  vazio.value = ''; vazio.textContent = 'Selecione...';
+  select.appendChild(vazio);
+  lista.forEach(function (p) {
+    var o = document.createElement('option');
+    o.value = p.nome; o.textContent = rotulo ? rotulo(p) : p.nome;
+    select.appendChild(o);
+  });
+}
+
+function initAgendamentos() {
+  agOptions(agEl('ag-consultor'), CONSULTORES, function (c) { return c.nome + (c.cargo ? ' · ' + c.cargo : ''); });
+  agOptions(agEl('ag-prevendedor'), PRE_VENDEDORES);
+  fetchAgendamentos();
+}
+
+function agAviso(msg) {
+  var box = agEl('ag-aviso');
+  box.innerHTML = '';
+  if (!msg) return;
+  var d = document.createElement('div');
+  d.className = 'ag-aviso'; d.textContent = msg;
+  box.appendChild(d);
+}
+
+// Tabela ainda não criada no Supabase: PostgREST responde PGRST205 / 42P01.
+function agTabelaFaltando(err) {
+  var t = (err && (err.code + ' ' + err.message)) || '';
+  return /PGRST205|42P01/.test(t) || (/agendamentos/i.test(t) && /does not exist|could not find|schema cache/i.test(t));
+}
+var AG_MSG_SEM_TABELA = 'A tabela "agendamentos" ainda não existe no Supabase. Dá para gerar o PDF e as mensagens normalmente, mas o agendamento não fica salvo até a migração supabase/agendamentos.sql ser aplicada.';
+
+async function fetchAgendamentos() {
+  var tbody = agEl('ag-body');
+  tbody.innerHTML = '<tr><td colspan="8" style="text-align:center"><div class="loader"></div></td></tr>';
+  if (!supabaseClient) { agAviso('Supabase não inicializado.'); agData = []; renderAgendamentos(); return; }
+  try {
+    var r = await supabaseClient.from('agendamentos').select('*')
+      .order('data_reuniao', { ascending: false }).order('hora_reuniao', { ascending: false });
+    if (r.error) throw r.error;
+    agTabelaOk = true; agAviso('');
+    agData = r.data || [];
+  } catch (err) {
+    console.error('Erro ao carregar agendamentos:', err);
+    agData = [];
+    if (agTabelaFaltando(err)) { agTabelaOk = false; agAviso(AG_MSG_SEM_TABELA); }
+    else agAviso('Erro ao carregar agendamentos: ' + (err.message || err));
+  }
+  renderAgendamentos();
+}
+
+function agFmtDataHora(row) {
+  if (!row.data_reuniao) return '—';
+  return mpvDataCurta(row.data_reuniao) + ' ' + mpvHora(String(row.hora_reuniao || '00:00').slice(0, 5));
+}
+
+function renderAgendamentos() {
+  var tbody = agEl('ag-body');
+  var busca = agVal('ag-busca').toLowerCase();
+  var st = agEl('ag-filtro-status').value;
+  var linhas = agData.filter(function (r) {
+    if (st && r.status !== st) return false;
+    if (!busca) return true;
+    return [r.empresa, r.contato, r.consultor, r.pre_vendedor, r.decisor].join(' ').toLowerCase().indexOf(busca) >= 0;
+  });
+  tbody.innerHTML = '';
+  if (!linhas.length) {
+    var tr0 = document.createElement('tr'), td0 = document.createElement('td');
+    td0.colSpan = 8; td0.style.cssText = 'text-align:center;color:var(--gray)';
+    td0.textContent = agTabelaOk ? 'Nenhum agendamento.' : 'Sem registros salvos.';
+    tr0.appendChild(td0); tbody.appendChild(tr0);
+    return;
+  }
+  linhas.forEach(function (r) {
+    var tr = document.createElement('tr');
+    [agFmtDataHora(r), r.empresa, r.contato, r.consultor, r.pre_vendedor].forEach(function (v) {
+      var td = document.createElement('td'); td.textContent = v || '—'; tr.appendChild(td);
+    });
+    var tdS = document.createElement('td');
+    var sel = document.createElement('select');
+    sel.className = 'filter-input ag-status';
+    Object.keys(AG_STATUS).forEach(function (k) {
+      var o = document.createElement('option'); o.value = k; o.textContent = AG_STATUS[k];
+      if (r.status === k) o.selected = true;
+      sel.appendChild(o);
+    });
+    sel.onchange = function () { mudarStatusAgendamento(r.id, sel.value); };
+    tdS.appendChild(sel); tr.appendChild(tdS);
+    var tdP = document.createElement('td');
+    tdP.textContent = r.pdf_gerado_em ? new Date(r.pdf_gerado_em).toLocaleString('pt-BR', { dateStyle: 'short', timeStyle: 'short' }) : '—';
+    tr.appendChild(tdP);
+    var tdA = document.createElement('td'); tdA.style.cssText = 'text-align:center;white-space:nowrap';
+    var bE = document.createElement('button'); bE.className = 'btn btn-sm btn-ghost'; bE.textContent = 'Editar';
+    bE.onclick = function () { abrirAgendamento(r); };
+    var bG = document.createElement('button'); bG.className = 'btn btn-sm'; bG.textContent = 'Gerar PDF'; bG.style.marginLeft = '6px';
+    bG.onclick = function () { abrirAgendamento(r); salvarAgendamento(true); };
+    tdA.appendChild(bE); tdA.appendChild(bG); tr.appendChild(tdA);
+    tbody.appendChild(tr);
+  });
+}
+
+async function mudarStatusAgendamento(id, status) {
+  try {
+    var r = await supabaseClient.from('agendamentos').update({ status: status, updated_at: new Date().toISOString() }).eq('id', id);
+    if (r.error) throw r.error;
+    agData.forEach(function (x) { if (x.id === id) x.status = status; });
+  } catch (err) {
+    alert('Erro ao mudar o status: ' + (err.message || err));
+    fetchAgendamentos();
+  }
+}
+
+var AG_CAMPOS = { 'ag-empresa': 'empresa', 'ag-contato': 'contato', 'ag-cargo': 'cargo', 'ag-email': 'email', 'ag-whatsapp': 'whatsapp',
+  'ag-data': 'data_reuniao', 'ag-link': 'link', 'ag-consultor': 'consultor', 'ag-prevendedor': 'pre_vendedor',
+  'ag-decisor': 'decisor', 'ag-decisor-cargo': 'decisor_cargo' };
+
+function novoAgendamento() {
+  agEl('ag-id').value = '';
+  Object.keys(AG_CAMPOS).forEach(function (id) { agEl(id).value = ''; });
+  agEl('ag-hora').value = '';
+  agEl('ag-form-title').textContent = 'Novo agendamento';
+  agEl('ag-erros').textContent = '';
+  agEl('ag-msgs-card').style.display = 'none';
+  agEl('ag-form-card').style.display = '';
+  agEl('ag-empresa').focus();
+}
+
+function abrirAgendamento(r) {
+  agEl('ag-id').value = r.id || '';
+  Object.keys(AG_CAMPOS).forEach(function (id) { agEl(id).value = r[AG_CAMPOS[id]] || ''; });
+  agEl('ag-hora').value = String(r.hora_reuniao || '').slice(0, 5);
+  agEl('ag-form-title').textContent = 'Agendamento · ' + (r.empresa || '');
+  agEl('ag-erros').textContent = '';
+  agEl('ag-msgs-card').style.display = 'none';
+  agEl('ag-form-card').style.display = '';
+  window.scrollTo(0, 0);
+}
+
+function fecharAgForm() {
+  agEl('ag-form-card').style.display = 'none';
+}
+
+function agLerForm() {
+  var d = {};
+  Object.keys(AG_CAMPOS).forEach(function (id) { d[AG_CAMPOS[id]] = agVal(id); });
+  d.hora_reuniao = agVal('ag-hora');
+  return d;
+}
+
+// Validação. paraPdf = também exige o contato completo do consultor (vai na capa).
+function agValidar(d, paraPdf) {
+  var e = [];
+  if (!d.empresa) e.push('Informe a empresa.');
+  if (!d.contato) e.push('Informe o nome do contato.');
+  if (!d.data_reuniao) e.push('Informe a data da reunião.');
+  if (!d.hora_reuniao) e.push('Informe a hora da reunião.');
+  if (d.data_reuniao && d.hora_reuniao) {
+    var quando = new Date(d.data_reuniao + 'T' + d.hora_reuniao + ':00');
+    if (isNaN(quando.getTime()) || quando.getTime() <= Date.now()) e.push('A data e a hora da reunião precisam estar no futuro.');
+  }
+  if (d.email && !/^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/.test(d.email)) e.push('E-mail do contato inválido.');
+  if (d.whatsapp && !/^\d{10,11}$/.test(d.whatsapp.replace(/\D/g, ''))) e.push('WhatsApp do contato inválido (DDD + número).');
+  if (d.link && !/^https?:\/\/\S+$/i.test(d.link)) e.push('O link da videochamada precisa começar com http:// ou https://.');
+  if (d.decisor_cargo && !d.decisor) e.push('Informe o nome do decisor (o cargo sozinho não entra no documento).');
+  var cons = CONSULTORES.filter(function (c) { return c.nome === d.consultor; })[0];
+  var pv = PRE_VENDEDORES.filter(function (p) { return p.nome === d.pre_vendedor; })[0];
+  if (!cons) e.push('Escolha o consultor especialista.');
+  if (!pv) e.push('Escolha o pré-vendedor.');
+  if (paraPdf && cons && (!cons.email || !cons.whatsapp))
+    e.push('O cadastro de ' + cons.nome + ' está sem e-mail ou WhatsApp no admin. O PDF não pode ser gerado sem o contato do consultor: complete a lista CONSULTORES.');
+  return { erros: e, consultor: cons, preVendedor: pv };
+}
+
+async function salvarAgendamento(gerar) {
+  var d = agLerForm();
+  var v = agValidar(d, gerar);
+  var boxErr = agEl('ag-erros');
+  boxErr.innerHTML = '';
+  if (v.erros.length) {
+    v.erros.forEach(function (m) { var p = document.createElement('div'); p.textContent = m; boxErr.appendChild(p); });
+    return;
+  }
+  var id = agVal('ag-id');
+  var row = {};
+  Object.keys(d).forEach(function (k) { row[k] = d[k] || null; });
+  row.consultor_email = v.consultor.email || null;
+  row.consultor_whatsapp = v.consultor.whatsapp || null;
+  row.updated_at = new Date().toISOString();
+  var btns = [agEl('ag-btn-salvar'), agEl('ag-btn-gerar')];
+  btns.forEach(function (b) { b.disabled = true; b.style.opacity = '0.6'; });
+  var salvo = false;
+  try {
+    var res = id ? await supabaseClient.from('agendamentos').update(row).eq('id', id).select()
+                 : await supabaseClient.from('agendamentos').insert([row]).select();
+    if (res.error) throw res.error;
+    if (res.data && res.data[0]) { id = res.data[0].id; agEl('ag-id').value = id; }
+    salvo = true; agTabelaOk = true; agAviso('');
+  } catch (err) {
+    console.error('Erro ao salvar agendamento:', err);
+    if (agTabelaFaltando(err)) { agTabelaOk = false; agAviso(AG_MSG_SEM_TABELA); }
+    else agAviso('O agendamento não foi salvo: ' + (err.message || err));
+  }
+
+  if (!gerar) {
+    btns.forEach(function (b) { b.disabled = false; b.style.opacity = ''; });
+    if (salvo) { fecharAgForm(); fetchAgendamentos(); }
+    return;
+  }
+
+  var dados = {
+    empresa: d.empresa, contato: d.contato, cargo: d.cargo, data: d.data_reuniao, hora: d.hora_reuniao, link: d.link,
+    decisor: d.decisor, decisor_cargo: d.decisor_cargo, emissao: mpvHojeIso(),
+    consultor: { nome: v.consultor.nome, email: v.consultor.email, whatsapp: v.consultor.whatsapp },
+    pre_vendedor: { nome: v.preVendedor.nome }
+  };
+  try {
+    var r = await gerarMaterialPrevio(dados);
+    window.__MPV_LAST = { nome: r.nome, paginas: r.paginas, fit: r.fit, data: r.pdf.output('datauristring') };
+    if (salvo && id) {
+      var up = await supabaseClient.from('agendamentos').update({ pdf_gerado_em: new Date().toISOString() }).eq('id', id);
+      if (up.error) console.error('Erro ao marcar pdf_gerado_em:', up.error);
+    }
+    mostrarMensagens(dados, d, r.nome);
+    if (salvo) fetchAgendamentos();
+  } catch (err) {
+    console.error('Erro ao gerar o material prévio:', err);
+    var p = document.createElement('div');
+    p.textContent = 'O PDF não foi gerado: ' + (err.message || err);
+    boxErr.appendChild(p);
+  }
+  btns.forEach(function (b) { b.disabled = false; b.style.opacity = ''; });
+}
+
+function agCopiar(texto, btn) {
+  function ok() { var t = btn.textContent; btn.textContent = 'Copiado'; setTimeout(function () { btn.textContent = t; }, 1500); }
+  if (navigator.clipboard && navigator.clipboard.writeText) navigator.clipboard.writeText(texto).then(ok, function () { agCopiarFallback(texto); ok(); });
+  else { agCopiarFallback(texto); ok(); }
+}
+function agCopiarFallback(texto) {
+  var ta = document.createElement('textarea');
+  ta.value = texto; ta.style.position = 'fixed'; ta.style.opacity = '0';
+  document.body.appendChild(ta); ta.select();
+  try { document.execCommand('copy'); } catch (e) {}
+  document.body.removeChild(ta);
+}
+
+function agWaLink(fone, texto) {
+  var n = String(fone || '').replace(/\D/g, '');
+  if (n.length === 10 || n.length === 11) n = '55' + n;
+  return 'https://wa.me/' + n + '?text=' + encodeURIComponent(texto);
+}
+
+function mostrarMensagens(dados, form, nomeArquivo) {
+  var m = mpvMensagens(dados);
+  var box = agEl('ag-msgs');
+  box.innerHTML = '';
+  agEl('ag-msgs-sub').textContent = 'PDF baixado: ' + nomeArquivo + '. Anexe o arquivo no e-mail e no WhatsApp.';
+  var blocos = [
+    { id: 'email', titulo: 'E-mail de agendamento', texto: 'Assunto: ' + m.assunto + '\n\n' + m.email, copiar: m.email, copiarAssunto: m.assunto,
+      link: form.email ? 'mailto:' + form.email + '?subject=' + encodeURIComponent(m.assunto) + '&body=' + encodeURIComponent(m.email) : '', linkTxt: 'Abrir no e-mail' },
+    { id: 'whats', titulo: 'WhatsApp de agendamento (com o PDF)', texto: m.whats, copiar: m.whats,
+      link: form.whatsapp ? agWaLink(form.whatsapp, m.whats) : '', linkTxt: 'Abrir no WhatsApp' },
+    { id: 'lembrete', titulo: 'WhatsApp de lembrete (24 h antes)', texto: m.lembrete, copiar: m.lembrete,
+      link: form.whatsapp ? agWaLink(form.whatsapp, m.lembrete) : '', linkTxt: 'Abrir no WhatsApp' }
+  ];
+  blocos.forEach(function (b) {
+    var div = document.createElement('div'); div.className = 'ag-msg'; div.id = 'ag-msg-' + b.id;
+    var head = document.createElement('div'); head.className = 'ag-msg-head';
+    var t = document.createElement('b'); t.textContent = b.titulo; head.appendChild(t);
+    var acoes = document.createElement('span');
+    if (b.link) { var a = document.createElement('a'); a.href = b.link; a.target = '_blank'; a.rel = 'noopener'; a.textContent = b.linkTxt; acoes.appendChild(a); }
+    if (b.copiarAssunto) {
+      var bA = document.createElement('button'); bA.className = 'btn btn-sm btn-ghost'; bA.textContent = 'Copiar assunto';
+      bA.onclick = function () { agCopiar(b.copiarAssunto, bA); }; acoes.appendChild(bA);
+    }
+    var bC = document.createElement('button'); bC.className = 'btn btn-sm'; bC.textContent = 'Copiar';
+    bC.onclick = function () { agCopiar(b.copiar, bC); }; acoes.appendChild(bC);
+    head.appendChild(acoes);
+    var pre = document.createElement('pre'); pre.textContent = b.texto;
+    div.appendChild(head); div.appendChild(pre);
+    box.appendChild(div);
+  });
+  agEl('ag-msgs-card').style.display = '';
+}

@@ -12,6 +12,9 @@
 
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+  <link rel="stylesheet" href="material-previo.css?v=1">
   
   <style>
     :root {
@@ -432,6 +435,33 @@
       .filter-input { width: 100%; min-width: unset; }
       .stats-row { flex-direction: column; }
     }
+
+    /* Abas */
+    .tabs { display: flex; gap: 4px; padding: 0 40px; border-bottom: 1px solid var(--border); background: var(--surface); }
+    .tab-btn { background: none; border: none; border-bottom: 2px solid transparent; color: var(--gray); padding: 14px 18px;
+      font-family: var(--font-display); font-size: 14px; font-weight: 600; cursor: pointer; transition: 0.2s; }
+    .tab-btn:hover { color: var(--text); }
+    .tab-btn.active { color: var(--text); border-bottom-color: var(--orange); }
+
+    /* Agendamentos */
+    .ag-card { background: var(--surface); border: 1px solid var(--border); border-radius: 12px; padding: 24px; margin-bottom: 20px; }
+    .ag-card h2 { font-family: var(--font-display); font-size: 18px; font-weight: 600; margin-bottom: 16px; }
+    .ag-card h3 { font-family: var(--font-display); font-size: 12px; font-weight: 600; margin: 18px 0 10px; color: var(--gray); text-transform: uppercase; letter-spacing: 0.06em; }
+    .ag-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(220px, 1fr)); gap: 14px; }
+    .ag-grid .filter-input { width: 100%; min-width: 0; }
+    .ag-grid .wide { grid-column: span 2; }
+    .ag-erros { color: var(--red); font-size: 13px; margin-top: 14px; line-height: 1.6; }
+    .ag-aviso { background: rgba(251,191,36,0.08); border: 1px solid rgba(251,191,36,0.35); color: var(--yellow); border-radius: 8px;
+      padding: 12px 16px; font-size: 13px; margin-bottom: 20px; line-height: 1.5; }
+    .ag-acoes { display: flex; gap: 10px; justify-content: flex-end; margin-top: 18px; flex-wrap: wrap; }
+    .ag-msg { background: var(--surface2); border: 1px solid var(--border); border-radius: 8px; padding: 14px 16px; margin-bottom: 14px; }
+    .ag-msg-head { display: flex; justify-content: space-between; align-items: center; gap: 10px; margin-bottom: 8px; flex-wrap: wrap; }
+    .ag-msg-head b { font-family: var(--font-display); font-size: 13px; }
+    .ag-msg-head span { display: flex; gap: 8px; align-items: center; }
+    .ag-msg pre { white-space: pre-wrap; font-family: var(--font-body); font-size: 13px; line-height: 1.55; color: #e5e7eb; }
+    .ag-msg a { color: var(--orange); font-size: 12px; text-decoration: none; }
+    .btn-ghost { background: rgba(255,255,255,0.05); color: white; border: 1px solid var(--border); }
+    .ag-status { padding: 6px 28px 6px 10px; min-width: 0; font-size: 12px; }
   </style>
 </head>
 <body>
@@ -450,12 +480,18 @@
   <header>
     <h1>SIIGA <span>Admin</span></h1>
     <div style="display: flex; gap: 10px; align-items: center;">
-      <button class="btn btn-sm" id="btn-test" onclick="insertTestRecords()" style="background: var(--surface2); border: 1px solid var(--border);">＋ Inserir Testes</button>
-      <button class="btn btn-sm" onclick="fetchData()">⟳ Atualizar</button>
+      <button class="btn btn-sm diag-only" id="btn-test" onclick="insertTestRecords()" style="background: var(--surface2); border: 1px solid var(--border);">＋ Inserir Testes</button>
+      <button class="btn btn-sm diag-only" onclick="fetchData()">⟳ Atualizar</button>
     </div>
   </header>
 
+  <nav class="tabs">
+    <button class="tab-btn active" id="tabbtn-diagnosticos" onclick="showTab('diagnosticos')">Diagnósticos</button>
+    <button class="tab-btn" id="tabbtn-agendamentos" onclick="showTab('agendamentos')">Agendamentos</button>
+  </nav>
+
   <main>
+   <section id="tab-diagnosticos">
     <!-- Stats Cards -->
     <div class="stats-row" id="stats-row">
       <div class="stat-card">
@@ -548,6 +584,90 @@
         </tbody>
       </table>
     </div>
+   </section>
+
+   <!-- Agendamentos: material prévio do diagnóstico (PDF + mensagens de envio) -->
+   <section id="tab-agendamentos" style="display:none">
+    <div id="ag-aviso"></div>
+
+    <div class="ag-card" id="ag-form-card" style="display:none">
+      <h2 id="ag-form-title">Novo agendamento</h2>
+      <input type="hidden" id="ag-id">
+      <h3>Cliente</h3>
+      <div class="ag-grid">
+        <div class="filter-group wide"><label class="filter-label">Empresa *</label><input type="text" class="filter-input" id="ag-empresa"></div>
+        <div class="filter-group"><label class="filter-label">Contato *</label><input type="text" class="filter-input" id="ag-contato"></div>
+        <div class="filter-group"><label class="filter-label">Cargo do contato</label><input type="text" class="filter-input" id="ag-cargo"></div>
+        <div class="filter-group"><label class="filter-label">E-mail do contato</label><input type="email" class="filter-input" id="ag-email"></div>
+        <div class="filter-group"><label class="filter-label">WhatsApp do contato</label><input type="text" class="filter-input" id="ag-whatsapp" placeholder="(85) 99999-9999" oninput="agMaskPhone(this)"></div>
+      </div>
+      <h3>Reunião</h3>
+      <div class="ag-grid">
+        <div class="filter-group"><label class="filter-label">Data *</label><input type="date" class="filter-input" id="ag-data"></div>
+        <div class="filter-group"><label class="filter-label">Hora *</label><input type="time" class="filter-input" id="ag-hora"></div>
+        <div class="filter-group wide"><label class="filter-label">Link da videochamada</label><input type="url" class="filter-input" id="ag-link" placeholder="https://"></div>
+        <div class="filter-group"><label class="filter-label">Consultor especialista *</label><select class="filter-input" id="ag-consultor"></select></div>
+        <div class="filter-group"><label class="filter-label">Pré-vendedor *</label><select class="filter-input" id="ag-prevendedor"></select></div>
+      </div>
+      <h3>Quem aprova a contratação (opcional)</h3>
+      <div class="ag-grid">
+        <div class="filter-group"><label class="filter-label">Nome do decisor</label><input type="text" class="filter-input" id="ag-decisor"></div>
+        <div class="filter-group"><label class="filter-label">Cargo do decisor</label><input type="text" class="filter-input" id="ag-decisor-cargo"></div>
+      </div>
+      <div class="ag-erros" id="ag-erros"></div>
+      <div class="ag-acoes">
+        <button class="btn btn-sm btn-ghost" onclick="fecharAgForm()">Cancelar</button>
+        <button class="btn btn-sm btn-ghost" id="ag-btn-salvar" onclick="salvarAgendamento(false)">Salvar</button>
+        <button class="btn btn-sm" id="ag-btn-gerar" onclick="salvarAgendamento(true)">Salvar e gerar PDF</button>
+      </div>
+    </div>
+
+    <div class="ag-card" id="ag-msgs-card" style="display:none">
+      <h2>Mensagens de envio</h2>
+      <p style="color:var(--gray);font-size:13px;margin:-8px 0 16px" id="ag-msgs-sub"></p>
+      <div id="ag-msgs"></div>
+    </div>
+
+    <div class="filters-bar">
+      <div class="filter-group" style="flex:2;min-width:200px">
+        <label class="filter-label">Buscar</label>
+        <input type="text" class="filter-input" id="ag-busca" placeholder="Empresa, contato, consultor..." oninput="renderAgendamentos()">
+      </div>
+      <div class="filter-group">
+        <label class="filter-label">Status</label>
+        <select class="filter-input" id="ag-filtro-status" onchange="renderAgendamentos()">
+          <option value="">Todos</option>
+          <option value="agendado">Agendado</option>
+          <option value="realizado">Realizado</option>
+          <option value="cancelado">Cancelado</option>
+        </select>
+      </div>
+      <div style="margin-left:auto; display:flex; gap:10px; align-self:flex-end">
+        <button class="btn btn-sm btn-ghost" onclick="fetchAgendamentos()">⟳ Atualizar</button>
+        <button class="btn btn-sm" id="ag-btn-novo" onclick="novoAgendamento()">＋ Novo agendamento</button>
+      </div>
+    </div>
+
+    <div class="table-container">
+      <table>
+        <thead>
+          <tr>
+            <th>Reunião</th>
+            <th>Empresa</th>
+            <th>Contato</th>
+            <th>Consultor</th>
+            <th>Pré-vendedor</th>
+            <th>Status</th>
+            <th>PDF gerado</th>
+            <th style="text-align: center;">Ações</th>
+          </tr>
+        </thead>
+        <tbody id="ag-body">
+          <tr><td colspan="8" style="text-align:center;color:var(--gray)">—</td></tr>
+        </tbody>
+      </table>
+    </div>
+   </section>
   </main>
 
   <!-- Slide-over Detalhes -->
@@ -668,6 +788,7 @@
     </div>
   </div>
 
-  <script src="admin.js?v=5"></script>
+  <script src="material-previo.js?v=1"></script>
+  <script src="admin.js?v=6"></script>
 </body>
 </html>
