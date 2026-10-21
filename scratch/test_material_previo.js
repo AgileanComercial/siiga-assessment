@@ -15,7 +15,7 @@ catch (e) { puppeteer = require(path.resolve(__dirname, '../../siiga-assessment/
 
 const BASE_DIR = path.resolve(__dirname, '..');
 const OUT_DIR = path.join(__dirname, 'out_material_previo');
-const PORT = 8251;
+const PORT = Number(process.env.TEST_PORT) || 8251;
 const BASE_URL = process.env.BASE_URL || ('http://127.0.0.1:' + PORT);
 fs.mkdirSync(OUT_DIR, { recursive: true });
 
