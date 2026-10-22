@@ -215,6 +215,13 @@ select.text-input option:disabled{color:#999}
 .opp-table th{text-align:left;padding:8px 10px;font-size:10px;text-transform:uppercase;letter-spacing:0.08em;color:#999;background:var(--light);border-bottom:1px solid var(--light2)}
 .opp-table td{padding:11px 10px;font-size:12px;border-bottom:1px solid var(--light2);vertical-align:top;color:#333}
 .opp-table tr:last-child td{border-bottom:none}
+/* Mobile: table scrolls inside its card (page does not scroll sideways); Gap column keeps a readable width */
+@media (max-width:560px){
+  #opp-table-el{display:block;overflow-x:auto;-webkit-overflow-scrolling:touch}
+  #opp-table-el th:nth-child(2),#opp-table-el td:nth-child(2){min-width:150px}
+  #opp-table-el th:nth-child(4),#opp-table-el td:nth-child(4){min-width:96px}
+  #opp-table-el th:nth-child(5),#opp-table-el td:nth-child(5){min-width:74px}
+}
 .gap-tag{padding:2px 8px;border-radius:20px;font-size:10px;font-weight:700}
 .roi-table{width:100%;border-collapse:collapse}
 .roi-table th{text-align:left;padding:6px 9px;font-size:9.5px;text-transform:uppercase;letter-spacing:0.08em;color:#999;border-bottom:1px solid var(--light2)}
@@ -308,3 +315,165 @@ select.text-input option:disabled{color:#999}
 .dor-toggle:hover{background:rgba(250,204,21,0.08)}
 .dor-toggle.on{background:rgba(250,204,21,0.16);border-style:solid}
 .combo-sub .dor-box{margin-top:10px}
+
+/* Apresentação SIIGA: telas Pilares e Método (entre a capa e o B0) */
+.pres-wrap{width:100%;max-width:1480px;margin:0 auto;display:flex;flex-direction:column;align-items:stretch}
+.pres-head{text-align:center;margin-bottom:28px}
+.pres-logo{font-family:'Bai Jamjuree';font-weight:700;font-size:clamp(44px,5.4vw,84px);line-height:1;color:var(--orange);letter-spacing:0.04em}
+.pres-sub{margin-top:10px;font-family:'Bai Jamjuree';font-size:clamp(14px,1.15vw,18px);font-weight:600;color:var(--gray3);text-transform:uppercase;letter-spacing:0.22em}
+.pilar-grid{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:18px}
+.pilar-card{background:linear-gradient(180deg,var(--black2) 0%,var(--black) 100%);border:1px solid rgba(255,95,31,0.35);border-radius:var(--r3);padding:24px 22px 26px}
+.pilar-num{font-family:'Bai Jamjuree';font-size:14px;font-weight:700;color:var(--orange);letter-spacing:0.14em;border-left:4px solid var(--orange);padding-left:10px;line-height:1.1}
+.pilar-nome{margin:14px 0 18px;font-family:'Bai Jamjuree';font-size:clamp(15px,1.2vw,19px);font-weight:700;color:var(--white);text-transform:uppercase;letter-spacing:0.08em;line-height:1.3}
+.pilar-list{list-style:none;margin:0;padding:0;display:flex;flex-direction:column;gap:10px}
+.pilar-list li{position:relative;padding-left:18px;font-size:clamp(13px,1vw,16px);line-height:1.45;color:var(--gray3)}
+.pilar-list li::before{content:"";position:absolute;left:0;top:0.55em;width:7px;height:7px;background:var(--orange)}
+.pres-stats{display:flex;justify-content:center;align-items:stretch;margin-top:28px}
+.pres-stat{flex:0 1 auto;min-width:260px;text-align:center;padding:4px 36px;border-left:1px solid var(--orange)}
+.pres-stat:first-child{border-left:0}
+.pres-stat-v{font-family:'Bai Jamjuree';font-weight:700;font-size:clamp(30px,3vw,48px);color:var(--orange);line-height:1.1;white-space:nowrap}
+.pres-stat-l{margin-top:4px;font-size:clamp(13px,1vw,16px);color:var(--gray3)}
+.pres-btns{display:flex;justify-content:space-between;gap:10px;margin-top:30px}
+.metodo-grid{display:grid;grid-template-columns:minmax(0,1.15fr) minmax(0,1fr);gap:20px}
+.metodo-card{background:var(--black2);border:1px solid rgba(255,255,255,0.08);border-radius:var(--r3);padding:28px 30px}
+.metodo-tit{font-family:'Bai Jamjuree';font-size:clamp(14px,1.1vw,17px);font-weight:700;color:var(--orange);text-transform:uppercase;letter-spacing:0.16em;margin-bottom:20px}
+.metodo-item{margin-bottom:20px}
+.metodo-item:last-child{margin-bottom:0}
+.metodo-item b{display:block;font-family:'Bai Jamjuree';font-size:clamp(15px,1.2vw,19px);font-weight:700;color:var(--white);margin-bottom:4px}
+.metodo-item span{display:block;font-size:clamp(13px,1vw,16px);line-height:1.5;color:var(--gray3)}
+.metodo-quote{font-style:italic;font-size:clamp(14px,1.1vw,18px);line-height:1.5;color:var(--white);border-left:3px solid var(--orange);padding-left:14px;margin-bottom:20px}
+.metodo-list{margin-bottom:24px}
+.metodo-selos{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+.metodo-selo{background:var(--orange);color:#fff;font-family:'Bai Jamjuree';font-size:clamp(13px,1vw,15px);font-weight:700;text-transform:uppercase;letter-spacing:0.08em;line-height:1.3;text-align:center;padding:10px 12px;border-radius:var(--r3)}
+@media (max-width:900px){.pilar-grid{grid-template-columns:repeat(2,minmax(0,1fr))}}
+@media (max-width:800px){.metodo-grid{grid-template-columns:1fr}}
+@media (max-width:560px){
+  .pilar-grid{grid-template-columns:1fr}
+  .pres-stats{flex-direction:column;gap:14px}
+  .pres-stat{flex:none;min-width:0;border-left:0;border-top:1px solid var(--orange);padding:14px 0 0}
+  .pres-stat:first-child{border-top:0;padding-top:0}
+  .pres-sub{letter-spacing:0.12em}
+}
+/* --- A. Moldura comum das 3 telas de apresentação ---
+   Cabeçalho SIIGA no topo, na mesma altura; conteúdo logo abaixo; botões logo abaixo do conteúdo.
+   Espaços fixos e iguais nas três telas; a sobra de altura fica embaixo da página. */
+#screen-diagnostico, #screen-pilares, #screen-metodo{justify-content:flex-start;padding:76px 32px 40px}
+.pres-btns{margin-top:28px}
+
+/* --- B. Botões das 3 telas: tamanho da v1 e laranja uniforme (gradiente de comprimento fixo) --- */
+.pres-btns .btn{font-size:15px;padding:13px 28px}
+.pres-btns .btn-p{background:linear-gradient(135deg,#ff7a42 0px,#ff5f1f 140px)}
+.pres-btns .btn-p:hover{background:linear-gradient(135deg,#ff8c5a 0px,#ff6b33 140px)}
+
+/* --- C. Diagnóstico SIIGA · 2 encontros (substitui todo o bloco .dg- atual) --- */
+.dg-intro{text-align:center;margin:0 auto 20px;max-width:1240px}
+.dg-eyebrow{font-family:'Bai Jamjuree';font-size:13px;font-weight:700;letter-spacing:0.14em;text-transform:uppercase;color:var(--orange)}
+.dg-title{font-family:'Bai Jamjuree';font-size:clamp(22px,1.9vw,30px);font-weight:700;line-height:1.2;margin:8px 0}
+.dg-lead{font-size:clamp(15px,1.05vw,17px);line-height:1.55;color:var(--gray3);text-wrap:balance}
+.dg-lead b{color:var(--white);font-weight:600}
+
+.dg-grid{display:grid;grid-template-columns:minmax(0,5fr) minmax(0,7fr);gap:20px;align-items:stretch}
+.dg-enc{background:var(--black2);border:1px solid rgba(255,255,255,0.08);border-radius:var(--r3);padding:28px 30px}
+.dg-enc.next{border-color:rgba(255,95,31,0.35)}
+.dg-head{display:flex;align-items:baseline;justify-content:space-between;gap:12px;padding-bottom:14px;border-bottom:1px solid rgba(255,255,255,0.08)}
+.dg-num{font-family:'Bai Jamjuree';font-size:14px;font-weight:700;letter-spacing:0.14em;text-transform:uppercase;color:var(--gray3)}
+.dg-enc.next .dg-num{color:var(--orange)}
+.dg-tag{font-family:'Bai Jamjuree';font-size:13px;font-weight:700;letter-spacing:0.08em;text-transform:uppercase;color:var(--gray3);white-space:nowrap}
+.dg-enc.next .dg-tag{color:var(--white)}
+.dg-name{font-family:'Bai Jamjuree';font-size:clamp(19px,1.5vw,24px);font-weight:700;line-height:1.25;margin:14px 0 14px}
+.dg-lbl{font-family:'Bai Jamjuree';font-size:13px;font-weight:700;letter-spacing:0.1em;text-transform:uppercase;color:var(--gray3);margin:0 0 10px}
+/* listas: usam .pilar-list (cor, marcador e corpo iguais a Pilares/Método); só o negrito é próprio */
+.dg-list li b{font-weight:700;color:var(--white)}
+
+.dg-cols{display:grid;grid-template-columns:1fr 1fr;gap:24px}
+.dg-agenda{margin-top:20px;background:var(--black2);border:1px solid rgba(255,255,255,0.08);border-radius:var(--r3);padding:22px 30px 20px}
+.dg-agenda-grid{display:grid;grid-template-columns:minmax(0,5fr) minmax(0,7fr);gap:20px 50px;align-items:start}
+.dg-dh{display:grid;grid-template-columns:1fr 1fr;gap:12px}
+.dg-agenda-h{display:flex;align-items:baseline;gap:10px;margin-bottom:14px;padding-bottom:12px;border-bottom:1px solid rgba(255,255,255,0.08)}
+.dg-agenda-h .dg-lbl{margin:0;color:var(--white)}
+.dg-opt{font-size:13px;color:var(--gray3)}
+.dg-field label{font-family:'Bai Jamjuree';font-size:13px;font-weight:600;letter-spacing:0.06em;text-transform:uppercase;color:var(--gray3);display:block;margin-bottom:6px}
+.dg-pp{display:flex;flex-direction:column;gap:8px}
+.dg-prow{display:grid;grid-template-columns:1fr 1fr 92px;gap:8px;align-items:center}
+.dg-prow .btn-rm{padding:10px 0;font-size:13px;width:100%}
+.dg-add{margin-top:10px;font-size:13px;padding:9px 16px}
+.dg-foot{font-size:13px;color:var(--gray3);margin-top:14px;line-height:1.5}
+#screen-diagnostico .text-input{font-size:15px;color-scheme:dark}
+
+/* mesmos breakpoints de Pilares/Método: 900 / 800 / 560 */
+@media (max-width:800px){
+  .dg-grid, .dg-agenda-grid{grid-template-columns:1fr}
+}
+@media (max-width:560px){
+  #screen-diagnostico, #screen-pilares, #screen-metodo{padding:76px 20px 40px}
+  .pres-btns .btn{padding:13px 18px}
+  .dg-enc, .dg-agenda{padding:22px 18px}
+  .dg-cols{grid-template-columns:1fr;gap:18px}
+  .dg-agenda-h{flex-direction:column;gap:2px}
+  .dg-pp{gap:14px}
+  .dg-prow{grid-template-columns:1fr;row-gap:6px}
+  .dg-prow > span{display:none}
+  .dg-prow .btn-rm{grid-column:1/-1;width:auto;justify-self:end;padding:6px 14px}
+
+  /* --- D. Mobile compacto de Pilares e Método --- */
+  .pilar-card, .metodo-card{padding:22px 18px}
+  .pilar-grid{gap:12px}
+  .pilar-nome{margin:10px 0 12px}
+  .pilar-list{gap:6px}
+  .pres-stats{flex-direction:row;gap:0}
+  .pres-stat{flex:1 1 0;border-top:0;border-left:1px solid var(--orange);padding:2px 6px}
+  .pres-stat:first-child{border-left:0;padding-top:2px}
+  .pres-stat-v{font-size:22px}
+  .pres-stat-l{font-size:12px}
+  .metodo-selos{gap:8px}
+  .metodo-selo{font-size:11px;letter-spacing:0.02em;padding:8px 6px}
+}
+
+/* --- Mobile da tela de resultado: sem rolagem horizontal da pagina (<=560px) ---
+   Inline-style grids are overridden by id/container selectors with !important;
+   only genuinely wide tables scroll inside their own card. Desktop is untouched. */
+@media (max-width:560px){
+  #exec-snapshot > div[style*="grid-template-columns"],
+  #gaps-summary-stats,
+  #roi-chain-card > div[style*="grid-template-columns"],
+  #screen-report [data-section="roi"] div[style*="grid-template-columns:1fr 1fr;gap:22px"],
+  #roi2-operacional > div[style*="grid-template-columns"]{grid-template-columns:minmax(0,1fr)!important}
+  #roi-inputs{grid-template-columns:repeat(2,minmax(0,1fr))!important}
+  #roi-chain-card > div[style*="grid-template-columns"] > div[style*="justify-content:center"]{padding:4px 0;transform:rotate(90deg)}
+  #screen-report .card{min-width:0}
+  #screen-transition div[style*="grid-template-columns:repeat(4,1fr)"]{grid-template-columns:repeat(2,minmax(0,1fr))!important}
+  #screen-admin div[style*="display:flex;gap:10px"],#screen-focused-result div[style*="display:flex;gap:10px"]{flex-wrap:wrap}
+  #roi-table-el,#roi2-cenarios-table,#ganhos-rotina-card .roi-table{display:block;overflow-x:auto;-webkit-overflow-scrolling:touch}
+}
+
+/* Seção 06 da tela (piloto aprovado).
+   Plano de Ação Executivo da tela: 3 Fases de Implementação (renderNextSteps em script.js).
+   Mesmas cores/tamanhos que os "atos" usavam inline (#ea580c, #e2e8f0, #fdba74, 13px/11.5px);
+   novo só a coluna de prazo com a mini-régua de 150 dias (mesma escala de ptRegua no PDF). */
+.ns-fases{display:flex;flex-direction:column;gap:16px;margin-bottom:10px}
+.ns-fase{display:grid;grid-template-columns:18px minmax(0,1fr) 196px;grid-template-areas:"n txt meta" "n res meta";column-gap:14px;row-gap:4px;font-size:13px;color:#e2e8f0;line-height:1.55}
+.ns-n{grid-area:n;font-family:'Bai Jamjuree';color:#ea580c;font-weight:700;font-size:13px;padding-top:2px}
+.ns-txt{grid-area:txt}
+.ns-txt strong{color:#ffffff}
+.ns-res{grid-area:res;font-size:11.5px;color:#fdba74}
+.ns-meta{grid-area:meta;padding-top:3px}
+.ns-prazo{font-size:11px;line-height:1.4;color:#cbd5e1;margin-bottom:6px}
+.ns-gantt{position:relative;height:6px;background:rgba(255,255,255,0.08);border-radius:1px}
+.ns-gantt b{position:absolute;top:0;bottom:0;background:#ea580c;border-radius:1px}
+.ns-tick{position:absolute;top:-3px;bottom:-3px;width:1px;background:rgba(255,255,255,0.22)}
+.ns-axis{position:relative;height:14px;margin-top:5px;font-size:10px;color:#94a3b8}
+.ns-axis span{position:absolute;top:0;transform:translateX(-50%);white-space:nowrap}
+.ns-axis span:first-child{transform:none}
+.ns-axis span:last-child{transform:translateX(-100%)}
+.ns-nota{font-size:10.5px;color:#94a3b8;margin:0 0 22px 0;padding-left:32px}
+@media (max-width:560px){
+  .ns-fase{grid-template-columns:18px minmax(0,1fr);grid-template-areas:"n txt" "n meta" "n res"}
+  .ns-meta{padding:4px 0 2px}
+  .ns-nota{padding-left:0}
+}
+/* Tema claro da tela (seletor #pdf-theme-toggle): a régua e a linha Resolve
+   ficariam sem contraste sobre o fundo branco gerado por applyPdfLightTheme. */
+[data-report-theme="light"] .ns-gantt{background:#e9e4da}
+[data-report-theme="light"] .ns-tick{background:#b8b0a2}
+[data-report-theme="light"] .ns-res{color:#c2410c}
+[data-report-theme="light"] .ns-axis,[data-report-theme="light"] .ns-nota{color:#6b6577}

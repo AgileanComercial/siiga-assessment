@@ -78,6 +78,16 @@ server.listen(PORT, async () => {
     await page.type('#c-email', 'contato@empresa-exemplo.com.br');
     await page.type('#c-telefone', '(11) 90000-0000');
     await page.click('button[onclick="startAssessment()"]');
+    await sleep(300); if (process.env.AGENDA) {
+      // Optional 2nd-meeting scheduling on the Diagnóstico screen (AGENDA=1)
+      await page.evaluate(() => {
+        document.getElementById('reuniao2-data').value = '2026-10-28';
+        document.getElementById('reuniao2-hora').value = '14:30';
+        addReuniao2Participante('Marina Alves', 'Diretora de Engenharia');
+        addReuniao2Participante('', 'Sem nome');
+      });
+    }
+    await page.click('#btn-diagnostico-continuar'); await sleep(300); await page.click('#btn-pilares-continuar'); await sleep(300); await page.click('#btn-metodo-iniciar');
     await sleep(300);
 
     for (let i = 0; i < 30; i++) {
@@ -178,6 +188,11 @@ server.listen(PORT, async () => {
       var fontsOk = PT_FONT_FACES.map(function(f){ return document.fonts.check(f, 'Ação'); });
       return { pages: pages, over: over, fontsOk: fontsOk };
     });
+    if (process.env.DUMP_PONTOS) {
+      // Points model (critical + others): n, code, phase, priority, for before/after comparison
+      const pts = await page.evaluate(() => { const M = ptModel('detalhado'); return M.criticos.concat(M.demais).map(p => [p.n, p.code, p.fase, p.prioridade].join('|')); });
+      fs.writeFileSync(process.env.DUMP_PONTOS, pts.join(String.fromCharCode(10)));
+    }
     const all = dom.pages.join('\n').replace(/\u00a0/g, ' ');
     const allLow = all.toLowerCase();
     const pend = all.match(/.{0,40}\[PENDENTE.{0,40}/i);
@@ -185,30 +200,118 @@ server.listen(PORT, async () => {
     console.log('\nFolga até o carimbo:', JSON.stringify(dom.over));
     check('fontes Bai Jamjuree e Manrope carregadas', dom.fontsOk.every(Boolean), JSON.stringify(dom.fontsOk));
     check('folga >= 10 mm em todas as folhas', dom.over.every(o => parseFloat(o.folga_mm) >= 9.5), JSON.stringify(dom.over.filter(o => parseFloat(o.folga_mm) < 9.5)));
+    // No orphan sheet: no non-cover sheet may have more than 180 mm free, except the accepted "Próximo passo" + signatures sheet
+    const orfas = dom.over.filter((o, i) => parseFloat(o.folga_mm) > 180 && !/PRÓXIMO PASSO/i.test(dom.pages[i + 1]));
+    check('nenhuma folha órfã (folga > 180 mm), exceto a do bloco Próximo passo', orfas.length === 0, JSON.stringify(orfas));
     check('sem [PENDENTE]', !pend, pend && pend[0]);
     check('sem "(TESTE)", e-mail ou telefone', !/\(teste\)|@|\(\d{2}\)\s?\d/i.test(all));
     check('sem a palavra gap', !/\bgaps?\b/i.test(all));
-    check('sem roteiro de venda', !/bate com a realidade|desenharmos o escopo|Próximo passo|não precisam ser comentados/i.test(all));
+    check('sem roteiro de venda', !/bate com a realidade|desenharmos o escopo|não precisam ser comentados/i.test(all));
     check('sem "Fase 4"/Jornada', !/Jornada|Fase 4/i.test(all));
     check('Depoimento de Cliente Agilean', /Depoimento de Cliente Agilean/i.test(all));
-    check('prioridades sem dias', !/início em até|Implantar em até/i.test(all) && /IMEDIATA/.test(all));
+    check('sem "Pilar / tema", "tema fora", ACOMPANHAMENTO nem "Rotinas N" / numeração de rotinas', !/Pilar \/ tema|tema fora|ACOMPANHAMENTO|Rotinas \d|\d · (Planejamento|Medição|Qualidade|ERP|Controle de Contratos|Folha de Produção)|Pilar 4 · Painéis/.test(all));
+    check('MO sem "Mão de obra" como pilar na tabela de pontos', !/	Mão de obra	/.test(all));
+    // Coherence: the point of phase N shows only the short name of phase N; order = phase I, II, III, then loss source, then current order
+    const coer = await page.evaluate(() => {
+      const M = ptModel('detalhado'); const bad = [];
+      M.criticos.concat(M.demais).forEach(p => {
+        const curto = { I: 'I · Planejamento e canteiro', II: 'II · ERP e qualidade', III: 'III · Pagamento da MO' }[p.fase];
+        if (p.faseCurta !== curto) bad.push(p.code + ' fase ' + p.fase + ' ' + p.faseCurta);
+      });
+      const gp = getGapPlan(calculateROI());
+      gp.rest.forEach(o => { const f = PT_FASE[o.code]; if (((f === 'I' || f === 'II') ? 'Alta' : 'Média') !== o.prioridade) bad.push('ferramenta ' + o.code + ' ' + o.prioridade); });
+      const fo = M.demais.map(d => ['I', 'II', 'III'].indexOf(d.fase));
+      if (fo.some((v, i) => i > 0 && v < fo[i - 1])) bad.push('ordem: fases fora de I, II, III');
+      // Same rule in the tool and in the report: phase, then position of the source in fontesOrd, then current order
+      const rk = o => gp.fontesOrd.indexOf(o.fonte);
+      const esp = gp.rest.concat(gp.attention).map((o, i) => ({ o, i })).sort((a, b) => (['I', 'II', 'III'].indexOf(PT_FASE[a.o.code]) - ['I', 'II', 'III'].indexOf(PT_FASE[b.o.code])) || (rk(a.o) - rk(b.o)) || (a.i - b.i)).map(k => k.o.code);
+      if (esp.join(',') !== M.demais.map(d => d.code).join(',')) bad.push('ordem do relatório difere da regra: ' + M.demais.map(d => d.code).join(','));
+      if (gp.rest.map(o => o.code).join(',') !== M.demais.map(d => d.code).filter(c => gp.rest.some(o => o.code === c)).join(',')) bad.push('ferramenta e relatório em ordens diferentes');
+      // Anchor cards on screen: pillar of MO points as P2/P3 and the PDF source names
+      if (/Gap-âncora \d · Mão de obra/i.test(document.getElementById('screen-report').innerText)) bad.push('MO como pilar nos cards');
+      if (/Otimização do time de gestão|Redução de retrabalhos|Ganho em velocidade de produção/.test(document.getElementById('opp-table-card').innerText + document.getElementById('exec-anchors-card').innerText)) bad.push('nome antigo de fonte na tabela de Gaps/Síntese');
+      M.demais.forEach((d, i) => { if (d.n !== M.criticos.length + i + 1) bad.push('numeração ' + d.code); });
+      // Tool table: phase column with the same short name, same order as plan.rest, no deadline or urgency word
+      const rows = Array.prototype.map.call(document.querySelectorAll('#opp-body tr'), tr => Array.prototype.map.call(tr.children, td => td.textContent.trim()));
+      // Tool table = same points, numbers, order and phase as sheet 05 of the PDF (M.demais)
+      if (rows.length !== M.demais.length) bad.push('linhas da ferramenta ' + rows.length + ' x PDF ' + M.demais.length);
+      rows.forEach((r, i) => { const d = M.demais[i]; if (!d || r[0] !== String(d.n).padStart(2, '0') || r[5] !== d.faseCurta || r[2] !== d.pilar || r[3] !== d.fonte.label || /^MO$/.test(r[2]) || r[1] !== gp.rest.concat(gp.attention).filter(o => o.code === d.code)[0].gap) bad.push('linha ' + i + ' da ferramenta: ' + r.join('|')); });
+      if (/Numeração dos pontos igual/.test(document.getElementById('next-steps-container').innerText)) bad.push('nota de numeração ainda na seção 06');
+      const card = document.getElementById('opp-table-card').innerText;
+      if (/IMEDIATA|PROGRAMADA|Prioridade|Alta|Média|Dia 0|Após o dia 60|Início/i.test(card)) bad.push('palavra de prazo/urgência na tabela de Gaps');
+      if (!/Por fase e fonte de perda · \d+ pontos/i.test(card)) bad.push('rótulo da tabela de Gaps');
+      return bad;
+    });
+    check('fase coerente (nome curto), ordem única e sem palavra de prazo (relatório e tabela de Gaps da ferramenta)', coer.length === 0, JSON.stringify(coer));
+    // Section 06 of the screen: same 3 "Resolve" lines, phase names and numbering as the PDF; no "ato" nor "Gap-âncora"
+    const s06 = await page.evaluate(() => {
+      const M = ptModel('detalhado'); const t = document.getElementById('next-steps-container').innerText.replace(/\s+/g, ' '); const bad = [];
+      PT_FASES.forEach(f => {
+        const r = ptResolve(M, f.id); if (r && t.indexOf(r) < 0) bad.push('Resolve fase ' + f.id + ': ' + r);
+        if (t.indexOf('Fase de Implementação ' + f.id + ' · ' + ptFaseNome(f, M)) < 0) bad.push('nome da fase ' + f.id);
+      });
+      if (/atos?|Gap-âncora/i.test(t)) bad.push('texto "ato" ou "Gap-âncora" na seção 06');
+      if (!/o plano de ação se organiza em 3 Fases de Implementação/.test(t)) bad.push('frase de introdução');
+      if (/obra\(s\)/.test(t)) bad.push('obra(s)');
+      return bad;
+    });
+    check('seção 06 da tela igual ao PDF (Resolve, nomes das fases, sem "ato"/"Gap-âncora")', s06.length === 0, JSON.stringify(s06));
+    check('folha 05 com coluna Fase', /FASE\s+PILAR|PILAR\s+FASE/i.test(dom.pages[4] || '') || /Fase I/.test(dom.pages[4] || ''));
+    check('bloco Próximo passo presente', /PRÓXIMO PASSO/i.test(all));
+    check('Participação recomendada sempre visível', /Participação recomendada/i.test(all));
+    if (process.env.AGENDA) {
+      check('agendamento: 28/10/2026 e 14h30', /28\/10\/2026/.test(all) && /14h30/.test(all));
+      check('participantes: tabela nas duas versões',
+        /Participante confirmado/i.test(all) && /Marina Alves/.test(all) && all.indexOf(C.contato) >= 0 && !/Sem nome/.test(all));
+    } else {
+      check('sem agendamento: "A definir" e sem tabela', /A definir/.test(all) && !/Participante confirmado/i.test(all));
+    }
+    // v5: folha 03 on the loss-map base (total loss, captured share, monthly gain, x reference fee), no explanatory notes
+    check('folha 03: perda total, perda capturada, ganho mensal e × mensalidade, sem notas', /Perda total por mês/i.test(dom.pages[2] || '') && /Perda capturada/i.test(dom.pages[2] || '') && /Ganho mensal/i.test(dom.pages[2] || '') && /× mensalidade ref\./i.test(dom.pages[2] || '') && !/Contexto:|não se somam|Unidade:|Fonte:/.test(dom.pages[2] || ''));
+    check('folhas 02 e 05 sem IMEDIATA, PROGRAMADA, Prioridade, Dia 0, Após o dia 60 nem Início', !/IMEDIATA|PROGRAMADA|Prioridade|Dia 0|Após o dia 60|início em até|Implantar em até/i.test((dom.pages[1] || '') + (dom.pages[4] || '').split(/PLANO DE TRANSFORMAÇÃO/i)[0]) && !/IMEDIATA|PROGRAMADA/.test(all));
+    check('folha 05: coluna Fase com nome curto, sem coluna de perda e sem nota de rodapé', /I · Planejamento e canteiro/.test(dom.pages[4] || '') && /III · Pagamento da MO/.test(dom.pages[4] || '') && !/Perda por mês sem tratamento/i.test(dom.pages[4] || '') && !/A Fase III vem após|o valor aparece só nos pontos críticos/.test(all));
+    // v5: wording rules and the same total on folhas 02 and 03
+    check('sem "Parcial" (status "Em alerta")', !/\bParcial(mente)?\b/.test(all) && /Em alerta/.test(dom.pages[1] || ''));
+    check('sem "Confidencial" nem "resumido"/"detalhado" no documento', !/Confidencial/i.test(all) && !/resumido|relatório detalhado/i.test(all));
+    check('capa: "Relatório Diagnóstico SIIGA"', /Relatório Diagnóstico SIIGA/i.test(dom.pages[0] || ''));
+    check('sem seção "Perda por fonte e ganho capturável" e sem referência a seções nas notas', !/Perda por fonte e ganho capturável/i.test(all) && !/seção \d/i.test(all));
+    check('sumário 01 a 06 (05 = Plano, 06 = Bases)', /05\s+Plano de Transformação Operacional/i.test(dom.pages[0] || '') && /06\s+Bases do diagnóstico/i.test(dom.pages[0] || ''));
+    {
+      const p2 = (dom.pages[1] || '').replace(/\u00a0/g, ' '), p3 = (dom.pages[2] || '').replace(/\u00a0/g, ' ');
+      const num = s => parseFloat(s.replace(/\./g, '').replace(',', '.'));
+      const m2 = p2.match(/perda estimada (?:na|por) obra é de R\$ ([\d.,]+) (mil|mi) em (\d+) meses/);
+      const m3 = p3.match(/Perda total estimada\s*R\$ ([\d.,]+) (mil|mi) em (\d+) meses/i);
+      const mm = p3.match(/Perda total por mês\s*R\$ ([\d.,]+) mil/i);
+      const k = u => u === 'mi' ? 1000 : 1;
+      const t2 = m2 && num(m2[1]) * k(m2[2]), t3 = m3 && num(m3[1]) * k(m3[2]);
+      check('total da folha 02 = total da folha 03 (e perda/mês × prazo)', !!(m2 && m3 && mm) && Math.abs(t2 - t3) <= (m2[2] === 'mi' ? 50 : 0.5) && Math.abs(num(mm[1]) * +m3[3] - t3) <= 1 && m2[3] === m3[3],
+        JSON.stringify({ folha02: m2 && m2.slice(1), folha03: m3 && m3.slice(1), mes: mm && mm[1] }));
+      check('folha 02: linha "Recuperável com o plano" com × mensalidade ref.', /Recuperável com o plano · [\d,]+× mensalidade ref\./.test(p2));
+    }
+    check('folha 02: Fase de Implementação com nome curto e sem Prioridade', /I · Planejamento e canteiro|III · Pagamento da MO/.test(dom.pages[1] || '') && /Fase de Implementação/i.test(dom.pages[1] || ''));
     if (MODE === 'resumido') {
       check('Resumido sem fórmula (÷, Cálculo:, Como é calculado, Fórmula, Anexo)', !/÷|Cálculo:|Como é calculado|Fórmula|Anexo A/i.test(all));
     } else {
       check('Detalhado com Anexo A e fórmula ÷', /Anexo A/.test(all) && /÷/.test(all));
     }
+    // Expected sheets (v5, without the loss-by-source section): Detalhado 10; Resumido 8, with or without the participants table
+    const EXP_FOLHAS = MODE === 'resumido' ? 8 : 10;
     if (CASE === 'pcl') {
-      ['21,5', 'R$ 526 mil', 'R$ 395 mil', 'R$ 11,5 mil', 'R$ 9,3 mil', 'R$ 5,5 mil', 'R$ 26,3 mil/mês', 'custa R$ 26 mil à obra', 'R$ 20,5 mil/mês', 'R$ 10,25 mil', '5,1×', '3,1×', 'R$ 6,15 mil',
-       'R$ 172,5 mil', 'R$ 140,0 mil', 'R$ 52,5 mil', 'R$ 78,8 mil', 'R$ 82,7 mil', 'R$ 526,4 mil', 'R$ 375,3 mil', 'R$ 35,1 mil',
+      ['21,5', 'R$ 526 mil', 'R$ 395 mil', 'R$ 11,5 mil', 'R$ 9,3 mil', 'R$ 5,5 mil', 'R$ 26,3 mil/mês', 'R$ 19,0 mil/mês', '9,5× mensalidade ref.', 'R$ 25,0 mil', '71%', '12,5×',
+       'R$ 172,5 mil', 'R$ 140,0 mil', 'R$ 82,7 mil', 'R$ 526,4 mil', 'R$ 35,1 mil', 'R$ 8,7 mil', 'R$ 6,4 mil', 'R$ 2,1 mil', 'R$ 4,0 mil', 'R$ 3,8 mil',
        'Digitalização do painel integrado de indicadores', 'Digitalização da comunicação de bloqueios de pagamento', 'Implantação da gestão de aditivos de verba',
-       'Plano de Transformação Operacional para a Construtora PCL', 'Pilar 3, Gestão da produção', 'Resolve: ponto crítico 1; pontos 05, 06, 07, 09, 10, 11 e 12.',
-       'Resolve: pontos críticos 2 e 3; ponto 08.'].forEach(s => check('PCL contém "' + s + '"', allLow.indexOf(s.toLowerCase()) >= 0));
-      check('PCL folhas = ' + (MODE === 'resumido' ? 8 : 10), dom.pages.length === (MODE === 'resumido' ? 8 : 10), dom.pages.length);
+       'Plano de Transformação Operacional para a Construtora PCL', 'Pilar 3, Gestão integrada da produção', 'Resolve: ponto crítico 1; pontos 04, 05, 06, 07, 08, 09, 10, 11, 12, 13, 14, 15 e 16.',
+       'Resolve: pontos 17, 18 e 19.', 'Resolve: pontos críticos 2 e 3; pontos 20, 21, 22, 23 e 24.', 'Por fase e fonte de perda · 21 pontos'].forEach(s => check('PCL contém "' + s + '"', allLow.indexOf(s.toLowerCase()) >= 0));
+      // Hours+payroll model only in the Detalhado annex (A.4); 15-month source values only in the annex
+      ['R$ 20,5 mil', 'R$ 10,25 mil', '5,1×', '3,1×', 'R$ 6,15 mil', 'R$ 52,5 mil', 'R$ 78,8 mil', 'R$ 375,3 mil'].forEach(s => check('PCL ' + (MODE === 'resumido' ? 'sem' : 'com (Anexo)') + ' "' + s + '"', (allLow.indexOf(s.toLowerCase()) >= 0) === (MODE !== 'resumido')));
+      check('PCL sem "custa R$ 26 mil" e sem bloco horas+folha no resumo', !/custa R\$ 26 mil/.test(all) && !/Perda em horas de gestão e folha/i.test(all));
+      check('PCL folhas = ' + EXP_FOLHAS, dom.pages.length === EXP_FOLHAS, dom.pages.length);
     } else {
       check('título sem artigo: "para Horizonte Engenharia"', allLow.indexOf('plano de transformação operacional para horizonte engenharia') >= 0);
       check('sem linhas de folha própria (terceirizada)', !/Retrabalho pago na folha/.test(all));
       check('ERP "Não utiliza ERP"', /Não utiliza ERP/.test(all));
       check('prazo 24 meses', /24 meses/.test(all));
+      ['Resolve: ponto crítico 2; pontos 04, 05, 06, 07, 08, 09, 10, 11, 12, 13, 14, 15 e 16.', 'Resolve: pontos críticos 1 e 3; ponto 17.', 'Resolve: pontos 18, 19 e 20.', 'Por fase e fonte de perda · 17 pontos', 'R$ 52,9 mil', 'R$ 39,1 mil', '19,5×', 'R$ 33,5 mil/mês', '16,8× mensalidade ref.', 'Total no portfólio (3 obras)'].forEach(s => check('terceirizada contém "' + s + '"', allLow.indexOf(s.toLowerCase()) >= 0));
     }
 
     if (uri && uri.startsWith('data:application/pdf')) {

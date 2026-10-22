@@ -116,7 +116,7 @@
 
 /* stamp (footer) */
 .ptr .carimbo{position:absolute;left:var(--m-left);right:var(--m-right);bottom:var(--carimbo-bottom);display:grid;
-  grid-template-columns:22mm minmax(0,1fr) 33mm 12mm 19mm 17mm;border:.75pt solid var(--fio-forte);background:var(--papel)}
+  grid-template-columns:22mm minmax(0,1fr) 12mm 19mm 17mm;border:.75pt solid var(--fio-forte);background:var(--papel)}
 .ptr .carimbo>div{padding:1.2mm 2mm;border-left:.4pt solid var(--hair);font-size:var(--t-nota);line-height:10pt}
 .ptr .carimbo>div:first-child{border-left:none;display:flex;align-items:center}
 .ptr .carimbo .k{display:block;font-family:var(--f-mono);font-size:5.8pt;line-height:7.5pt;color:var(--texto3);text-transform:uppercase;letter-spacing:.04em}
@@ -279,3 +279,38 @@
 .ptr .ax td.f{font-size:7.1pt;line-height:10pt}
 .ptr .b6,.ptr tr.tot td,.ptr tr.sel td,.ptr .lead b,.ptr .plano p b,.ptr .sign b,.ptr td b,.ptr .bar .val b,.ptr .fr .ft,.ptr .carimbo b{font-weight:var(--w-forte)}
 .ptr .lbl.contsub{font-family:var(--f-sans);font-weight:var(--w-medio);font-size:9pt;text-transform:none;letter-spacing:0;color:var(--tinta)}
+
+/* Bloco "Próximo passo" (2º encontro), seção 06 */
+.ptr .enc2 .r2-t{font-family:var(--f-disp);font-size:var(--t-h2);line-height:14pt;font-weight:var(--w-subtitulo);color:var(--tinta);margin-bottom:1.2mm}
+.ptr .enc2 .r2-p{font-size:var(--t-corpo);line-height:12.5pt;color:var(--texto2);margin-bottom:3mm;max-width:128mm}
+.ptr .enc2 .r2-p b{color:var(--tinta);font-weight:var(--w-forte)}
+.ptr .enc2 .strip{grid-template-columns:34mm 26mm minmax(0,1fr)}
+.ptr .enc2 .r2-v{font-family:var(--f-disp);font-size:13pt;line-height:17pt;font-weight:var(--w-titulo);color:var(--tinta);white-space:nowrap}
+.ptr .enc2 .r2-v.pend{font-size:var(--t-h2);font-weight:var(--w-subtitulo);color:var(--texto2)}
+.ptr .enc2 .r2-pp{font-size:var(--t-celula);line-height:12pt;padding-top:.6mm}
+.ptr .enc2 table{margin-top:3mm}
+/* Versão compacta (Resumido): cabe na folha das assinaturas sem criar folha nova */
+.ptr .enc2.cmp{margin-top:3.5mm}
+.ptr .enc2.cmp .r2-tc{font-size:var(--t-src);line-height:8.5pt;color:var(--texto2);margin-top:1.6mm}
+.ptr .enc2.cmp .strip>div{padding-top:1mm;padding-bottom:1.1mm}
+.ptr .enc2.cmp .r2-v{font-size:11pt;line-height:13pt}
+.ptr .enc2.cmp .r2-v.pend{font-size:9.5pt}
+.ptr .enc2+.sign{margin-top:5mm}
+/* Longer pillar names (same as the Pilares screen) wrap to two lines */
+.ptr .bar{height:auto;min-height:10mm;padding:.5mm 0}
+.ptr .bar .nm .pn{line-height:10pt}
+
+/* v5: section 02 on the loss-map base (4-figure strip, loss x gain per source) and the recoverable row of section 01 */
+.ptr .strip.four{grid-template-columns:1.15fr .85fr 1.1fr 1fr}
+.ptr .strip.four .lbl{white-space:nowrap}
+.ptr .pf{display:grid;grid-template-columns:44mm minmax(0,1fr);column-gap:3mm;align-items:center;padding:1.6mm 0;border-bottom:.4pt solid var(--fio)}
+.ptr .pf .nm{line-height:10pt}
+.ptr .pf .bb{display:flex;flex-direction:column;gap:1mm}
+.ptr .pf .ln{display:flex;align-items:center;gap:1.6mm;height:3.4mm}
+.ptr .pf .ln i{display:block;height:100%}
+.ptr .pf .ln.p i,.ptr .leg5 i.p{background:var(--critico)} .ptr .pf .ln.g i,.ptr .leg5 i.g{background:var(--ok)}
+.ptr .pf .ln span{font-size:var(--t-nota);line-height:9pt;white-space:nowrap}
+.ptr .pf .ln.p span{color:var(--critico)} .ptr .pf .ln.g span{color:var(--ok)}
+.ptr .leg5{display:flex;gap:6mm;margin-top:2mm;font-size:var(--t-nota)}
+.ptr .leg5 i{display:inline-block;width:3mm;height:2.4mm;margin-right:1.4mm;vertical-align:-.2mm}
+.ptr tr.rec td{color:var(--ok);font-weight:var(--w-forte)}

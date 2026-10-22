@@ -90,8 +90,150 @@ function maskPhone(input){var d=input.value.replace(/\D/g,'');if(d.length>11)d=d
       <div><label style="font-size:10px;color:var(--gray2);text-transform:uppercase;letter-spacing:0.08em;display:block;margin-bottom:4px">Consultor Agilean</label>
         <input class="text-input" id="c-consultor" placeholder="Seu nome" oninput="maskCapitalize(this)"></div>
     </div>
-    <button class="btn btn-p" style="width:100%;font-size:15px;padding:14px" onclick="startAssessment()">Iniciar Diagnóstico →</button>
+    <button class="btn btn-p" style="width:100%;font-size:15px;padding:14px" onclick="startAssessment()">Continuar →</button>
     <p style="margin-top:10px;font-size:11px;color:var(--gray2)">Duração estimada: 45 min · Conduzido pelo consultor</p>
+  </div>
+</div>
+
+<!-- DIAGNOSTICO SIIGA · 2 ENCONTROS (apresentação) -->
+<div class="screen" id="screen-diagnostico">
+  <div class="pres-wrap">
+    <div class="pres-head"><div class="pres-logo">SIIGA</div><div class="pres-sub">Sistema Integrado e Inteligente de Gestão Agilean</div></div>
+    <div class="dg-body">
+    <div class="dg-intro">
+    <div class="dg-eyebrow">Diagnóstico SIIGA · <span class="js-empresa"></span></div>
+    <h1 class="dg-title">O Diagnóstico SIIGA acontece em dois encontros</h1>
+    <p class="dg-lead">Hoje fazemos o diagnóstico da operação. No 2º encontro, a Agilean apresenta o <b>projeto de implementação de melhorias</b> para <span class="js-empresa-txt"></span>.</p>
+    </div>
+
+    <div class="dg-grid">
+      <section class="dg-enc" id="diagnostico-encontro-1">
+        <div class="dg-head"><span class="dg-num">1º encontro</span><span class="dg-tag">Hoje</span></div>
+        <div class="dg-name">Diagnóstico</div>
+        <div class="dg-lbl">O que a empresa recebe</div>
+        <ul class="pilar-list dg-list">
+          <li>Diagnóstico da operação nos <b>4 pilares do SIIGA</b></li>
+          <li>Relatório do diagnóstico: <b>pontos críticos</b>, <b>perdas estimadas</b> e <b>plano de ação</b></li>
+        </ul>
+      </section>
+
+      <section class="dg-enc next" id="diagnostico-encontro-2">
+        <div class="dg-head"><span class="dg-num">2º encontro</span><span class="dg-tag">Próximo passo</span></div>
+        <div class="dg-name">Projeto de implementação de melhorias</div>
+        <div class="dg-cols">
+          <div>
+            <div class="dg-lbl">O que a empresa recebe</div>
+            <ul class="pilar-list dg-list">
+              <li>O projeto de implementação de melhorias para <span class="js-empresa-txt"></span>, feito a partir deste diagnóstico</li>
+            </ul>
+          </div>
+          <div>
+            <div class="dg-lbl">Quem deve participar</div>
+            <ul class="pilar-list dg-list">
+              <li>Os <b>decisores</b> da empresa (diretoria)</li>
+              <li>Quem respondeu ao diagnóstico</li>
+            </ul>
+          </div>
+        </div>
+      </section>
+    </div>
+
+    <section class="dg-agenda" id="diagnostico-agenda">
+      <div class="dg-agenda-h"><div class="dg-lbl">Agendamento do 2º encontro</div><span class="dg-opt">opcional, pode ser preenchido depois</span></div>
+      <div class="dg-agenda-grid">
+        <div class="dg-dh">
+          <div class="dg-field"><label for="reuniao2-data">Data</label><input class="text-input" id="reuniao2-data" type="date"></div>
+          <div class="dg-field"><label for="reuniao2-hora">Horário</label><input class="text-input" id="reuniao2-hora" type="time"></div>
+        </div>
+        <div>
+          <div class="dg-field"><label>Participantes (nome e cargo)</label></div>
+          <div class="dg-pp" id="reuniao2-participantes"></div>
+          <button class="btn btn-s dg-add" id="btn-reuniao2-add" type="button" onclick="addReuniao2Participante()">+ Adicionar participante</button>
+        </div>
+      </div>
+      <p class="dg-foot">Se preenchido, o agendamento sai no relatório, junto ao plano de ação.</p>
+    </section>
+    </div>
+
+    <div class="pres-btns">
+      <button class="btn btn-s" id="btn-diagnostico-voltar" onclick="diagnosticoVoltar()">← Voltar</button>
+      <button class="btn btn-p" id="btn-diagnostico-continuar" onclick="diagnosticoContinuar()">Continuar →</button>
+    </div>
+  </div>
+</div>
+
+<!-- PILARES SIIGA (apresentação) -->
+<div class="screen" id="screen-pilares">
+  <div class="pres-wrap">
+    <div class="pres-head"><div class="pres-logo">SIIGA</div><div class="pres-sub">Sistema Integrado e Inteligente de Gestão Agilean</div></div>
+    <div class="pilar-grid">
+    <div class="pilar-card" id="pilar-card-1">
+      <div class="pilar-num">PILAR 01</div>
+      <div class="pilar-nome">Planejamento estratégico do fluxo de produção</div>
+      <ul class="pilar-list"><li>Lean EAP</li><li>Modelo de produção</li><li>Ensaio de recursos</li><li>Linha de base</li></ul>
+    </div>
+    <div class="pilar-card" id="pilar-card-2">
+      <div class="pilar-num">PILAR 02</div>
+      <div class="pilar-nome">Proteção e garantia da execução do plano</div>
+      <ul class="pilar-list"><li>Restrições</li><li>Lookahead Planning</li><li>Comprometimento de MO</li><li>Reprogramação tática</li></ul>
+    </div>
+    <div class="pilar-card" id="pilar-card-3">
+      <div class="pilar-num">PILAR 03</div>
+      <div class="pilar-nome">Gestão integrada da produção</div>
+      <ul class="pilar-list"><li>Plano mensal</li><li>Ciclo diário</li><li>Avanço físico</li><li>Controle de produção MO</li></ul>
+    </div>
+    <div class="pilar-card" id="pilar-card-4">
+      <div class="pilar-num">PILAR 04</div>
+      <div class="pilar-nome">Controle real e performance da produção</div>
+      <ul class="pilar-list"><li>Performance HUB</li><li>Pagamento por evidência</li><li>Reunião de inteligência</li></ul>
+    </div>
+    </div>
+    <div class="pres-stats">
+      <div class="pres-stat"><div class="pres-stat-v">+10.000</div><div class="pres-stat-l">obras reais</div></div>
+      <div class="pres-stat"><div class="pres-stat-v">+25 anos</div><div class="pres-stat-l">exp. campo</div></div>
+      <div class="pres-stat"><div class="pres-stat-v">+10 anos</div><div class="pres-stat-l">de dados</div></div>
+    </div>
+    <div class="pres-btns">
+      <button class="btn btn-s" id="btn-pilares-voltar" onclick="showDiagnostico()">← Voltar</button>
+      <button class="btn btn-p" id="btn-pilares-continuar" onclick="showMetodo()">Continuar →</button>
+    </div>
+  </div>
+</div>
+
+<!-- ORIGEM DO MÉTODO / O QUE O SIIGA GARANTE (apresentação) -->
+<div class="screen" id="screen-metodo">
+  <div class="pres-wrap">
+    <div class="pres-head"><div class="pres-logo">SIIGA</div><div class="pres-sub">Sistema Integrado e Inteligente de Gestão Agilean</div></div>
+    <div class="metodo-grid">
+      <div class="metodo-card metodo-origem" id="metodo-origem">
+        <div class="metodo-tit">Origem do método</div>
+        <div class="metodo-item"><b>Last Planner System</b><span>Embutido nos algoritmos: sequenciamento, balanceamento de fluxo e causa raiz.</span></div>
+        <div class="metodo-item"><b>+25 anos de experiência em campo</b><span>De MCMV a alto padrão, carteiras de centenas de obras simultâneas.</span></div>
+        <div class="metodo-item"><b>+10 anos de dados estruturados</b><span>Sequências, durações e padrões de produtividade. Nenhuma big tech tem esses dados.</span></div>
+        <div class="metodo-item"><b>Boas práticas das obras de maior sucesso</b><span>O que as melhores construtoras brasileiras fazem diferente, sistematizado em método.</span></div>
+      </div>
+      <div class="metodo-card metodo-garante" id="metodo-garantias">
+        <div class="metodo-tit">O que o SIIGA garante</div>
+        <div class="metodo-quote">“Planejamento não é o problema. O problema é fazer o planejamento sobreviver à execução.”</div>
+        <ul class="pilar-list metodo-list">
+          <li>O plano chega ao CPF do operário, não para na sala técnica</li>
+          <li>O desvio é visto no mesmo dia, não no fechamento do mês</li>
+          <li>Qualidade é trava para pagamento: nenhum centavo sem lastro</li>
+          <li>Engenheiro estratégico, não operacional</li>
+          <li>IA que potencializa quem tem método</li>
+        </ul>
+        <div class="metodo-selos">
+          <span class="metodo-selo">+25%<br>Produtividade</span>
+          <span class="metodo-selo">Obra<br>no prazo</span>
+          <span class="metodo-selo">Margem<br>protegida</span>
+          <span class="metodo-selo">Pagamento vinculado<br>à produção</span>
+        </div>
+      </div>
+    </div>
+    <div class="pres-btns">
+      <button class="btn btn-s" id="btn-metodo-voltar" onclick="showPilares()">← Voltar</button>
+      <button class="btn btn-p" id="btn-metodo-iniciar" onclick="beginB0()">Iniciar diagnóstico →</button>
+    </div>
   </div>
 </div>
 
@@ -410,7 +552,7 @@ function maskPhone(input){var d=input.value.replace(/\D/g,'');if(d.length>11)d=d
          a tabela cheia (cabeçalho) reservando espaço vazio até o rodapé. -->
     <div class="card card-wide rep-mb" id="opp-table-card" data-keep-group="gaps" data-section="gaps">
       <div class="rep-sec-title"><span class="rep-sec-num">03</span>Gaps Identificados</div>
-      <table class="opp-table" id="opp-table-el"><thead><tr><th>#</th><th>Gap Identificado</th><th>Pilar</th><th>Fonte de perda</th><th>Situação</th><th>Prioridade</th></tr></thead><tbody id="opp-body"></tbody></table>
+      <table class="opp-table" id="opp-table-el"><thead><tr><th>#</th><th>Gap Identificado</th><th>Pilar</th><th>Fonte de perda</th><th>Situação</th><th>Fase</th></tr></thead><tbody id="opp-body"></tbody></table>
     </div>
 
     <!-- Pontos de atenção: notas 1,5 (a prática existe, mas é informal). -->
@@ -545,12 +687,12 @@ function maskPhone(input){var d=input.value.replace(/\D/g,'');if(d.length>11)d=d
          "SIIGA — Sistema Integrado", "Os 4 Pilares SIIGA" e "Pareceres de
          Lideranças" (depoimentos) migram para a proposta comercial. -->
 
-    <!-- ÚLTIMA PÁGINA: Próximos Passos (Ato 1/2/3) + Fluxo Metodológico + Ecossistema
+    <!-- ÚLTIMA PÁGINA: Plano de Ação Executivo (Fases I, II e III) + Fluxo Metodológico + Ecossistema
          ERP + assinatura — restaurada do commit e577e33 SEM edição de texto (validada
          visualmente pelo usuário). Idêntica nos dois modos. -->
     <div class="card card-wide rep-mb" id="next-steps-page" data-section="ultima" style="background:#fff">
 
-      <!-- Seção Próximos Passos (Ato 1, 2, 3) -->
+      <!-- Seção Plano de Ação Executivo (Fases de Implementação) -->
       <!-- Fundo escuro intencional: o conteúdo é injetado por renderNextSteps() em
            script.js com texto branco/claro fixo. background:#14141b bate com o
            padrão já usado pelos cards de depoimento e está na lista de exceção do

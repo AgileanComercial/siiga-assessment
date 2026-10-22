@@ -74,6 +74,7 @@ server.listen(PORT, async () => {
     await page.type('#c-email', 'ana@cenarios.com.br');
     await page.type('#c-telefone', '(11) 98888-7777');
     await page.click('button[onclick="startAssessment()"]');
+    await sleep(300); await page.click('#btn-diagnostico-continuar'); await sleep(300); await page.click('#btn-pilares-continuar'); await sleep(300); await page.click('#btn-metodo-iniciar');
     await sleep(300);
     for (let i = 0; i < 30; i++) {
       if (await active(page) !== 'screen-b0') break;
@@ -116,7 +117,7 @@ server.listen(PORT, async () => {
 
     // ── A: Redesenho "Não se aplica" (só Ativação), mensalidade com desconto por obra ──
     const rA = await gerar(page, { plan:'maestria', progNA:true, mensalPor:1700, validade:15, kickoff:'2026-10-20' });
-    savePdf(rA.uri, 'SIIGA_Proposta_Ajustes_A_SoAtivacao.pdf', check);
+    savePdf(rA.uri, 'SIIGA_Proposta_ProdAjustes_A_SoAtivacao.pdf', check);
     check('A: seções do programa ocultas (Objetivo)', !/objetivo do redesenho/i.test(rA.txt));
     check('A: seção Programa oculta', !/o programa de redesenho siiga/i.test(rA.txt));
     check('A: Workshop Lean fora da capa', !/workshop lean experience/i.test(rA.txt));
@@ -132,7 +133,7 @@ server.listen(PORT, async () => {
 
     // ── B: os dois produtos ativos, desconto por obra ──
     const rB = await gerar(page, { plan:'maestria', mensalPor:1700, validade:15 });
-    savePdf(rB.uri, 'SIIGA_Proposta_Ajustes_B_Completa.pdf', check);
+    savePdf(rB.uri, 'SIIGA_Proposta_ProdAjustes_B_Completa.pdf', check);
     check('B: Objetivo do Redesenho presente', /objetivo do redesenho/i.test(rB.txt));
     check('B: mensalidade por obra 1.700 e "5 obras"', /1\.700/.test(rB.txt) && rB.txt.indexOf('5 obras') >= 0);
     check('B: card Plataforma nos termos por obra', /Plataforma \(após\)[\s\S]{0,60}\/obra\/mês/i.test(rB.txt));
@@ -157,7 +158,7 @@ server.listen(PORT, async () => {
 
     // ── D: só Redesenho (Ativação NA), nº de obras ajustado na proposta (3 obras; diagnóstico = 5) ──
     const rD = await gerar(page, { nObras:3, plan:'maestria', ativNA:true, mensalPor:1800, validade:15, kickoff:'2026-10-20' });
-    savePdf(rD.uri, 'SIIGA_Proposta_Ajustes_D2_SoRedesenho_3obras.pdf', check);
+    savePdf(rD.uri, 'SIIGA_Proposta_ProdAjustes_D2_SoRedesenho_3obras.pdf', check);
     check("D: sem \"Não se aplica\" e sem card de Ativação", !/não se aplica/i.test(rD.txt) && !/ativação siiga/i.test(rD.txt));
     check('D: mensalidade por obra faixa 2-3 (2.162 De, 1.800 Por) e "3 obras"', rD.txt.indexOf('2.162') >= 0 && rD.txt.indexOf('1.800') >= 0 && rD.txt.indexOf('3 obras') >= 0);
     check('D: Objetivo do Redesenho presente', /objetivo do redesenho/i.test(rD.txt));

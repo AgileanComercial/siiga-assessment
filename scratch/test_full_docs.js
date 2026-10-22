@@ -43,7 +43,7 @@ server.listen(PORT, async () => {
     page.on('pageerror', err => { console.log('PAGE ERROR:', err.message); fails.push('pageerror: ' + err.message); });
     page.on('dialog', d => d.dismiss());
     await page.setViewport({ width: 1280, height: 1000, deviceScaleFactor: 2 });
-    await page.goto('http://localhost:' + PORT + '/index.html', { waitUntil: 'networkidle0' });
+    await page.goto(process.env.URL || ('http://localhost:' + PORT + '/index.html'), { waitUntil: 'networkidle0' });
     await page.evaluate(() => { try { localStorage.clear(); } catch (e) {} });
 
     await page.type('#c-empresa', EMPRESA);
@@ -53,6 +53,7 @@ server.listen(PORT, async () => {
     await page.type('#c-email', 'ana@exemploe2e.com.br');
     await page.type('#c-telefone', '(11) 98888-7777');
     await page.click('button[onclick="startAssessment()"]');
+    await sleep(300); await page.click('#btn-diagnostico-continuar'); await sleep(300); await page.click('#btn-pilares-continuar'); await sleep(300); await page.click('#btn-metodo-iniciar');
     await sleep(300);
 
     // Bloco 0 — respostas medianas (2ª opção) e ROI realista

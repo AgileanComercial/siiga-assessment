@@ -75,21 +75,10 @@ var PT_CONSEQ = {
   'MO.7':'Medição de empreiteiros que leva dias para fechar é definida por negociação, não por registro.'
 };
 
-// Implementation Phase per question code (I = routines 1, 2 + Pilar 4;
-// II = routines 3 and 6; III = routines 4 and 5). Used for critical and
-// "imediata/programada" points; points in ACOMPANHAMENTO get no phase.
-var PT_FASE = {
-  'F1.1':'I','F1.2':'I','F1.3':'I','F1.4':'I','F1.5':'I','F1.6':'I','F1.7':'II',
-  'F2.1':'I','F2.2':'I','F2.3':'I',
-  'F3.1':'I','F3.2':'I','F3.3':'I','F3.4':'II','F3.5':'I',
-  'F4.1':'I','F4.2':'I','F4.3':'I','F4.4':'II',
-  'MO.1':'III','MO.2':'III','MO.3':'III','MO.4':'III','MO.5':'III','MO.6':'III','MO.7':'III'
-};
+// Implementation Phase per question code (PT_FASE) and the priority derived from it
+// (prioridadeDaFase) live in script.js, the single source shared with the tool.
 
-var PT_FONTE_LABEL = {
-  time:'Horas do time de gestão', retrabalho:'Retrabalho', velocidade:'Custos proporcionais ao prazo',
-  erros:'Erros de medição e folha', mo:'Estouro de mão de obra'
-};
+// PT_FONTE_LABEL (loss source names) and PT_MO_PILAR live in script.js, the single source shared with the tool.
 // Basis of each loss source, without formula (allowed in RESUMIDO: data + rates).
 var PT_FONTE_BASE = {
   time:'Horas de gestão informadas e hora técnica de referência (R$ 115/h).',
@@ -99,17 +88,18 @@ var PT_FONTE_BASE = {
   erros:'Orçamento da obra informado, mão de obra como 45% do custo e desvio médio de medição e folha (5%).',
   mo:'Orçamento da obra informado, mão de obra como 45% do custo e estouro médio de mercado (15%).'
 };
-var PT_PILAR_NOME = { f1:'Planejamento estratégico', f2:'Proteção da execução', f3:'Gestão da produção', f4:'Controle e performance' };
+// Same names as the Pilares screen of the tool (sales slide)
+var PT_PILAR_NOME = { f1:'Planejamento estratégico do fluxo de produção', f2:'Proteção e garantia da execução do plano', f3:'Gestão integrada da produção', f4:'Controle real e performance da produção' };
 var PT_MERCADO = { f1:0.70, f2:0.62, f3:0.55, f4:0.58 }; // same values as the radar benchmark
 var PT_TIPOLOGIA = { vert:'Residencial vertical', horiz:'Residencial horizontal', mcmv:'MCMV / Habitação popular', com:'Comercial / industrial', div:'Portfólio diversificado' };
 var PT_NUM_EXT = { 1:'um', 2:'dois', 3:'três', 4:'quatro', 5:'cinco' };
 
 var PT_FASES = [
-  { id:'I', nome:'Planejamento e Controle Integrado com o Canteiro', rot:'Rotinas 1 e 2 e Pilar 4 (painéis)',
+  { id:'I', nome:'Planejamento e Controle Integrado com o Canteiro',
     dur:'até 60 dias (dia 0 a 60)', fd:'Até 60 dias. Linha de Balanço, apontamento diário, lookahead e painéis de indicadores.' },
-  { id:'II', nome:'Integração com o ERP e o Sistema de Qualidade', rot:'Rotinas 3 e 6',
+  { id:'II', nome:'Integração com o ERP e o Sistema de Qualidade',
     dur:'até 60 dias, em paralelo à Fase I', fd:'Até 60 dias, em paralelo à Fase I. FVS digital vinculada ao avanço e integração com o sistema de gestão.' },
-  { id:'III', nome:'Controle de Pagamento da Mão de Obra Integrado', rot:'Rotinas 4 e 5',
+  { id:'III', nome:'Controle de Pagamento da Mão de Obra Integrado',
     dur:'até 90 dias, após as Fases I e II (cerca do dia 60 ao 150)', fd:'Até 90 dias, após as Fases I e II. Medição de empreiteiros e fechamento de folha por evidência de avanço.' }
 ];
 
@@ -207,10 +197,15 @@ function ptModel(mode) {
       mes:it.baseValue / prazo, basis:it.basis };
   });
 
-  // Points: critical (anchors), imediata/programada (rest), acompanhamento (attention)
-  var top3 = plan.top3;
-  var prio = function(o) { return top3.indexOf(o.fonte) >= 0 ? 'IMEDIATA' : 'PROGRAMADA'; };
-  var pilarLbl = function(o, longo) { return o.bk === 'mo' ? 'Mão de obra' : (longo ? 'Pilar ' : 'P') + o.bk.charAt(1); };
+  // Points: critical (anchors); the rest and attention share one table
+  var pilarLbl = function(o, longo) {
+    var n;
+    if (o.bk === 'mo') {
+      n = PT_MO_PILAR[o.code];
+      if (!n) throw new Error('PT_MO_PILAR: código de mão de obra sem pilar mapeado: ' + o.code);
+    } else { n = o.bk.charAt(1); }
+    return (longo ? 'Pilar ' : 'P') + n;
+  };
   var titulo = function(o) { return (o.score === 0 ? 'Implantação ' : 'Digitalização ') + (PT_PRATICA[o.code] || ('de ' + ptLow(o.gap))); };
   var fonteVista = {};
   var criticos = plan.anchors.map(function(o, i) {
@@ -224,7 +219,7 @@ function ptModel(mode) {
     var cs = FONTE_CASE[o.fonte];
     return {
       n:i + 1, code:o.code, titulo:titulo(o), pilar:pilarLbl(o, true), fase:PT_FASE[o.code] || '',
-      prioridade:prio(o), star:o.star, frase:frase, situacao:situacao,
+      faseCurta:faseCurtaDoGap(o.code), star:o.star, frase:frase, situacao:situacao,
       conseq:PT_CONSEQ[o.code] || (GAP_INFO[o.code] || {}).impact || '',
       fonte:f, mes:first ? f.mes : null,
       base:(o.fonte === 'time' && !roi.horasDoCliente) ? PT_FONTE_BASE.timeRef : (PT_FONTE_BASE[o.fonte] || ''),
@@ -233,16 +228,18 @@ function ptModel(mode) {
     };
   });
   var nCrit = criticos.length;
-  var demais = plan.rest.map(function(o, i) {
-    return { n:nCrit + i + 1, code:o.code, titulo:titulo(o), pilar:pilarLbl(o, false), fonte:fontes[o.fonte],
-      prioridade:o.prioridade === 'Alta' ? 'IMEDIATA' : 'PROGRAMADA', fase:PT_FASE[o.code] || '' };
+  // One table: rest and attention together, ordered by the single rule shared with the tool
+  // (phase I, II, III; then loss source by fontesOrd; then current order; see ordenarGapsPorFaseEFonte in script.js).
+  // Source only when the engine computes it (o.fonte); otherwise a dash, never invented.
+  var demais = gapsNumerados(plan).map(function(o) {
+    return { code:o.code, titulo:titulo(o), pilar:pilarLbl(o, false),
+      fonte:(o.fonte && fontes[o.fonte]) || { label:'—' }, fase:PT_FASE[o.code] || '', faseCurta:faseCurtaDoGap(o.code) };
   });
-  var acomp = plan.attention.map(function(o, i) {
-    return { n:nCrit + demais.length + i + 1, titulo:titulo(o), pilar:pilarLbl(o, false) };
-  });
+  demais.forEach(function(d, i){ d.n = nCrit + i + 1; }); // equals o.n from gapsNumerados (anchors.length === nCrit)
   var critFonteKeys = Object.keys(fonteVista);
   var critPerda = critFonteKeys.reduce(function(a, k){ return a + fontes[k].perda; }, 0);
   var critMes = critPerda / prazo;
+  var critCapMes = critFonteKeys.reduce(function(a, k){ return a + fontes[k].cap; }, 0) / prazo;
 
   // Monthly loss x gain (ROI model): full scenario as the loss, 50% as the gain
   var comp = function(r) { return { horas:r.estrategica.valorCapacidade, retr:r.estrategica.rec2, indev:r.estrategica.rec3,
@@ -257,8 +254,9 @@ function ptModel(mode) {
     moLongo:mo === 'propria' ? 'mão de obra própria' : (mo === 'mista' ? 'mão de obra mista' : (mo === 'terceirizada' ? 'mão de obra terceirizada' : '')),
     tipologia:PT_TIPOLOGIA[S.tipologia] || '',
     score:score, pilares:pilares, worst:worst, roi:roi, plan:plan, fontes:fontes,
-    criticos:criticos, demais:demais, acomp:acomp, totalAvaliados:plan.all.length,
-    critPerda:critPerda, critMes:critMes, mapaMes:roi.totalBase / prazo,
+    reuniao2:S.reuniao2 || { data:'', hora:'', participantes:[] },
+    criticos:criticos, demais:demais, totalAvaliados:plan.all.length,
+    critPerda:critPerda, critMes:critMes, critCapMes:critCapMes, mapaMes:roi.totalBase / prazo,
     cons:cons, pleno:pleno, pess:pess, perdaMes:comp(pleno), ganhoMes:comp(cons), ganhoPess:comp(pess),
     folha:(S.roi2 && S.roi2.folha) || 0, horasInf:cons.operacional.horasInformadas, horasPot:cons.operacional.potPleno,
     ferr:f
@@ -268,15 +266,16 @@ function ptModel(mode) {
 // ── Page fragments ───────────────────────────────────────────────────────
 function ptSt(cls, word) { return '<span class="st ' + cls + '"><i></i>' + word + '</span>'; }
 function ptStCls(p) { return p < 0.40 ? 'c' : (p < 0.90 ? 'a' : 'o'); }
-function ptStWord(p) { return p < 0.40 ? 'Crítico' : (p < 0.90 ? 'Parcial' : 'Estruturado'); }
+function ptStWord(p) { return p < 0.40 ? 'Crítico' : (p < 0.90 ? 'Em alerta' : 'Estruturado'); }
 function ptSec(num, titulo, first) {
   return '<div class="row sec' + (first ? ' first' : '') + '"><div class="secnum">' + num + '</div><div class="sectit">' + titulo + '</div></div>';
 }
-function ptDocNome(M) { return M.det ? 'Relatório detalhado' : 'Relatório resumido'; }
+function ptDocNome(M) { return 'Relatório Diagnóstico SIIGA'; }
+// Score level shown in the report: no "Parcial" wording (tool, admin and database keep the original text)
+function ptNivel(n) { return /Parcialmente Estruturado/.test(n || '') ? 'Em alerta · Gargalos de escala' : n; }
 function ptCarimbo(M, n, total) {
   return '<div><img src="' + PT_LOGO + '" alt="Agilean"></div>' +
-    '<div><span class="k">Documento</span><b>Diagnóstico SIIGA · ' + ptEsc(M.empresa) + '</b> · ' + ptDocNome(M) + '</div>' +
-    '<div><span class="k">Classificação</span>Confidencial · uso restrito ' + ptEsc(M.empresa) + '</div>' +
+    '<div><span class="k">Documento</span><b>Diagnóstico SIIGA · ' + ptEsc(M.empresa) + '</b></div>' +
     '<div><span class="k">Versão</span>' + M.versao + '</div><div><span class="k">Data</span>' + M.data + '</div>' +
     '<div><span class="k">Folha</span><b>' + ptPad(n) + '</b> / ' + ptPad(total) + '</div>';
 }
@@ -300,7 +299,7 @@ function ptSecResumo(M) {
   var ext = PT_NUM_EXT[nC] || String(nC);
   var crit = M.criticos.map(function(c) {
     return '<tr><td>' + c.n + '</td><td><span class="b6">' + c.titulo + '</span>' + (c.frase ? '<span class="q">“' + ptEsc(c.frase.replace(/\.$/, '')) + '.”</span>' : '') + '</td>' +
-      '<td>' + c.pilar + '</td><td>' + (c.fase ? 'Fase ' + c.fase : '—') + '</td><td><b class="b6">' + c.prioridade + '</b></td>' +
+      '<td>' + c.pilar + '</td><td style="white-space:nowrap">' + c.faseCurta + '</td>' +
       '<td class="n">' + (c.mes != null ? ptMil(c.mes, 1) : '—') + '</td></tr>';
   }).join('');
   var pctCrit = M.roi.totalBase ? Math.round(M.critPerda / M.roi.totalBase * 100) : 0;
@@ -309,12 +308,6 @@ function ptSecResumo(M) {
     '; as fontes de perda ligadas a ' + (nC === 1 ? 'um ponto crítico respondem' : ext + ' pontos críticos respondem') +
     ' por <b>' + ptMilInt(M.critPerda) + '</b> (' + pctCrit + '%).';
   var escopo = [ptObrasTxt(M), ptMilVar(M.orc) + (M.obras > 1 ? ' por obra' : ''), M.prazo + ' meses', M.moTxt].filter(Boolean).join(' · ');
-  var srcCrit = M.det
-    ? 'Perda por mês = perda da fonte em ' + M.prazo + ' meses ÷ ' + M.prazo + ' (seção 05); valor mostrado no ponto crítico que recebe a fonte.'
-    : 'Perda mensal estimada da fonte de perda associada a cada ponto crítico (seção 05).';
-  var nDemais = M.demais.length + M.acomp.length;
-  if (nDemais) srcCrit += ' Demais pontos avaliados (' + nDemais + '): seção 04.';
-  var frase = 'Cada mês sem tratar ' + (nC === 1 ? 'o ponto crítico' : 'os ' + nC + ' pontos críticos') + ' custa ' + ptMilInt(M.critMes) + (M.obras > 1 ? ' a cada obra.' : ' à obra.');
   var meta = '<div class="meta" style="margin-top:5mm">' +
     (M.entrevistado ? '<div><span class="lbl">Entrevistado</span>' + ptEsc(M.entrevistado) + '</div>' : '') +
     (M.consultor ? '<div><span class="lbl">Consultor</span>' + ptEsc(M.consultor) + ', Agilean</div>' : '') +
@@ -325,7 +318,7 @@ function ptSecResumo(M) {
     '<div class="row" style="margin-top:5mm"><div>' +
       '<div class="lbl">Score de maturidade</div>' +
       '<div class="score">' + ptNum(M.score.score, 0, 1) + '<small>/' + M.score.max + '</small></div>' +
-      '<div style="margin-top:1mm">' + ptSt(ptStCls(M.score.pct), M.score.nivel) + '</div>' +
+      '<div style="margin-top:1mm">' + ptSt(ptStCls(M.score.pct), ptNivel(M.score.nivel)) + '</div>' +
       '<div class="note" style="margin-top:.6mm">' + ptPct(M.score.pct) + ' da pontuação máxima</div>' + meta +
     '</div><div>' +
       '<p class="lead">' + lead + '</p>' +
@@ -334,96 +327,59 @@ function ptSecResumo(M) {
         '<div class="bars">' + bars + '</div>' +
         '<div class="axis"><div></div><div class="ticks"><span style="left:0">0</span><span style="left:25%">25</span><span style="left:50%">50</span><span style="left:75%">75</span><span style="left:100%">100%</span></div><div></div><div></div></div>' +
         '<div class="leg"><span><i class="sw-cli"></i>' + ptEsc(M.empresa) + '</span><span><i class="sw-mkt"></i>Média de mercado</span><span><i class="sw-ref"></i>Referência SIIGA (100%)</span></div>' +
-        '<div class="src">Unidade: % da pontuação máxima de cada pilar. Pilar mais crítico: menor percentual da pontuação máxima. Fonte: entrevista de diagnóstico' + (M.data ? ', ' + M.data : '') + '. Mercado: base SIIGA, construtoras de porte similar.</div>' +
       '</div></div></div>';
   var blocks = [{ sec:'01', html:b1 }];
   if (nC) {
     blocks.push({ sec:'01', html:'<div class="row sec"><div><div class="lbl rule">Pontos críticos</div><div class="note" style="margin-top:1.5mm">' + nC + ' de ' + M.totalAvaliados + ' pontos avaliados</div></div><div>' +
-      '<table><thead><tr><th style="width:5mm">#</th><th>Ponto crítico</th><th style="width:15mm">Pilar / tema</th><th style="width:17mm">Fase de Implementação</th><th style="width:21mm">Prioridade</th><th class="n wrap" style="width:24mm">Perda por mês sem tratamento</th></tr></thead>' +
-      '<tbody>' + crit + '<tr class="tot"><td></td><td>Total ' + (nC === 1 ? 'do ponto crítico' : 'dos ' + nC + ' pontos críticos') + '</td><td></td><td></td><td></td><td class="n">' + ptMil(M.critMes, 1) + '/mês</td></tr></tbody></table>' +
-      '<p class="note" style="margin-top:2mm"><b class="b6">' + frase + '</b></p><div class="src">' + srcCrit + '</div></div></div>' });
+      '<table><thead><tr><th style="width:5mm">#</th><th>Ponto crítico</th><th style="width:15mm">Pilar</th><th style="width:38mm">Fase de Implementação</th><th class="n wrap" style="width:24mm">Perda por mês sem tratamento</th></tr></thead>' +
+      '<tbody>' + crit + '<tr class="tot"><td></td><td>Total ' + (nC === 1 ? 'do ponto crítico' : 'dos ' + nC + ' pontos críticos') + '</td><td></td><td></td><td class="n">' + ptMil(M.critMes, 1) + '/mês</td></tr>' +
+      '<tr class="rec"><td></td><td colspan="3">Recuperável com o plano · ' + ptMult(M.critCapMes / M.cons.mensalidade) + ' mensalidade ref.</td><td class="n">' + ptMil(M.critCapMes, 1) + '/mês</td></tr></tbody></table></div></div>' });
   }
-  blocks.push({ sec:'01', html:'<div class="row sec"><div><div class="lbl rule">Perda e ganho mensal</div></div><div>' +
-    '<div class="strip"><div><div class="lbl">Perda em horas de gestão e folha</div><div class="big p">' + ptMil(M.perdaMes.total, 2) + '/mês</div></div>' +
-    '<div><div class="lbl">Ganho mensal (' + ptPct(ROI_CAPTURA_FIXA) + ')</div><div class="big g">' + ptMil(M.ganhoMes.total, 2) + '</div></div>' +
-    '<div><div class="lbl">× mensalidade ref.</div><div class="big">' + ptMult(M.ganhoMes.total / M.cons.mensalidade) + '</div></div></div>' +
-    '<div class="src">Detalhamento e cenários: seção 02. Mensalidade de referência: ' + ptRefBRL(M.cons.mensalidade) + ' por obra.</div></div></div>' });
   return blocks;
 }
 function ptRefBRL(v) { return 'R$ ' + Math.round(v).toLocaleString('pt-BR'); }
 
+// Section 02: total loss and monthly gain on the loss-map base (same R$ total as section 01).
+// Values per project; the hours+payroll model stays only in Annex A.4.
 function ptSecPerdaGanho(M) {
-  var P = M.perdaMes, G = M.ganhoMes;
-  var temFolha = (P.retr + P.indev) > 0;
-  var cap = ptPct(ROI_CAPTURA_FIXA);
-  var hRec = M.horasPot, hRecC = M.cons.operacional.hMes;
-  var custoH = ROI_REAL_K.CUSTO_HORA_TECNICA;
-  // chart: same scale for loss and gain bars
-  var chart = '';
-  if (P.total > 0) {
-    var mx = P.total / 1000;
-    var scale = mx * 1.366;
-    // largest "nice" step (1, 2, 5 x 10^n) that still gives at least 5 ticks
-    var mag = Math.pow(10, Math.floor(Math.log10(scale))), step = mag / 10;
-    [10, 5, 2, 1, 0.5, 0.2, 0.1].some(function(m) { if (scale / (m * mag) >= 4.5) { step = m * mag; return true; } return false; });
-    var w = function(v) { return (v / 1000 / scale * 100).toFixed(2) + '%'; };
-    var stack = function(vals, cls) {
-      var off = 0, out = '';
-      vals.forEach(function(v, k) {
-        if (v <= 0) return;
-        var lab = ptNum(v / 1000, 1, 2);
-        out += '<div class="seg ' + cls + (k + 1) + '" style="left:' + w(off) + ';width:' + w(v) + '">' + (k === 1 ? '<b>' + lab + '</b>' : lab) + '</div>';
-        off += v;
-      });
-      return out;
-    };
-    var ticks = '';
-    for (var t = 0; t <= scale + 1e-9; t += step) ticks += '<span style="left:' + (t / scale * 100).toFixed(2) + '%">' + ptNum(t, 0, 2) + '</span>';
-    var comps = [[1, 'Horas do time técnico']];
-    if (temFolha) comps.push([2, 'Retrabalho pago'], [3, 'Pagamentos indevidos']);
-    var leg = comps.map(function(c){ return '<span class="pair"><i class="sw r' + c[0] + '"></i><i class="sw g' + c[0] + '"></i>' + c[1] + '</span>'; }).join('');
-    chart = '<div style="margin-top:6mm;position:relative">' +
-      '<div class="chart-t">Metade da perda em horas de gestão e folha é recuperável no cenário conservador</div>' +
-      '<div class="sb"><div class="nm">Perda hoje<span>100% da base</span></div><div class="plot">' + stack([P.horas, P.retr, P.indev], 'r') + '</div></div>' +
-      '<div class="sb"><div class="nm">Ganho<span>captura de ' + cap + '</span></div><div class="plot">' + stack([G.horas, G.retr, G.indev], 'g') + '</div></div>' +
-      '<div class="ticks2">' + ticks + '</div>' +
-      '<div class="leg2"><div><span class="pair"><i class="sw r1"></i>Vermelho: perda hoje</span><span class="pair"><i class="sw g1"></i>Verde: ganho no cenário conservador</span></div><div style="margin-top:1mm">' + leg + '</div></div>' +
-      '<div class="src">Unidade: R$ mil por mês, 1 obra. Fonte: dados informados no diagnóstico' + (M.data ? ' (' + M.data + ')' : '') + ' e referências de mercado da seção 07.</div></div>';
-  }
-  var folhaTxt = ptMilVar(M.folha);
-  var linhaHoras = M.horasInf > 0 ? ptHoras(M.horasInf).replace(' h', ' h/mês') + ' informadas, ' + ptHoras(hRec) + ' recuperáveis' : 'Horas não informadas no diagnóstico';
-  var rows = [['Horas do time técnico em rotinas manuais', linhaHoras,
-      'Cálculo: ' + ptHoras(hRec) + ' × R$ ' + custoH + '/h (ganho: ' + ptHoras(hRecC) + ' × R$ ' + custoH + '/h)', P.horas, G.horas]];
-  if (temFolha) {
-    rows.push(['Retrabalho pago na folha', 'Folha de ' + folhaTxt + '/mês', 'Cálculo: ' + folhaTxt + ' × 5% (ganho: × ' + cap + ')', P.retr, G.retr]);
-    rows.push(['Pagamentos indevidos na folha', 'Folha de ' + folhaTxt + '/mês', 'Cálculo: ' + folhaTxt + ' × 5% × 80% (ganho: × ' + cap + ')', P.indev, G.indev]);
-  }
-  var compRows = rows.map(function(r) {
-    return '<tr><td>' + r[0] + '</td><td>' + r[1] + (M.det ? '<span class="q">' + r[2] + '</span>' : '') + '</td><td class="n">' + ptMil(r[3], 2) + '</td><td class="n">' + ptMil(r[4], 2) + '</td></tr>';
-  }).join('');
+  var P = M.prazo, mens = M.cons.mensalidade, porObra = M.obras > 1;
+  var perdaMes = M.roi.totalBase / P, ganhoMes = M.roi.totalPorObra / P;
+  var capPct = M.roi.totalBase ? M.roi.totalPorObra / M.roi.totalBase : 0;
+  var linked = {};
+  M.criticos.forEach(function(c){ (linked[c.fonte.key] = linked[c.fonte.key] || []).push(c.n); });
+  var itens = M.roi.items.map(function(it){ return M.fontes[it.key]; });
+  var porPerda = itens.slice().sort(function(a, b){ return b.perda - a.perda; });
+  var mx = porPerda.length ? porPerda[0].perda / P : 0;
+  var w = function(v) { return mx ? (v / (mx * 1.22) * 100).toFixed(1) + '%' : '0%'; };
+  var lab = function(v) { return ptNum(v / 1000, 1, 1); };
+  var chart = '<div style="margin-top:6mm"><div class="chart-t">' + ptPct(capPct) + ' da perda total é recuperável com o plano: ' + ptMil(ganhoMes, 1) + ' de ' + ptMil(perdaMes, 1) + ' por mês' + (porObra ? ' por obra' : '') + '</div>' +
+    porPerda.map(function(f) {
+      return '<div class="pf"><div class="nm">' + f.labelTab + '</div><div class="bb">' +
+        '<div class="ln p"><i style="width:' + w(f.mes) + '"></i><span>' + lab(f.mes) + '</span></div>' +
+        '<div class="ln g"><i style="width:' + w(f.cap / P) + '"></i><span>' + lab(f.cap / P) + '</span></div></div></div>';
+    }).join('') +
+    '<div class="leg5"><span><i class="p"></i>Perda por mês (R$ mil)</span><span><i class="g"></i>Ganho mensal com o plano (R$ mil)</span></div></div>';
   var baseInf = '<div class="meta"><div class="lbl rule" style="margin-bottom:2.4mm">Base informada</div>' +
-    '<div><span class="lbl">Horas de gestão</span>' + (M.horasInf > 0 ? ptNum(M.horasInf, 0, 1) + ' h/mês em 5 rotinas' : 'Não informadas') + '</div>' +
-    (M.folha > 0 ? '<div><span class="lbl">Folha de produção</span>' + folhaTxt + '/mês</div>' : '') +
-    '<div><span class="lbl">Hora técnica</span>R$ ' + custoH + '/h, referência de mercado</div>' +
-    '<div><span class="lbl">Obra</span>' + (M.obras === 1 ? '1' : M.obras + ' obras') + ' · ' + M.prazo + ' meses' + (M.moTxt ? ' · ' + M.moTxt : '') + '</div></div>';
+    '<div><span class="lbl">' + (porObra ? 'Orçamento médio por obra' : 'Orçamento da obra') + '</span>' + ptMilVar(M.orc) + '</div>' +
+    '<div><span class="lbl">Prazo</span>' + P + ' meses</div>' +
+    '<div><span class="lbl">' + (porObra ? 'Obras' : 'Obra') + '</span>' + M.obras + (M.moTxt ? ' · ' + M.moTxt : '') + '</div>' +
+    '<div><span class="lbl">Perda total estimada</span>' + ptMil(M.roi.totalBase, 1) + ' em ' + P + ' meses' + (porObra ? ' por obra' : '') + '</div></div>';
   var b1 = ptSec('02', 'Perda e ganho mensal', true) +
     '<div class="row" style="margin-top:5mm">' + baseInf + '<div>' +
-      '<div class="strip two"><div><div class="lbl">Perda em horas de gestão e folha</div><div class="big xl p">' + ptMil(P.total, 2) + '/mês</div></div>' +
-      '<div><div class="lbl">Ganho mensal (' + cap + ')</div><div class="big xl g">' + ptMil(G.total, 2) + '</div></div></div>' +
-      '<p class="note" style="margin-top:2mm">Contexto: a perda total do Mapa é de ' + ptMil(M.roi.totalBase, 1) + ' em ' + M.prazo + ' meses' + (M.obras > 1 ? ' por obra' : '') +
-        ', cerca de ' + ptMil(M.mapaMes, 1) + ' por mês (seção 05). Os ' + ptMil(P.total, 2) + ' são a parte em horas de gestão e folha.</p>' +
+      '<div class="strip four"><div><div class="lbl">Perda total por mês</div><div class="big p">' + ptMil(perdaMes, 1) + '</div></div>' +
+      '<div><div class="lbl">Perda capturada</div><div class="big">' + ptPct(capPct) + '</div></div>' +
+      '<div><div class="lbl">Ganho mensal</div><div class="big g">' + ptMil(ganhoMes, 1) + '</div></div>' +
+      '<div><div class="lbl">× mensalidade ref.</div><div class="big">' + ptMult(ganhoMes / mens) + '</div></div></div>' +
       chart + '</div></div>';
-  var b2 = '<div class="row sec"><div><div class="lbl rule">Composição</div></div><div><table><thead><tr><th>Componente</th><th>Base informada</th>' +
-    '<th class="n wrap" style="width:24mm">Perda/mês (horas e folha)</th><th class="n" style="width:26mm">Ganho/mês (' + cap + ')</th></tr></thead><tbody>' + compRows +
-    '<tr class="tot"><td>Total</td><td></td><td class="n perda">' + ptMil(P.total, 2) + '</td><td class="n ganho">' + ptMil(G.total, 2) + '</td></tr></tbody></table></div></div>';
-  var cen = [['Pessimista', 0.30, M.pess], ['Conservador (adotado)', ROI_CAPTURA_FIXA, M.cons]];
-  var cenRows = cen.map(function(c, i) {
-    var g = c[2].estrategica.valorCapacidade + c[2].estrategica.recTotal;
-    return '<tr' + (i === 1 ? ' class="sel"' : '') + '><td>' + c[0] + '</td><td class="n">' + ptPct(c[1]) + '</td><td class="n">' + ptHoras(c[2].operacional.hMes) + '</td><td class="n">' + ptMil(g, 2) + '</td><td class="n">' + ptMult(g / c[2].mensalidade) + '</td></tr>';
+  var rows = itens.map(function(f) {
+    var l = linked[f.key];
+    return '<tr><td>' + f.labelTab + '</td><td class="n">' + ptMil(f.mes, 1) + '</td><td class="n">' + ptPct(f.fator) + '</td><td class="n">' + ptMil(f.cap / P, 1) + '</td><td style="padding-left:5mm">' +
+      (l ? (l.length === 1 ? 'Ponto crítico ' : 'Pontos críticos ') + ptLista(l.map(String)) : '—') + '</td></tr>';
   }).join('');
-  var b3 = '<div class="row sec"><div><div class="lbl rule">Retorno por cenário</div></div><div><table><thead><tr><th>Cenário</th><th class="n" style="width:16mm">Captura</th><th class="n" style="width:22mm">Horas/mês</th><th class="n" style="width:26mm">Ganho mensal</th><th class="n" style="width:28mm">× mensalidade ref.</th></tr></thead><tbody>' + cenRows + '</tbody></table>' +
-    '<p class="note" style="margin-top:3mm">Mensalidade de referência: ' + ptRefBRL(M.cons.mensalidade) + ' por obra, base de cálculo e não proposta comercial. Estimativa a partir dos dados informados; não representa garantia contratual. Perda por fonte no prazo da obra: seção 05.</p></div></div>';
-  return [{ sec:'02', html:b1 }, { sec:'02', html:b2 }, { sec:'02', html:b3 }];
+  var portf = porObra ? '<tr class="tot"><td>Total no portfólio (' + M.obras + ' obras)</td><td class="n">' + ptMil(M.roi.totalBase * M.obras / P, 1) + '</td><td class="n"></td><td class="n">' + ptMil(M.roi.totalPortfolio / P, 1) + '</td><td></td></tr>' : '';
+  var b2 = '<div class="row sec"><div><div class="lbl rule">Composição</div></div><div><table><thead><tr><th>Fonte de perda</th><th class="n" style="width:22mm">Perda/mês</th><th class="n" style="width:16mm">Captura</th><th class="n" style="width:24mm">Ganho/mês</th><th class="wrap" style="width:31mm;padding-left:5mm">Ponto crítico ligado</th></tr></thead><tbody>' + rows +
+    '<tr class="tot"><td>' + (porObra ? 'Total por obra' : 'Total, 1 obra') + '</td><td class="n perda">' + ptMil(perdaMes, 1) + '</td><td class="n">' + ptPct(capPct) + '</td><td class="n ganho">' + ptMil(ganhoMes, 1) + '</td><td></td></tr>' + portf + '</tbody></table></div></div>';
+  return [{ sec:'02', html:b1 }, { sec:'02', html:b2 }];
 }
 
 function ptSecCriticos(M) {
@@ -449,39 +405,23 @@ function ptSecCriticos(M) {
     blocks.push({ sec:'03', html:(i === 0 ? head : '') + html });
   });
   if (!blocks.length) blocks.push({ sec:'03', html:head });
-  var distintas = M.criticos.every(function(c){ return c.mes != null; });
-  var top3 = M.criticos.length === 3 && distintas && M.criticos.every(function(c){ return M.plan.top3.indexOf(c.fonte.key) >= 0; });
-  blocks.push({ sec:'03', html:'<div class="row"><div></div><div class="src">Valores por fonte de perda, ' + (M.obras === 1 ? '1 obra' : 'por obra') + ' (seção 05). ' +
-    (top3 ? 'Um ponto crítico por fonte, entre as três de maior perda.' : 'Pontos críticos escolhidos por fonte de perda, da maior para a menor, com prioridade para as dores declaradas pelo cliente.') + '</div></div>' });
   return blocks;
 }
 
 function ptSecDemais(M) {
-  var tot = M.demais.length + M.acomp.length;
+  var tot = M.demais.length;
   if (!tot) return [];
   var head = ptSec('04', 'Demais pontos avaliados', true);
   var blocks = [];
-  if (M.demais.length) {
-    blocks.push({ sec:'04', head:head, rows:M.demais, render:function(rows, first, last) {
-      var tr = rows.map(function(d) {
-        return '<tr><td>' + ptPad(d.n) + '</td><td class="b6">' + d.titulo + '</td><td>' + d.pilar + '</td><td>' + d.fonte.label + '</td><td><b class="b6">' + d.prioridade + '</b></td><td class="n">—</td></tr>';
-      }).join('');
-      return '<div style="margin-top:5mm">' + (first ? '<div class="lbl" style="margin-bottom:2mm">Imediata e programada · ' + M.demais.length + ' de ' + tot + '</div>' : '') +
-        '<table><thead><tr><th style="width:7mm">#</th><th>Ponto</th><th style="width:20mm">Pilar / tema</th><th style="width:42mm">Fonte de perda</th><th style="width:24mm">Prioridade</th><th class="n wrap" style="width:26mm">Perda por mês sem tratamento</th></tr></thead><tbody>' + tr + '</tbody></table>' +
-        (last ? '<div class="src">Pilares: P1 Planejamento estratégico, P2 Proteção da execução, P3 Gestão da produção, P4 Controle e performance. Mão de obra: tema fora dos 4 pilares e do score /57.<br>Perda por mês: valor mostrado só no ponto crítico que recebe a fonte (seção 03); a fonte não é dividida nem somada em duplicidade (valores por fonte: seção 05).</div>' : '') + '</div>';
-    }});
-  }
-  if (M.acomp.length) {
-    var lst = function(items) {
-      return '<table><thead><tr><th style="width:6mm">#</th><th>Ponto em acompanhamento</th><th class="n" style="width:22mm">Pilar / tema</th></tr></thead><tbody>' +
-        items.map(function(a){ return '<tr><td>' + ptPad(a.n) + '</td><td>' + a.titulo + '</td><td class="n">' + a.pilar + '</td></tr>'; }).join('') + '</tbody></table>';
-    };
-    blocks.push({ sec:'04', head:M.demais.length ? '' : head, rows:M.acomp, render:function(rows, first) {
-      var half = Math.ceil(rows.length / 2);
-      return '<div style="margin-top:' + (M.demais.length ? '9mm' : '5mm') + '">' + '<div class="lbl" style="margin-bottom:2mm">ACOMPANHAMENTO · ' + M.acomp.length + ' de ' + tot + (first ? ' · perda por mês sem tratamento: —' : ' · continuação') + '</div>' +
-        '<div style="display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);column-gap:8mm">' + lst(rows.slice(0, half)) + (rows.length > half ? lst(rows.slice(half)) : '<div></div>') + '</div></div>';
-    }});
-  }
+  blocks.push({ sec:'04', head:head, rows:M.demais, render:function(rows, first, last) {
+    // Tighter vertical padding so the single table (all points) keeps its footnote on the same sheet.
+    var pd = ' style="padding-top:.45mm;padding-bottom:.45mm"';
+    var tr = rows.map(function(d) {
+      return '<tr><td' + pd + '>' + ptPad(d.n) + '</td><td class="b6"' + pd + '>' + d.titulo + '</td><td' + pd + '>' + d.pilar + '</td><td style="padding-top:.45mm;padding-bottom:.45mm;white-space:nowrap">' + d.faseCurta + '</td><td' + pd + '>' + d.fonte.label + '</td></tr>';
+    }).join('');
+    return '<div style="margin-top:5mm">' + (first ? '<div class="lbl" style="margin-bottom:2mm">Por fase e fonte de perda · ' + tot + ' pontos</div>' : '') +
+      '<table><thead><tr><th style="width:7mm">#</th><th>Ponto</th><th style="width:10mm">Pilar</th><th style="width:36.8mm">Fase</th><th style="width:46mm">Fonte de perda</th></tr></thead><tbody>' + tr + '</tbody></table></div>';
+  }});
   return blocks;
 }
 
@@ -518,13 +458,13 @@ function ptRotinas(M) {
     3:'Painel integrado com prazo, ritmo, restrições, qualidade e custo.' }[f43] || 'Indicadores compilados manualmente antes de cada reunião.';
   var semErp = (erpV === 'nenhum');
   return {
-    I:[['1 · Planejamento & Reprogramação', ptFerrLabel(f.planejamento), planSit, planEnt],
-       ['2 · Medição de Avanço Físico', ptFerrLabel(f.medicao), 'Sistemas desconectados; avanço apurado manualmente, sem rastreio diário.', 'Apontamento diário via app; lookahead de 4 semanas com remoção de restrições medida pelo IRR.'],
-       ['Pilar 4 · Painéis de indicadores', '—', p4Sit, 'Painéis de indicadores e reunião executiva com dados consolidados.']],
-    II:[['3 · Qualidade (FVS)', ptFerrLabel(f.qualidade), 'Retrabalhos identificados tarde; qualidade tratada como auditoria separada do pagamento.', 'FVS digital vinculada ao avanço físico.'],
-        ['6 · ERP / Sistema de Gestão', ptEsc(erpNome), erpSit, erpEnt]],
-    III:[['4 · Controle de Contratos / Empreiteiros', ptFerrLabel(f.contratos), 'Negociação de medição desgastante; sem evidência objetiva para liberar pagamento.', 'Medição de empreiteiros baseada em avanço apontado e FVS aprovada.'],
-         ['5 · Folha de Produção / Fechamento de MO', ptFerrLabel(f.folha), 'Fechamento manual e lento; produtividade por equipe sem rastreabilidade.', 'Fechamento de folha e produtividade por HH em horas' + (semErp ? '.' : ', integrado ao ERP.')]]
+    I:[['Planejamento & Reprogramação', ptFerrLabel(f.planejamento), planSit, planEnt],
+       ['Medição de Avanço Físico', ptFerrLabel(f.medicao), 'Sistemas desconectados; avanço apurado manualmente, sem rastreio diário.', 'Apontamento diário via app; lookahead de 4 semanas com remoção de restrições medida pelo IRR.'],
+       ['Painéis de indicadores', '—', p4Sit, 'Painéis de indicadores e reunião executiva com dados consolidados.']],
+    II:[['Qualidade (FVS)', ptFerrLabel(f.qualidade), 'Retrabalhos identificados tarde; qualidade tratada como auditoria separada do pagamento.', 'FVS digital vinculada ao avanço físico.'],
+        ['ERP / Sistema de Gestão', ptEsc(erpNome), erpSit, erpEnt]],
+    III:[['Controle de Contratos / Empreiteiros', ptFerrLabel(f.contratos), 'Negociação de medição desgastante; sem evidência objetiva para liberar pagamento.', 'Medição de empreiteiros baseada em avanço apontado e FVS aprovada.'],
+         ['Folha de Produção / Fechamento de MO', ptFerrLabel(f.folha), 'Fechamento manual e lento; produtividade por equipe sem rastreabilidade.', 'Fechamento de folha e produtividade por HH em horas' + (semErp ? '.' : ', integrado ao ERP.')]]
   };
 }
 var PT_PLANO_THEAD = '<thead><tr><th style="width:34mm">Rotina</th><th style="width:30mm">Ferramenta hoje</th><th>Situação observada</th><th>Entrega prevista</th></tr></thead>';
@@ -535,7 +475,7 @@ function ptFaseNome(fase, M) {
 }
 function ptFaseGroup(fase, linhas, M) {
   return '<tr class="grp"><td colspan="4"><span class="gl">Fase de Implementação ' + fase.id + '</span><b class="b6">' + ptFaseNome(fase, M) + '</b>' +
-    '<div class="gsub">' + fase.rot + ' · ' + fase.dur + '</div></td></tr>' +
+    '<div class="gsub">' + fase.dur + '</div></td></tr>' +
     linhas.map(function(l){ return '<tr><td class="b6">' + l[0] + '</td><td>' + l[1] + '</td><td>' + l[2] + '</td><td>' + l[3] + '</td></tr>'; }).join('');
 }
 function ptRegua() {
@@ -546,7 +486,7 @@ function ptRegua() {
   return '<div class="chart-t">As Fases I e II ocupam os primeiros 60 dias; a Fase III vai até cerca do dia 150</div>' +
     '<div style="position:relative"><div class="tgrid">' + lines + '</div>' +
     row('Fase de Implementação I', 0, 60, 'a', 'até 60 dias') + row('Fase de Implementação II', 0, 60, 'b', 'até 60 dias, em paralelo') + row('Fase de Implementação III', 60, 150, 'c', 'até 90 dias, após I e II') +
-    '</div><div class="tticks">' + ticks + '</div><div class="src">Unidade: dias corridos a partir do início do projeto. Duração total estimada: cerca de 150 dias.</div>';
+    '</div><div class="tticks">' + ticks + '</div>';
 }
 function ptResolve(M, faseId) {
   var cr = M.criticos.filter(function(c){ return c.fase === faseId; }).map(function(c){ return String(c.n); });
@@ -557,40 +497,56 @@ function ptResolve(M, faseId) {
   return parts.length ? 'Resolve: ' + parts.join('; ') + '.' : '';
 }
 
-function ptSecFontes(M) {
-  var linked = {};
-  M.criticos.forEach(function(c){ (linked[c.fonte.key] = linked[c.fonte.key] || []).push(c.n); });
-  var rows = M.roi.items.map(function(it) {
-    var f = M.fontes[it.key], l = linked[it.key];
-    return '<tr><td>' + f.labelTab + '</td><td class="n">' + ptMil(f.perda, 1) + '</td><td class="n">' + ptPct(f.fator) + '</td><td class="n">' + ptMil(f.cap, 1) + '</td><td style="padding-left:8mm">' +
-      (l ? (l.length === 1 ? 'Ponto crítico ' : 'Pontos críticos ') + ptLista(l.map(String)) : '—') + '</td></tr>';
-  }).join('');
-  var totLbl = M.obras === 1 ? 'Total, 1 obra' : 'Total por obra';
-  var portf = M.obras > 1 ? '<tr class="tot"><td>Total no portfólio (' + M.obras + ' obras)</td><td class="n">' + ptMil(M.roi.totalBase * M.obras, 1) + '</td><td class="n"></td><td class="n">' + ptMil(M.roi.totalPortfolio, 1) + '</td><td></td></tr>' : '';
-  var b5 = ptSec('05', 'Perda por fonte e ganho capturável', true) +
-    '<div style="margin-top:5mm"><table><thead><tr><th>Fonte de perda</th><th class="n" style="width:28mm">Perda (' + M.prazo + ' meses)</th><th class="n" style="width:24mm">Fator de captura</th><th class="n" style="width:30mm">Ganho capturável</th><th class="wrap" style="width:34mm;padding-left:8mm">Ponto crítico ligado</th></tr></thead>' +
-    '<tbody>' + rows + '<tr class="tot"><td>' + totLbl + '</td><td class="n">' + ptMil(M.roi.totalBase, 1) + '</td><td class="n"></td><td class="n">' + ptMil(M.roi.totalPorObra, 1) + '</td><td></td></tr>' + portf + '</tbody></table>' +
-    '<div class="src">Base: ' + (M.obras === 1 ? '1 obra, orçamento ' : M.obras + ' obras, orçamento médio de ') + ptMilVar(M.orc) + (M.obras > 1 ? ' por obra' : '') + ', prazo ' + M.prazo + ' meses. Valores em R$ mil, arredondados; totais calculados antes do arredondamento. Perda por fonte (' + M.prazo + ' meses) e retorno mensal (seção 02) são estimativas de modelos diferentes e não são somáveis.</div></div>';
+// Section 05: Plano de Transformação Operacional (the former loss-by-source table now lives in section 02).
+function ptSecPlano(M) {
   var R = ptRotinas(M);
-  var blocks = [{ sec:'05', html:b5 }];
+  var blocks = [];
   // Phases I+II, timeline, Phase III, action card, signatures (pilot order)
-  blocks.push({ sec:'06', head:ptSec('06', ptPlano06(M)), rows:[0, 1], render:function(rows) {
+  blocks.push({ sec:'05', head:ptSec('05', ptPlano06(M)), rows:[0, 1], render:function(rows) {
     return '<div style="margin-top:5mm"><table>' + PT_PLANO_THEAD + '<tbody>' + rows.map(function(i){ return ptFaseGroup(PT_FASES[i], R[PT_FASES[i].id], M); }).join('') + '</tbody></table></div>';
   }});
-  blocks.push({ sec:'06', html:'<div style="margin-top:7mm">' + ptRegua() + '</div>' });
-  blocks.push({ sec:'06', html:'<div style="margin-top:7mm"><table>' + PT_PLANO_THEAD + '<tbody>' + ptFaseGroup(PT_FASES[2], R.III, M) + '</tbody></table></div>' });
-  var perfil = [ptObrasTxt(M) + (M.tipologia ? ' no perfil <i class="it">' + M.tipologia + '</i>' : ''), M.moLongo ? 'com <i class="it">' + M.moLongo + '</i>' : ''].filter(Boolean).join(', ');
+  blocks.push({ sec:'05', html:'<div style="margin-top:7mm">' + ptRegua() + '</div>' });
+  blocks.push({ sec:'05', html:'<div style="margin-top:7mm"><table>' + PT_PLANO_THEAD + '<tbody>' + ptFaseGroup(PT_FASES[2], R.III, M) + '</tbody></table></div>' });
   var frentes = PT_FASES.map(function(fz, i) {
     var res = ptResolve(M, fz.id);
     return '<div class="fr"><div class="nn">0' + (i + 1) + '</div><div><div class="ft">Fase de Implementação ' + fz.id + ' · ' + ptFaseNome(fz, M) + '</div><div class="fd">' + fz.fd + '</div>' + (res ? '<div class="fz">' + res + '</div>' : '') + '</div></div>';
   }).join('');
-  blocks.push({ sec:'06', html:'<div style="margin-top:9mm" class="plano"><div class="kk sq">Plano de ação executivo</div><h3>Fases de Implementação e pontos atendidos</h3>' +
-    '<p>Com base no diagnóstico ' + (M.art ? 'da ' : 'de ') + '<b>' + ptEsc(M.empresa) + '</b> (' + perfil + '), o plano de ação se organiza em três Fases de Implementação.</p>' + frentes + '</div>' });
+  blocks.push({ sec:'05', html:'<div style="margin-top:9mm" class="plano"><div class="kk sq">Plano de ação executivo</div><h3>Fases de Implementação e pontos atendidos</h3>' + frentes + '</div>' });
   var sig = [];
   if (M.consultor) sig.push('<div><span class="lbl">Elaborado por (Agilean)</span><b class="b6">' + ptEsc(M.consultor) + '</b><br>Consultor Agilean</div>');
   if (M.contato) sig.push('<div><span class="lbl">Responsável pela empresa</span><b class="b6">' + ptEsc(M.contato) + '</b>' + (M.cargo ? '<br>' + ptEsc(M.cargo) : '') + '</div>');
-  if (sig.length) blocks.push({ sec:'06', html:'<div class="sign">' + sig.join('') + '</div>' });
+  // "Próximo passo" and the signatures form one block, so the signatures never end up alone on a sheet
+  blocks.push({ sec:'05', html:ptBlocoReuniao2(M) + (sig.length ? '<div class="sign">' + sig.join('') + '</div>' : '') });
   return blocks;
+}
+
+// "Próximo passo": 2nd meeting block, section 06 (between the action plan and the signatures).
+// Resumido: compact (no intro sentence, no participants table); Detalhado: full.
+function ptHoraBR(h) { var p = String(h || '').split(':'); return p.length < 2 ? '' : (p[1] === '00' ? (+p[0]) + 'h' : (+p[0]) + 'h' + p[1]); }
+function ptBlocoReuniao2(M) {
+  var R = M.reuniao2 || {};
+  var pp = (R.participantes || []).filter(function(p){ return (p.nome || '').trim(); });
+  var emp = ptEsc(M.empresa);
+  var titulo = '2º encontro: apresentação do projeto de implementação de melhorias';
+  var strip = '<div class="strip">' +
+    '<div><div class="lbl">Data</div><div class="r2-v' + (R.data ? '' : ' pend') + '">' + (R.data ? ptDataBR(R.data) : 'A definir') + '</div></div>' +
+    '<div><div class="lbl">Horário</div><div class="r2-v' + (R.hora ? '' : ' pend') + '">' + (R.hora ? ptHoraBR(R.hora) : 'A definir') + '</div></div>' +
+    '<div><div class="lbl">Participação recomendada</div><div class="r2-pp">Decisores da empresa (diretoria), além de quem respondeu ao diagnóstico.</div></div></div>';
+  // The participants table appears in both versions, only when a date and participants exist
+  var tabela = (R.data && pp.length)
+    ? '<table><thead><tr><th>Participante confirmado</th><th>Cargo</th></tr></thead><tbody>' +
+      pp.map(function(p){ return '<tr><td class="b6">' + ptEsc(p.nome) + '</td><td>' + (p.cargo ? ptEsc(p.cargo) : '—') + '</td></tr>'; }).join('') + '</tbody></table>'
+    : '';
+  if (!M.det) {
+    // Compact (Resumido): the title moves to the label column; no sentence or source line.
+    return '<div class="row sec enc2 cmp"><div><div class="lbl rule">Próximo passo</div><div class="r2-tc">' + titulo + '</div></div><div>' + strip + tabela + '</div></div>';
+  }
+  var html = '<div class="row sec enc2"><div><div class="lbl rule">Próximo passo</div></div><div>' +
+    '<h3 class="r2-t">' + titulo + '</h3>' +
+    '<p class="r2-p">A Agilean apresenta ' + (M.art ? 'à ' : 'a ') + '<b>' + emp + '</b> o projeto de implementação de melhorias, feito a partir deste diagnóstico.</p>' + strip;
+  html += tabela;
+  html += '</div></div>';
+  return html;
 }
 
 function ptSecBases(M) {
@@ -603,16 +559,17 @@ function ptSecBases(M) {
     ['Horas de gestão informadas', M.horasInf > 0 ? ptNum(M.horasInf, 0, 1) + ' h/mês' : 'Não informadas']];
   if (M.folha > 0) oper.push(['Folha de produção', ptMilVar(M.folha) + '/mês']);
   oper.push(['Cenário adotado', ptPct(ROI_CAPTURA_FIXA) + ' · ' + roiCapturaLabel(ROI_CAPTURA_FIXA)]);
-  var glos = [['EAP','Estrutura analítica do projeto.'],['FVS','Ficha de verificação de serviço.'],['HH','Homem-hora.'],['IRR','Índice de remoção de restrições.'],
+  var glos = [['P1 a P4', 'Pilares: P1 ' + PT_PILAR_NOME.f1 + '; P2 ' + PT_PILAR_NOME.f2 + '; P3 ' + PT_PILAR_NOME.f3 + '; P4 ' + PT_PILAR_NOME.f4 + '.'],
+    ['EAP','Estrutura analítica do projeto.'],['FVS','Ficha de verificação de serviço.'],['HH','Homem-hora.'],['IRR','Índice de remoção de restrições.'],
     ['Lookahead','Planejamento de médio prazo, com janela de semanas à frente da execução.'],['MO','Mão de obra.'],['PPC','Percentual de planos concluídos.'],
     ['Fator de captura','Fração da perda de cada fonte que se estima recuperar, conforme a maturidade dos pilares ligados à fonte.'],
     ['Mensalidade de referência', ptRefBRL(MENSALIDADE_ROI_POR_OBRA) + ' por obra; base de cálculo, não é proposta comercial.']];
   var t2 = function(rows) { return rows.map(function(r){ return '<tr><td>' + r[0] + '</td><td class="n">' + r[1] + '</td></tr>'; }).join(''); };
   return [
-    { sec:'07', breakBefore:true, html:ptSec('07', 'Bases do diagnóstico', true) + '<div class="row" style="margin-top:5mm"><div><div class="lbl rule">Referências de mercado</div></div><div><table><thead><tr><th>Parâmetro</th><th class="n">Valor</th></tr></thead><tbody>' + t2(refs) + '</tbody></table></div></div>' },
-    { sec:'07', html:'<div class="row sec"><div><div class="lbl rule">Dados da operação</div></div><div><table><thead><tr><th>Dado</th><th class="n">Valor</th></tr></thead><tbody>' + t2(oper) + '</tbody></table>' +
+    { sec:'06', breakBefore:true, html:ptSec('06', 'Bases do diagnóstico', true) + '<div class="row" style="margin-top:5mm"><div><div class="lbl rule">Referências de mercado</div></div><div><table><thead><tr><th>Parâmetro</th><th class="n">Valor</th></tr></thead><tbody>' + t2(refs) + '</tbody></table></div></div>' },
+    { sec:'06', html:'<div class="row sec"><div><div class="lbl rule">Dados da operação</div></div><div><table><thead><tr><th>Dado</th><th class="n">Valor</th></tr></thead><tbody>' + t2(oper) + '</tbody></table>' +
       '<div class="src">Fonte: entrevista de diagnóstico' + (M.data ? ', ' + M.data : '') + '.</div></div></div>' },
-    { sec:'07', html:'<div class="row sec"><div><div class="lbl rule">Glossário</div></div><div><table><tbody>' + glos.map(function(g){ return '<tr><td class="b6" style="width:44mm">' + g[0] + '</td><td>' + g[1] + '</td></tr>'; }).join('') + '</tbody></table>' +
+    { sec:'06', html:'<div class="row sec"><div><div class="lbl rule">Glossário</div></div><div><table><tbody>' + glos.map(function(g){ return '<tr><td class="b6" style="width:44mm">' + g[0] + '</td><td>' + g[1] + '</td></tr>'; }).join('') + '</tbody></table>' +
       '<p class="note" style="margin-top:3mm">Estimativa a partir dos dados informados no diagnóstico e de referências de mercado; não representa garantia contratual.</p></div></div>' }
   ];
 }
@@ -677,9 +634,8 @@ var PT_SECOES = {
   '02':{ run:'Perda e ganho mensal', toc:'Perda e ganho mensal', cls:'' },
   '03':{ run:'Pontos críticos', toc:'Pontos críticos', cls:'tight' },
   '04':{ run:'Demais pontos avaliados', toc:'Demais pontos avaliados', cls:'tight dense' },
-  '05':{ run:'Perda por fonte e ganho capturável', toc:'Perda por fonte e ganho capturável', cls:'' },
-  '06':{ run:'Plano de Transformação Operacional', toc:null, cls:'', flow:true },
-  '07':{ run:'Bases do diagnóstico', toc:'Bases do diagnóstico', cls:'tight' },
+  '05':{ run:'Plano de Transformação Operacional', toc:null, cls:'', flow:true },
+  '06':{ run:'Bases do diagnóstico', toc:'Bases do diagnóstico', cls:'tight' },
   'A':{ run:'Anexo A · Memória de cálculo', toc:'Anexo A · Memória de cálculo', cls:'', noCont:true }
 };
 
@@ -700,7 +656,7 @@ function ptPaginate(root, M, blocks) {
     cur = { el:pg, body:pg.querySelector('.body'), sec:sec, n:0 };
     pages.push(cur);
     if (cont && !meta.noCont) {
-      var t = sec === '06' ? ptPlano06(M) : meta.run;
+      var t = sec === '05' ? ptPlano06(M) : meta.run;
       cur.body.insertAdjacentHTML('beforeend', '<div class="row sec first"><div class="lbl rule">' + sec + ' · continuação</div><div class="lbl rule contsub">' + t + '</div></div>');
     }
   }
@@ -724,7 +680,7 @@ function ptPaginate(root, M, blocks) {
     if (!cur || b.breakBefore === true || (secChange && !meta.flow)) newPage(b.sec, false);
     if (!b.rows) {
       var nodes = add((b.head || '') + b.html);
-      if (!fits() && cur.n > 0) { remove(nodes); newPage(b.sec, true); add((b.head || '') + b.html); }
+      if (!fits() && cur.n > 0) { remove(nodes); newPage(b.sec, !!secStart[b.sec]); add((b.head || '') + b.html); }
       if (!secStart[b.sec]) secStart[b.sec] = pages.length;
       cur.n++;
       return;
@@ -739,7 +695,7 @@ function ptPaginate(root, M, blocks) {
         remove(nd);
       }
       if (!placed) {
-        if (cur.n > 0) { newPage(b.sec, true); continue; }
+        if (cur.n > 0) { newPage(b.sec, !!secStart[b.sec] || !first); continue; }
         k = 1; add((first ? (b.head || '') : '') + b.render(rest.slice(0, 1), first, rest.length === 1));
       }
       if (!secStart[b.sec]) secStart[b.sec] = pages.length;
@@ -759,11 +715,10 @@ function ptCapa(M, tocRows, total) {
   if (M.entrevistado) idt.push(['Entrevistado', ptEsc(M.entrevistado)]);
   if (M.consultor) idt.push(['Consultor', ptEsc(M.consultor) + ', Agilean']);
   if (M.data) idt.push(['Data do diagnóstico', M.data]);
-  idt.push(['Versão', M.versao], ['Documento', ptDocNome(M)]);
+  idt.push(['Versão', M.versao]);
   pg.innerHTML = ptNb('<img class="logo" src="' + PT_LOGO + '" alt="Agilean">' +
     '<div class="ctit"><div class="lbl sq">' + ptDocNome(M) + '</div><h1 style="margin-top:2mm">Diagnóstico <span class="o">SIIGA</span></h1><div class="cco">' + ptEsc(M.empresa) + '</div></div>' +
     '<table class="idt">' + idt.map(function(r, i){ return '<tr><td class="lbl"' + (i === 0 ? ' style="width:42mm"' : '') + '>' + r[0] + '</td><td>' + r[1] + '</td></tr>'; }).join('') + '</table>' +
-    '<div class="classif">Confidencial · uso restrito ' + ptEsc(M.empresa) + '</div>' +
     '<div class="toc"><div class="lbl rule" style="margin-bottom:2mm">Sumário</div><table><thead><tr><th style="width:10mm">Seção</th><th>Título</th><th class="n">Folha</th></tr></thead><tbody>' +
       tocRows.map(function(r){ return '<tr><td>' + r[0] + '</td><td>' + r[1] + '</td><td class="n">' + ptPad(r[2]) + '</td></tr>'; }).join('') + '</tbody></table></div>');
   return pg;
@@ -778,15 +733,15 @@ function ptBuild(mode) {
   root.id = 'ptr-root';
   root.className = 'ptr';
   document.body.appendChild(root);
-  var blocks = [].concat(ptSecResumo(M), ptSecPerdaGanho(M), ptSecCriticos(M), ptSecDemais(M), ptSecFontes(M), ptSecBases(M), M.det ? ptSecAnexo(M) : []);
+  var blocks = [].concat(ptSecResumo(M), ptSecPerdaGanho(M), ptSecCriticos(M), ptSecDemais(M), ptSecPlano(M), ptSecBases(M), M.det ? ptSecAnexo(M) : []);
   var pg = ptPaginate(root, M, blocks);
   var pages = pg.pages;
   var total = pages.length + 1;
   pages.forEach(function(p, i) { p.el.querySelector('.carimbo').innerHTML = ptNb(ptCarimbo(M, i + 2, total)); });
   var toc = [];
-  ['01','02','03','04','05','06','07','A'].forEach(function(s) {
+  ['01','02','03','04','05','06','A'].forEach(function(s) {
     if (!pg.secStart[s]) return;
-    toc.push([s, s === '06' ? ptPlano06(M) : PT_SECOES[s].toc, pg.secStart[s] + 1]);
+    toc.push([s, s === '05' ? ptPlano06(M) : PT_SECOES[s].toc, pg.secStart[s] + 1]);
   });
   root.insertBefore(ptCapa(M, toc, total), root.firstChild);
   ptHatch(root);
@@ -870,7 +825,7 @@ function generateRelatorioPrancha(mode) {
     var jsPDFNS = window.jspdf ? window.jspdf.jsPDF : window.jsPDF;
     var pdf = new jsPDFNS({ orientation:'portrait', unit:'mm', format:'a4', compress:true });
     var M = built.model;
-    pdf.setProperties({ title:'Diagnóstico SIIGA · ' + M.empresa + ' · ' + ptDocNome(M), author:'Agilean',
+    pdf.setProperties({ title:'Diagnóstico SIIGA · ' + M.empresa, author:'Agilean',
       subject:'Diagnóstico de maturidade SIIGA · ' + M.empresa, keywords:'SIIGA, diagnóstico', creator:'SIIGA Assessment' });
     var pageEls = Array.prototype.slice.call(built.root.querySelectorAll(':scope > .page'));
     var paper = ptToken('--papel') || '#FFFFFF';

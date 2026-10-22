@@ -53,6 +53,7 @@ server.listen(PORT, async () => {
     await page.type('#c-email', 'teste@meridiano.com.br');
     await page.type('#c-telefone', '(11) 91234-5678');
     await page.click('button[onclick="startAssessment()"]');
+    await sleep(300); await page.click('#btn-diagnostico-continuar'); await sleep(300); await page.click('#btn-pilares-continuar'); await sleep(300); await page.click('#btn-metodo-iniciar');
     await sleep(300);
 
     // Bloco 0

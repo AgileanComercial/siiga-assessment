@@ -495,6 +495,87 @@ function startAssessment() {
   currentBlock = 'b0';
   currentQIdx = 0;
   saveDraft();
+  showDiagnostico();
+}
+
+// Presentation screens (cover > pilares > método > B0). Each step is a small
+// named function so a new screen can be inserted in the chain later.
+function showCover() {
+  document.getElementById('nav-step').textContent = 'SIIGA Assessment';
+  showScreen('screen-cover');
+}
+function showDiagnostico() {
+  var nome = (typeof ptNomeEmpresa === 'function') ? ptNomeEmpresa(S.empresa || '') : (S.empresa || '');
+  var art = (typeof ptArtigo === 'function') ? ptArtigo(nome) : '';
+  Array.prototype.forEach.call(document.querySelectorAll('#screen-diagnostico .js-empresa'), function(el){ el.textContent = (S.empresa || '').toUpperCase(); });
+  Array.prototype.forEach.call(document.querySelectorAll('#screen-diagnostico .js-empresa-txt'), function(el){ el.textContent = art + (nome || 'a empresa'); });
+  renderReuniao2();
+  document.getElementById('nav-step').textContent = 'Diagnóstico SIIGA';
+  showScreen('screen-diagnostico');
+}
+function diagnosticoVoltar() {
+  readReuniao2();
+  saveDraft();
+  showCover();
+}
+function diagnosticoContinuar() {
+  readReuniao2();
+  saveDraft();
+  showPilares();
+}
+
+// ── 2º encontro (agendamento opcional): S.reuniao2 = { data, hora, participantes:[{nome,cargo}] } ──
+function addReuniao2Participante(nome, cargo) {
+  var box = document.getElementById('reuniao2-participantes');
+  var row = document.createElement('div');
+  row.className = 'dg-prow';
+  var inN = document.createElement('input'); inN.className = 'text-input'; inN.setAttribute('data-k', 'nome'); inN.placeholder = 'Nome'; inN.value = nome || '';
+  var inC = document.createElement('input'); inC.className = 'text-input'; inC.setAttribute('data-k', 'cargo'); inC.placeholder = 'Cargo'; inC.value = cargo || '';
+  row.appendChild(inN); row.appendChild(inC);
+  if (box.children.length > 0) {
+    var rm = document.createElement('button');
+    rm.type = 'button'; rm.className = 'btn btn-s btn-rm'; rm.textContent = 'Remover';
+    rm.onclick = function() { row.parentNode.removeChild(row); };
+    row.appendChild(rm);
+  } else {
+    row.appendChild(document.createElement('span'));
+  }
+  box.appendChild(row);
+}
+// Restores the fields from S.reuniao2; the first participant defaults to the cover contact (editable).
+function renderReuniao2() {
+  var r = S.reuniao2;
+  document.getElementById('reuniao2-data').value = (r && r.data) || '';
+  document.getElementById('reuniao2-hora').value = (r && r.hora) || '';
+  document.getElementById('reuniao2-participantes').innerHTML = '';
+  var lista = (r && r.participantes && r.participantes.length) ? r.participantes : (r ? [] : [{ nome: S.contato || '', cargo: S.cargo || '' }]);
+  if (!lista.length) lista = [{ nome: '', cargo: '' }];
+  lista.forEach(function(p) { addReuniao2Participante(p.nome, p.cargo); });
+}
+// Reads the fields into S.reuniao2; participants with an empty name are dropped.
+function readReuniao2() {
+  var parts = [];
+  Array.prototype.forEach.call(document.querySelectorAll('#reuniao2-participantes .dg-prow'), function(row) {
+    var nome = row.querySelector('[data-k="nome"]').value.trim();
+    var cargo = row.querySelector('[data-k="cargo"]').value.trim();
+    if (nome) parts.push({ nome: nome, cargo: cargo });
+  });
+  S.reuniao2 = { data: document.getElementById('reuniao2-data').value || '', hora: document.getElementById('reuniao2-hora').value || '', participantes: parts };
+}
+
+function showPilares() {
+  document.getElementById('nav-step').textContent = 'Pilares SIIGA';
+  showScreen('screen-pilares');
+}
+function showMetodo() {
+  document.getElementById('nav-step').textContent = 'Método SIIGA';
+  showScreen('screen-metodo');
+}
+// Enters the questionnaire; idx (optional) preserves the saved question on resume.
+function beginB0(idx) {
+  currentBlock = 'b0';
+  currentQIdx = idx > 0 ? idx : 0;
+  saveDraft();
   renderB0();
   showScreen('screen-b0');
 }
@@ -590,6 +671,7 @@ function selectB0(idx) {
   if(q.scored) S.scores[q.key] = opt.score;
   if(q.key === 'modeloMO') S.showMO = true;
   renderB0();
+  saveDraft(); // resume at the question where the user stopped
 }
 
 // ═══════════════════════════════════════════
@@ -604,6 +686,7 @@ function beginPhases() {
   currentBlock = 'phase';
   renderPhaseQ();
   showScreen('screen-phase');
+  saveDraft();
 }
 
 function getFilteredQs(bd) {
@@ -889,6 +972,7 @@ function selectPhaseOpt(optIdx, score) {
   var q = filteredQs[currentQIdx];
   setScoreByCode(bk, q.code, score);
   renderPhaseQ();
+  saveDraft();
 }
 
 // Grava o score de um sub-item de uma combo-tela direto no pilar de origem
@@ -897,6 +981,7 @@ function selectPhaseOpt(optIdx, score) {
 function selectComboSub(bkTarget, code, score) {
   setScoreByCode(bkTarget, code, score);
   renderPhaseQ();
+  saveDraft();
 }
 
 function renderComboSubHtml(bkTarget, code, label) {
@@ -972,6 +1057,7 @@ function nextQ() {
     if(currentQIdx < B0Q.length - 1) {
       currentQIdx++;
       renderB0();
+      saveDraft();
     } else {
       showScreen('screen-transition');
     }
@@ -1004,16 +1090,19 @@ function nextQ() {
 
 function prevQ() {
   if(currentBlock === 'b0') {
-    if(currentQIdx > 0) { currentQIdx--; renderB0(); }
+    if(currentQIdx > 0) { currentQIdx--; renderB0(); saveDraft(); }
+    else showMetodo();
   } else if(currentBlock === 'phase') {
     if(currentQIdx > 0) {
       currentQIdx--;
       renderPhaseQ();
+      saveDraft();
     } else if(currentPhaseIdx > 0) {
       currentPhaseIdx--;
       var prevBk = phaseOrder[currentPhaseIdx];
       currentQIdx = getNavQs(PQ[prevBk], prevBk).length - 1;
       renderPhaseQ();
+      saveDraft();
     } else {
       showScreen('screen-transition');
     }
@@ -1644,17 +1733,18 @@ function renderQualitativeGains() {
   }).join('');
 }
 
-// Última Página do Diagnóstico — Plano de Ação Executivo (3 Atos) + citação de
-// fechamento. Restaurado do commit e577e33 SEM edição de texto (validado
-// visualmente pelo usuário). Preenche #next-steps-container (card
-// #next-steps-page, data-section="ultima", em index.html). Igual nos dois
-// modos (resumido e detalhado) — nunca teve modo resumido separado.
+// Última Página do Diagnóstico — Plano de Ação Executivo (3 Fases de Implementação) +
+// citação de fechamento. As fases, os nomes e o "Resolve" são os mesmos do card
+// "Plano de ação executivo" do PDF (PT_FASES, ptFaseNome, ptResolve), com a numeração
+// de pontos de ptModel (a mesma das folhas 02 e 05 do PDF). Preenche
+// #next-steps-container (card #next-steps-page, data-section="ultima", em index.html).
 function renderNextSteps() {
   var container = document.getElementById('next-steps-container');
   if (!container) return;
 
   var empresa = S.empresa || 'sua empresa';
   var obras = S.numObras || 1;
+  var obrasTxt = obras === 1 ? '1 obra' : obras + ' obras';
   var tipologiaMap = {
     vert: 'Residencial vertical',
     horiz: 'Residencial horizontal',
@@ -1665,22 +1755,28 @@ function renderNextSteps() {
   var tipologiaLabel = tipologiaMap[S.tipologia] || 'Construção Civil';
   var moLabel = S.modeloMO === 'propria' ? 'mão de obra própria' : (S.modeloMO === 'mista' ? 'mão de obra mista' : 'mão de obra terceirizada');
 
-  // Cada ato indica o(s) gap(s)-âncora que resolve (ver atoDoGap()). Ato sem
-  // âncora cita até 2 gaps críticos do mesmo ato; sem nenhum, não mostra a linha.
   var plan = getGapPlan(calculateROI());
-  var resolve = {1:[], 2:[], 3:[]};
-  plan.anchors.forEach(function(o, i){ resolve[atoDoGap(o.code)].push('Gap-âncora ' + (i+1) + ' (' + o.gap + ')'); });
-  [1,2,3].forEach(function(n) {
-    if(resolve[n].length) return;
-    plan.rest.filter(function(o){ return atoDoGap(o.code) === n; }).slice(0, 2).forEach(function(o){ resolve[n].push(o.gap.charAt(0).toLowerCase() + o.gap.slice(1)); });
-  });
-  var resolveHtml = function(n) {
-    return resolve[n].length ? '<div style="font-size:11.5px;color:#fdba74;margin-top:4px">Resolve: ' + resolve[n].join(' e ') + '</div>' : '';
-  };
-  var ato = function(n, titulo, texto) {
-    return '<div style="display:flex;align-items:flex-start;gap:14px;font-size:13px;color:#e2e8f0;line-height:1.55">' +
-      '<span style="font-family:\'Bai Jamjuree\';color:#ea580c;font-weight:700;font-size:13px;padding-top:2px">0' + n + '</span>' +
-      '<span><strong style="color:#ffffff">' + titulo + '</strong> — ' + texto + resolveHtml(n) + '</span>' +
+
+  // Fases de Implementação: mesma fonte do PDF. Se o modelo do relatório falhar
+  // (ex.: código de MO sem pilar em PT_MO_PILAR), as fases aparecem sem a linha "Resolve".
+  var M = null;
+  try { M = ptModel('detalhado'); } catch (e) { console.error('renderNextSteps: ptModel', e); }
+  var FASE_DIAS = { I:[0, 60], II:[0, 60], III:[60, 150] }; // mesma régua de ptRegua() (150 dias)
+  var pct = function(v) { return (v / 150 * 100).toFixed(2) + '%'; };
+  var faseHtml = function(fz, i) {
+    // fd = "Até 60 dias. Linha de Balanço, ..." -> prazo ("Até 60 dias") + entrega
+    var m = /^(Até [^.]+)\.\s*(.*)$/.exec(fz.fd);
+    var prazo = m ? m[1] : fz.dur, entrega = m ? m[2] : fz.fd;
+    var d = FASE_DIAS[fz.id] || [0, 0];
+    var res = M ? ptResolve(M, fz.id) : '';
+    var eixo = (i === PT_FASES.length - 1) ? '<div class="ns-axis"><span style="left:0">0</span><span style="left:' + pct(60) + '">60</span><span style="left:100%">150 dias</span></div>' : '';
+    return '<div class="ns-fase">' +
+      '<span class="ns-n">0' + (i + 1) + '</span>' +
+      '<div class="ns-txt"><strong>Fase de Implementação ' + fz.id + ' · ' + ptFaseNome(fz, M) + '</strong> — ' + entrega + '</div>' +
+      '<div class="ns-meta"><div class="ns-prazo">' + prazo + '</div>' +
+        '<div class="ns-gantt" role="img" aria-label="Dia ' + d[0] + ' a ' + d[1] + '"><i class="ns-tick" style="left:' + pct(60) + '"></i><b style="left:' + pct(d[0]) + ';width:' + pct(d[1] - d[0]) + '"></b></div>' + eixo +
+      '</div>' +
+      (res ? '<div class="ns-res">' + res + '</div>' : '') +
     '</div>';
   };
 
@@ -1692,7 +1788,7 @@ function renderNextSteps() {
   };
   var ouvimos = [];
   if (momentoTxt[S.momento]) ouvimos.push(momentoTxt[S.momento]);
-  ouvimos.push('<strong style="color:#ffffff">Operação:</strong> ' + obras + ' obra(s), orçamento médio de ' + fmtNum(S.orcamentoMedio || 0) + ' e prazo médio de ' + (S.prazoMedio || 0) + ' meses, com ' + moLabel + '.');
+  ouvimos.push('<strong style="color:#ffffff">Operação:</strong> ' + obrasTxt + ', orçamento médio de ' + fmtNum(S.orcamentoMedio || 0) + ' e prazo médio de ' + (S.prazoMedio || 0) + ' meses, com ' + moLabel + '.');
   var f = S.ferramentas || {};
   var ferr = [['planejamento','planejamento'],['medicao','medição'],['qualidade','qualidade'],['contratos','contratos'],['folha','folha']]
     .filter(function(p){ return f[p[0]] && String(f[p[0]]).trim(); })
@@ -1707,13 +1803,10 @@ function renderNextSteps() {
       '<div class="rep-sec-title" style="margin-bottom:8px"><span class="rep-sec-num">06</span>Plano de Ação Executivo</div>' +
       '<div style="font-family:\'Bai Jamjuree\';font-size:17px;font-weight:700;color:#ffffff;margin-bottom:14px">Apresentação do Projeto de Solução para a ' + empresa + '</div>' +
       '<p style="font-size:13px;color:#cbd5e1;line-height:1.75;margin-bottom:20px">' +
-        'Com base no diagnóstico da <strong>' + empresa + '</strong> (' + obras + ' obra(s) no perfil <em>' + tipologiaLabel + '</em> com <em>' + moLabel + '</em>), estruturamos uma demonstração executiva focada nos 3 atos de transformação operacional:' +
+        'Com base no diagnóstico da <strong>' + empresa + '</strong> (' + obrasTxt + ' no perfil <em>' + tipologiaLabel + '</em> com <em>' + moLabel + '</em>), o plano de ação se organiza em 3 Fases de Implementação:' +
       '</p>' +
-      '<div style="display:flex;flex-direction:column;gap:16px;margin-bottom:22px">' +
-        ato(1, 'Metodologia & Copilotos de Planejamento', 'Linha de Balanço e automação de cronograma com cruzamento orçamentário direto do ERP em minutos.') +
-        ato(2, 'Canteiro Ágil & Gestão Operacional', 'Apontamentos diários em campo, remoção preventiva de restrições com 4 semanas de antecedência e FVS vinculada à medição.') +
-        ato(3, 'Fechamento Blindado & Performance HUB', 'Inteligência executiva em tempo real e integração bidirecional com ERP para fechar medições e folha em horas.') +
-      '</div>' +
+      '<div class="ns-fases">' + PT_FASES.map(faseHtml).join('') + '</div>' +
+      '<div style="height:22px"></div>' +
       '<div style="padding:16px 18px;background:rgba(234,88,12,0.06);border-radius:6px;border-left:2.5px solid #ea580c">' +
         '<span style="font-size:13px;color:#cbd5e1;font-style:italic;line-height:1.6">"Identificamos oportunidades claras de ganho de eficiência e estancamento de perdas na sua operação. Na reunião executiva, demonstraremos a metodologia SIIGA capturando esses resultados desde o primeiro ciclo."</span>' +
       '</div>' +
@@ -2181,7 +2274,7 @@ function renderAnchorGapCards(plan, roi) {
     card.style.cssText = 'padding:18px 24px;margin-bottom:10px';
     card.innerHTML =
       '<div style="display:flex;justify-content:space-between;align-items:flex-start;gap:14px;margin-bottom:10px">' +
-        '<div><div style="font-size:9.5px;font-weight:700;letter-spacing:0.1em;text-transform:uppercase;color:#ea580c">Gap-âncora '+(i+1)+' · '+(pilarLabel[o.phase]||o.phase) +
+        '<div><div style="font-size:9.5px;font-weight:700;letter-spacing:0.1em;text-transform:uppercase;color:#ea580c">Gap-âncora '+(i+1)+' · '+(pilarNumDoGap(o) ? 'Pilar '+pilarNumDoGap(o) : (pilarLabel[o.phase]||o.phase)) +
           (o.star ? ' · <span style="color:#eab308">★ dor declarada</span>' : '') + '</div>' +
           '<div style="font-family:Bai Jamjuree,sans-serif;font-size:17px;font-weight:700;color:'+REP_TXT_STRONG+';margin-top:2px">'+o.gap+'</div></div>' +
         '<div style="text-align:right;font-size:10.5px;color:'+REP_TXT_MUT+';white-space:nowrap">Fonte de perda<br><strong style="color:'+REP_TXT_STRONG+'">'+FONTE_LABEL[o.fonte]+'</strong></div>' +
@@ -2212,31 +2305,23 @@ function renderGapsIdentificados(plan) {
         'Nenhum gap crítico ou oportunidade de melhoria identificada nesta fase do diagnóstico.</div>';
     } else {
       var start = plan.anchors.length;
-      var pill = function(p) {
-        var a = (p === 'Alta');
-        return '<span style="display:inline-block;padding:1px 9px;border-radius:10px;font-size:10px;font-weight:700;background:'+(a?'rgba(239,68,68,0.14)':'rgba(234,179,8,0.16)')+';color:'+(a?'#dc2626':'#ca8a04')+'">'+p+'</span>';
-      };
-      var rows = plan.rest.length ? plan.rest.map(function(r, idx) {
-        return '<tr><td style="color:var(--rep-text-mut, #999)">'+String(start+idx+1).padStart(2,'0')+'</td>' +
+      var lista = gapsNumerados(plan);
+      var rows = lista.length ? lista.map(function(r) {
+        return '<tr><td style="color:var(--rep-text-mut, #999)">'+String(r.n).padStart(2,'0')+'</td>' +
           '<td><strong>'+r.gap+'</strong></td>' +
-          '<td style="color:var(--rep-text-mut, #999)">'+(pil[r.phase]||r.phase)+'</td>' +
-          '<td style="font-size:11px">'+FONTE_LABEL[r.fonte]+'</td>' +
+          '<td style="color:var(--rep-text-mut, #999)">'+(pilarNumDoGap(r) ? 'P'+pilarNumDoGap(r) : (pil[r.phase]||r.phase))+'</td>' +
+          '<td style="font-size:11px">'+(FONTE_LABEL[r.fonte] || '—')+'</td>' +
           '<td style="font-size:11px">'+(r.score === 0 ? 'Sem prática' : 'Informal')+'</td>' +
-          '<td>'+pill(r.prioridade)+'</td></tr>';
+          '<td style="font-size:11px;white-space:nowrap">'+faseCurtaDoGap(r.code)+'</td></tr>';
       }).join('') : '<tr><td colspan="6" style="color:var(--rep-text-mut, #999)">Nenhum outro gap crítico além dos gaps-âncora.</td></tr>';
       oppTableCard.innerHTML = '<div class="rep-sec-title"><span class="rep-sec-num">03</span>Gaps Identificados</div>' +
-        '<p style="font-size:12px;color:#666;margin-bottom:10px">Não precisam ser comentados na reunião. Prioridade <strong>Alta</strong>: a fonte de perda está entre as 3 mais caras e a prática é inexistente ou informal. <strong>Média</strong>: demais casos.</p>' +
-        '<table class="opp-table" id="opp-table-el"><thead><tr><th>#</th><th>Gap Identificado</th><th>Pilar</th><th>Fonte de perda</th><th>Situação</th><th>Prioridade</th></tr></thead><tbody id="opp-body">'+rows+'</tbody></table>';
+        '<p style="font-size:12px;color:#666;margin-bottom:10px">Todos os pontos desta lista, críticos e de atenção, são referência para a equipe e não precisam ser comentados na reunião; o foco são os 3 pontos críticos do topo. A Fase III vem após as Fases I e II porque o pagamento por evidência depende da base entregue nelas.</p>' +
+        '<div style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:0.08em;color:#999;margin-bottom:8px">Por fase e fonte de perda · '+lista.length+' pontos</div>' +
+        '<table class="opp-table" id="opp-table-el"><thead><tr><th>#</th><th>Gap Identificado</th><th>Pilar</th><th>Fonte de perda</th><th>Situação</th><th>Fase</th></tr></thead><tbody id="opp-body">'+rows+'</tbody></table>';
     }
   }
-  if(attnCard) {
-    if(!plan.attention.length) { attnCard.style.display = 'none'; attnCard.innerHTML = ''; return; }
-    attnCard.style.display = '';
-    attnCard.innerHTML = repLbl('Pontos de atenção · a prática existe, mas é informal (' + plan.attention.length + ')') +
-      '<div style="display:grid;grid-template-columns:1fr 1fr;gap:2px 22px">' + plan.attention.map(function(a) {
-        return '<div style="font-size:11.5px;color:'+REP_TXT+';padding:5px 0;border-bottom:1px solid var(--rep-border,rgba(255,255,255,0.05))">'+a.gap+' <span style="color:'+REP_TXT_MUT+'">· '+(pil[a.phase]||a.phase)+'</span></div>';
-      }).join('') + '</div>';
-  }
+  // Attention points (nota 1,5) now live in the single table above; the old card stays hidden.
+  if(attnCard) { attnCard.style.display = 'none'; attnCard.innerHTML = ''; }
 }
 
 // Página 6 · ROI em 4 passos (dado do cliente → horas → R$ → retorno) + KPIs.
@@ -2415,7 +2500,7 @@ function buildReport() {
     // futura diferente), o crítico é o que deve aparecer aqui.
     var worstCritico = opps.filter(function(o){ return o.severity === 'critico'; })[0];
     var worstOpp = worstCritico || opps[0];
-    var worstOppLabel = worstOpp ? (fLabels[worstOpp.phase] || worstOpp.phase) : '—';
+    var worstOppLabel = worstOpp ? (pilarNumDoGap(worstOpp) ? 'Pilar ' + pilarNumDoGap(worstOpp) : (fLabels[worstOpp.phase] || worstOpp.phase)) : '—';
     var radarWorstLabel = (typeof RADAR_STATE !== 'undefined' && RADAR_STATE) ? RADAR_STATE.labels[RADAR_STATE.worstIdx] : '—';
     var radarWorstPct = (typeof RADAR_STATE !== 'undefined' && RADAR_STATE) ? Math.round(Math.max(0, RADAR_STATE.reference[RADAR_STATE.worstIdx] - RADAR_STATE.clientPct[RADAR_STATE.worstIdx]) * 100) + ' p.p.' : '—';
     gapsSummaryEl.innerHTML =
@@ -2915,10 +3000,20 @@ var GAP_FONTE = {
   'F4.1':'time', 'F4.2':'time', 'F4.3':'time', 'F4.4':'erros',
   'MO.1':'mo', 'MO.2':'mo', 'MO.3':'mo', 'MO.4':'erros', 'MO.5':'velocidade', 'MO.6':'retrabalho', 'MO.7':'erros'
 };
-var FONTE_LABEL = {
-  time:'Otimização do time de gestão', retrabalho:'Redução de retrabalhos', velocidade:'Ganho em velocidade de produção',
+// Loss source names shown to the client (tool and PDF). Internal keys stay unchanged.
+var PT_FONTE_LABEL = {
+  time:'Horas do time de gestão', retrabalho:'Retrabalho', velocidade:'Custos proporcionais ao prazo',
   erros:'Erros de medição e folha', mo:'Estouro de mão de obra'
 };
+var FONTE_LABEL = PT_FONTE_LABEL;
+// Display-only pillar of each labor (MO) point; o.bk stays 'mo' for score and plan.
+// MO points stay outside the /57 score: they only get a pillar reference here.
+var PT_MO_PILAR = { 'MO.1':3, 'MO.2':2, 'MO.3':2, 'MO.4':3, 'MO.5':2, 'MO.6':2, 'MO.7':3 };
+// Pillar number of a point (MO points via PT_MO_PILAR); '' when unknown.
+function pilarNumDoGap(o) {
+  if (o.bk === 'mo') return PT_MO_PILAR[o.code] || '';
+  return String(o.bk || '').charAt(1);
+}
 // Base de cada fonte SEM fórmula (o Resumido vai ao cliente e as fórmulas são
 // PI da Agilean): só dados informados e taxas de referência de mercado.
 var FONTE_BASE_TXT = {
@@ -2952,8 +3047,9 @@ function answerLabelFor(bk, code, score) {
 //               caras para as mais baratas; dentro da fonte, o gap marcado com
 //               ★ (dor declarada na entrevista) vem primeiro, depois a menor nota.
 //               ★ críticos de outras fontes entram até o teto de 5.
-//   rest      — demais gaps críticos, com Prioridade Alta (fonte entre as 3
-//               mais caras) ou Média.
+//   rest      — demais gaps críticos, ordenados por fase, fonte de perda e ordem
+//               atual (ordenarGapsPorFaseEFonte()).
+//               (o.prioridade é um campo interno e não é exibido.)
 //   attention — notas 1,5 (prática existe, mas informal).
 function getGapPlan(roi) {
   roi = roi || calculateROI();
@@ -2965,6 +3061,7 @@ function getGapPlan(roi) {
     var f = GAP_FONTE[o.code] || 'velocidade';
     if(base[f] === undefined) f = 'velocidade'; // ex.: MO terceirizada não tem a fonte "mo"
     o.fonte = f;
+    o.prioridade = prioridadeDaFase(o.code);
     o.star = !!(dores[o.code] && dores[o.code].star);
     o.frase = (dores[o.code] && dores[o.code].frase) ? String(dores[o.code].frase).trim() : '';
   });
@@ -2986,21 +3083,47 @@ function getGapPlan(roi) {
       if(anchors.length < 3) anchors.push(o);
     });
   }
-  var rest = crit.filter(function(o){ return anchors.indexOf(o) < 0; }).map(function(o) {
-    o.prioridade = top3.indexOf(o.fonte) >= 0 ? 'Alta' : 'Média';
-    return o;
-  }).sort(function(a,b){ return ((a.prioridade === 'Alta' ? 0 : 1) - (b.prioridade === 'Alta' ? 0 : 1)) || (a.order - b.order); });
+  var rest = ordenarGapsPorFaseEFonte(crit.filter(function(o){ return anchors.indexOf(o) < 0; }), fontesOrd);
   var attention = opps.filter(function(o){ return o.severity === 'oportunidade' && anchors.indexOf(o) < 0; })
     .sort(function(a,b){ return a.order - b.order; });
-  return { all: opps, anchors: anchors, rest: rest, attention: attention, top3: top3, base: base };
+  return { all: opps, anchors: anchors, rest: rest, attention: attention, top3: top3, base: base, fontesOrd: fontesOrd };
 }
 
-// Ato do Plano de Ação que resolve cada gap (1 planejamento, 2 canteiro,
-// 3 fechamento/performance).
-function atoDoGap(code) {
-  if(/^F1\./.test(code)) return 1;
-  if(/^F[23]\./.test(code) || code === 'MO.5' || code === 'MO.6') return 2;
-  return 3;
+// Implementation Phase per question code (I = routines 1, 2 + Pilar 4;
+// II = routines 3 and 6; III = routines 4 and 5). Single source for the report
+// (relatorio-prancha.js) and for the Gaps table of the tool.
+var PT_FASE = {
+  'F1.1':'I','F1.2':'I','F1.3':'I','F1.4':'I','F1.5':'I','F1.6':'I','F1.7':'II',
+  'F2.1':'I','F2.2':'I','F2.3':'I',
+  'F3.1':'I','F3.2':'I','F3.3':'I','F3.4':'II','F3.5':'I',
+  'F4.1':'I','F4.2':'I','F4.3':'I','F4.4':'II',
+  'MO.1':'III','MO.2':'III','MO.3':'III','MO.4':'III','MO.5':'III','MO.6':'III','MO.7':'III'
+};
+// Internal field only (not shown): Fases I and II = Alta, Fase III = Média. Codes without a phase stay Média.
+// Short phase names shown in the Gaps table (tool) and in sheets 02 and 05 (report); same words as the
+// official names in PT_FASES (relatorio-prancha.js). Phase II keeps "ERP e qualidade" in every case.
+var PT_FASE_CURTO = { I:'I · Planejamento e canteiro', II:'II · ERP e qualidade', III:'III · Pagamento da MO' };
+function faseCurtaDoGap(code) { return PT_FASE_CURTO[PT_FASE[code]] || '—'; }
+// Single numbering/ordering source for the Gaps table (tool) and sheet 05 (report): rest + attention
+// ordered by ordenarGapsPorFaseEFonte, numbered from anchors.length + 1.
+function gapsNumerados(plan) {
+  var list = ordenarGapsPorFaseEFonte(plan.rest.concat(plan.attention), plan.fontesOrd);
+  list.forEach(function(o, i){ o.n = plan.anchors.length + i + 1; });
+  return list;
+}
+// Single ordering rule for the Gaps table (tool) and sheet 05 (report):
+// 1) phase I, II, III (no phase last); 2) loss source by fontesOrd (most expensive first; no source last
+// in its phase); 3) current order (stable).
+function ordenarGapsPorFaseEFonte(list, fontesOrd) {
+  var f = function(o){ var i = ['I','II','III'].indexOf(PT_FASE[o.code]); return i < 0 ? 3 : i; };
+  var r = function(o){ var i = fontesOrd.indexOf(o.fonte); return i < 0 ? fontesOrd.length : i; };
+  return list.map(function(o, i){ return { o: o, i: i }; })
+    .sort(function(a, b){ return (f(a.o) - f(b.o)) || (r(a.o) - r(b.o)) || (a.i - b.i); })
+    .map(function(k){ return k.o; });
+}
+function prioridadeDaFase(code) {
+  var f = PT_FASE[code];
+  return (f === 'I' || f === 'II') ? 'Alta' : 'Média';
 }
 
 function fmtHorasBR(h) {
@@ -4537,6 +4660,9 @@ var DRAFT_KEY = 'siiga_draft';
 var syncTimeout = null;
 
 function saveDraft() {
+  // The scheduling fields live in the DOM only while their screen is open
+  var dgScr = document.getElementById('screen-diagnostico');
+  if (dgScr && dgScr.classList.contains('active')) readReuniao2();
   try {
     var draft = {
       ts: Date.now(),
@@ -4708,7 +4834,7 @@ function resumeDraft() {
   // Navigate to where the user was
   document.getElementById('resume-banner').style.display = 'none';
   if(currentBlock === 'b0') {
-    startAssessment();
+    beginB0(currentQIdx);
   } else if(currentBlock === 'transition') {
     showScreen('screen-transition');
   } else if(currentBlock === 'phase') {
@@ -4720,7 +4846,7 @@ function resumeDraft() {
   } else if(currentBlock === 'horas') {
     showHorasScreen(draft.horasOrigem || 'full');
   } else {
-    startAssessment();
+    beginB0();
   }
   showToast('Diagnóstico retomado!');
 }
