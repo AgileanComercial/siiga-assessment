@@ -232,6 +232,11 @@
 .ptr .tb.a{background:var(--tinta)}
 .ptr .tb.b{background:repeating-linear-gradient(135deg,var(--tinta) 0px,var(--tinta) var(--hatch),var(--hatch-neutro) var(--hatch),var(--hatch-neutro) calc(var(--hatch) * 2))}
 .ptr .tb.c{background:var(--marca-txt)}
+.ptr .tl.grp{height:6mm;border-bottom:0;align-items:end}
+.ptr .tl.grp .nm{padding-bottom:.6mm}
+.ptr .tl.sub{height:7mm}
+.ptr .tl.sub .nm{padding-left:4mm;color:var(--texto2)}
+.ptr .tbl{position:absolute;top:0;margin-left:1.2mm;padding:0 1.2mm;background:var(--papel);font-size:7pt;line-height:4.6mm;color:var(--texto2);white-space:nowrap}
 .ptr .tgrid{position:absolute;left:47mm;right:5mm;top:0;bottom:0;pointer-events:none}
 .ptr .tgrid i{position:absolute;top:0;bottom:0;border-left:.4pt dotted var(--hair)}
 .ptr .tticks{position:relative;margin-left:47mm;margin-right:5mm;height:4mm;margin-top:1mm;font-family:var(--f-mono);font-size:6.3pt;color:var(--texto3)}

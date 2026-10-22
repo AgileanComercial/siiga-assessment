@@ -315,6 +315,7 @@ select.text-input option:disabled{color:#999}
 .dor-toggle:hover{background:rgba(250,204,21,0.08)}
 .dor-toggle.on{background:rgba(250,204,21,0.16);border-style:solid}
 .combo-sub .dor-box{margin-top:10px}
+.dor-aviso{font-size:12px;line-height:1.45;color:#fbbf24;background:rgba(251,191,36,0.08);border-left:3px solid #fbbf24;border-radius:4px;padding:8px 12px}
 
 /* Apresentação SIIGA: telas Pilares e Método (entre a capa e o B0) */
 .pres-wrap{width:100%;max-width:1480px;margin:0 auto;display:flex;flex-direction:column;align-items:stretch}
@@ -461,6 +462,8 @@ select.text-input option:disabled{color:#999}
 .ns-gantt{position:relative;height:6px;background:rgba(255,255,255,0.08);border-radius:1px}
 .ns-gantt b{position:absolute;top:0;bottom:0;background:#ea580c;border-radius:1px}
 .ns-tick{position:absolute;top:-3px;bottom:-3px;width:1px;background:rgba(255,255,255,0.22)}
+.ns-sub{font-size:10.5px;line-height:1.3;color:#94a3b8;margin:6px 0 3px}
+.ns-sub:first-child{margin-top:0}
 .ns-axis{position:relative;height:14px;margin-top:5px;font-size:10px;color:#94a3b8}
 .ns-axis span{position:absolute;top:0;transform:translateX(-50%);white-space:nowrap}
 .ns-axis span:first-child{transform:none}
@@ -476,4 +479,4 @@ select.text-input option:disabled{color:#999}
 [data-report-theme="light"] .ns-gantt{background:#e9e4da}
 [data-report-theme="light"] .ns-tick{background:#b8b0a2}
 [data-report-theme="light"] .ns-res{color:#c2410c}
-[data-report-theme="light"] .ns-axis,[data-report-theme="light"] .ns-nota{color:#6b6577}
+[data-report-theme="light"] .ns-axis,[data-report-theme="light"] .ns-nota,[data-report-theme="light"] .ns-sub{color:#6b6577}

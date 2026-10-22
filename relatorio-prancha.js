@@ -93,6 +93,9 @@ var PT_PILAR_NOME = { f1:'Planejamento estratégico do fluxo de produção', f2:
 var PT_MERCADO = { f1:0.70, f2:0.62, f3:0.55, f4:0.58 }; // same values as the radar benchmark
 var PT_TIPOLOGIA = { vert:'Residencial vertical', horiz:'Residencial horizontal', mcmv:'MCMV / Habitação popular', com:'Comercial / industrial', div:'Portfólio diversificado' };
 var PT_NUM_EXT = { 1:'um', 2:'dois', 3:'três', 4:'quatro', 5:'cinco' };
+var PT_NUM_EXT_F = { 1:'uma', 2:'duas', 3:'três', 4:'quatro', 5:'cinco' };
+// "Prioridade 1" / "Prioridades 1 e 2"
+function ptPrioLista(ns) { return (ns.length === 1 ? 'Prioridade ' : 'Prioridades ') + ptLista(ns.map(String)); }
 
 var PT_FASES = [
   { id:'I', nome:'Planejamento e Controle Integrado com o Canteiro',
@@ -100,7 +103,12 @@ var PT_FASES = [
   { id:'II', nome:'Integração com o ERP e o Sistema de Qualidade',
     dur:'até 60 dias, em paralelo à Fase I', fd:'Até 60 dias, em paralelo à Fase I. FVS digital vinculada ao avanço e integração com o sistema de gestão.' },
   { id:'III', nome:'Controle de Pagamento da Mão de Obra Integrado',
-    dur:'até 90 dias, após as Fases I e II (cerca do dia 60 ao 150)', fd:'Até 90 dias, após as Fases I e II. Medição de empreiteiros e fechamento de folha por evidência de avanço.' }
+    dur:'após as Fases I e II, a partir do dia 60: Controle de Empreiteiros em 20 dias (até o dia 80) e Folha de Produção em 90 dias (até o dia 150)',
+    fd:'A partir do dia 60, após as Fases I e II. Controle de Empreiteiros em 20 dias (medição de empreiteiros por evidência de avanço) e Folha de Produção em 90 dias (fechamento de folha por evidência de avanço).',
+    prazo:'A partir do dia 60',
+    // Two fronts, both starting on day 60 (timeline in the report and in the tool)
+    frentes:[{ nome:'Folha de Produção', ini:60, fim:150, rot:'90 dias, após I e II' },
+             { nome:'Controle de Empreiteiros', ini:60, fim:80, rot:'20 dias, após I e II' }] }
 ];
 
 var PT_VERSAO = '1.0';
@@ -218,7 +226,7 @@ function ptModel(mode) {
     var frase = o.frase ? ptCap(o.frase).replace(/[.\s]+$/, '') + '.' : '';
     var cs = FONTE_CASE[o.fonte];
     return {
-      n:i + 1, code:o.code, titulo:titulo(o), pilar:pilarLbl(o, true), fase:PT_FASE[o.code] || '',
+      n:i + 1, code:o.code, titulo:titulo(o), pilar:pilarLbl(o, true), fase:PT_FASE[o.code] || '', alerta:o.severity !== 'critico',
       faseCurta:faseCurtaDoGap(o.code), star:o.star, frase:frase, situacao:situacao,
       conseq:PT_CONSEQ[o.code] || (GAP_INFO[o.code] || {}).impact || '',
       fonte:f, mes:first ? f.mes : null,
@@ -228,14 +236,18 @@ function ptModel(mode) {
     };
   });
   var nCrit = criticos.length;
-  // One table: rest and attention together, ordered by the single rule shared with the tool
-  // (phase I, II, III; then loss source by fontesOrd; then current order; see ordenarGapsPorFaseEFonte in script.js).
   // Source only when the engine computes it (o.fonte); otherwise a dash, never invented.
+  // Remaining critical points (score 0 or 1) only, grouped by loss source; same rule as the tool's
+  // Gaps table (gapsNumerados in script.js). Points in alert (score 1.5) are only counted.
   var demais = gapsNumerados(plan).map(function(o) {
-    return { code:o.code, titulo:titulo(o), pilar:pilarLbl(o, false),
-      fonte:(o.fonte && fontes[o.fonte]) || { label:'—' }, fase:PT_FASE[o.code] || '', faseCurta:faseCurtaDoGap(o.code) };
-  });
-  demais.forEach(function(d, i){ d.n = nCrit + i + 1; }); // equals o.n from gapsNumerados (anchors.length === nCrit)
+      return { code:o.code, titulo:titulo(o), pilar:pilarLbl(o, false), fonteKey:o.fonte,
+        fonte:(o.fonte && fontes[o.fonte]) || { label:'—' }, fase:PT_FASE[o.code] || '', faseCurta:faseCurtaDoGap(o.code) };
+    });
+  demais.forEach(function(d, i){ d.n = nCrit + i + 1; d.grpFirst = !i || demais[i - 1].fonteKey !== d.fonteKey; });
+  var nGrp = {};
+  demais.forEach(function(d){ nGrp[d.fonteKey] = (nGrp[d.fonteKey] || 0) + 1; });
+  var alertaFase = {};
+  plan.attention.forEach(function(o){ var fz = PT_FASE[o.code] || ''; alertaFase[fz] = (alertaFase[fz] || 0) + 1; });
   var critFonteKeys = Object.keys(fonteVista);
   var critPerda = critFonteKeys.reduce(function(a, k){ return a + fontes[k].perda; }, 0);
   var critMes = critPerda / prazo;
@@ -255,7 +267,9 @@ function ptModel(mode) {
     tipologia:PT_TIPOLOGIA[S.tipologia] || '',
     score:score, pilares:pilares, worst:worst, roi:roi, plan:plan, fontes:fontes,
     reuniao2:S.reuniao2 || { data:'', hora:'', participantes:[] },
-    criticos:criticos, demais:demais, totalAvaliados:plan.all.length,
+    criticos:criticos, demais:demais, totalAvaliados:plan.all.length, nGrp:nGrp,
+    nCritTot:criticos.filter(function(c){ return !c.alerta; }).length + demais.length, nAlerta:plan.attention.length, alertaFase:alertaFase,
+    nPrioAlerta:criticos.filter(function(c){ return c.alerta; }).length,
     critPerda:critPerda, critMes:critMes, critCapMes:critCapMes, mapaMes:roi.totalBase / prazo,
     cons:cons, pleno:pleno, pess:pess, perdaMes:comp(pleno), ganhoMes:comp(cons), ganhoPess:comp(pess),
     folha:(S.roi2 && S.roi2.folha) || 0, horasInf:cons.operacional.horasInformadas, horasPot:cons.operacional.potPleno,
@@ -296,7 +310,7 @@ function ptSecResumo(M) {
       '<div class="stt">' + ptSt(ptStCls(p.pct), ptStWord(p.pct)) + '</div></div>';
   }).join('');
   var nC = M.criticos.length;
-  var ext = PT_NUM_EXT[nC] || String(nC);
+  var ext = PT_NUM_EXT_F[nC] || String(nC);
   var crit = M.criticos.map(function(c) {
     return '<tr><td>' + c.n + '</td><td><span class="b6">' + c.titulo + '</span>' + (c.frase ? '<span class="q">“' + ptEsc(c.frase.replace(/\.$/, '')) + '.”</span>' : '') + '</td>' +
       '<td>' + c.pilar + '</td><td style="white-space:nowrap">' + c.faseCurta + '</td>' +
@@ -305,7 +319,7 @@ function ptSecResumo(M) {
   var pctCrit = M.roi.totalBase ? Math.round(M.critPerda / M.roi.totalBase * 100) : 0;
   var lead = 'A perda estimada ' + ptPorObra(M) + ' é de <b>' + ptMilInt(M.roi.totalBase) + '</b> em ' + M.prazo + ' meses' +
     (M.obras > 1 ? ' (' + ptMilInt(M.roi.totalBase * M.obras) + ' no portfólio de ' + M.obras + ' obras)' : '') +
-    '; as fontes de perda ligadas a ' + (nC === 1 ? 'um ponto crítico respondem' : ext + ' pontos críticos respondem') +
+    '; as fontes de perda ligadas ' + (nC === 1 ? 'à prioridade respondem' : 'às ' + ext + ' prioridades respondem') +
     ' por <b>' + ptMilInt(M.critPerda) + '</b> (' + pctCrit + '%).';
   var escopo = [ptObrasTxt(M), ptMilVar(M.orc) + (M.obras > 1 ? ' por obra' : ''), M.prazo + ' meses', M.moTxt].filter(Boolean).join(' · ');
   var meta = '<div class="meta" style="margin-top:5mm">' +
@@ -330,9 +344,9 @@ function ptSecResumo(M) {
       '</div></div></div>';
   var blocks = [{ sec:'01', html:b1 }];
   if (nC) {
-    blocks.push({ sec:'01', html:'<div class="row sec"><div><div class="lbl rule">Pontos críticos</div><div class="note" style="margin-top:1.5mm">' + nC + ' de ' + M.totalAvaliados + ' pontos avaliados</div></div><div>' +
-      '<table><thead><tr><th style="width:5mm">#</th><th>Ponto crítico</th><th style="width:15mm">Pilar</th><th style="width:38mm">Fase de Implementação</th><th class="n wrap" style="width:24mm">Perda por mês sem tratamento</th></tr></thead>' +
-      '<tbody>' + crit + '<tr class="tot"><td></td><td>Total ' + (nC === 1 ? 'do ponto crítico' : 'dos ' + nC + ' pontos críticos') + '</td><td></td><td></td><td class="n">' + ptMil(M.critMes, 1) + '/mês</td></tr>' +
+    blocks.push({ sec:'01', html:'<div class="row sec"><div><div class="lbl rule">Prioridades</div><div class="note" style="margin-top:1.5mm">' + (nC - M.nPrioAlerta) + ' de ' + M.nCritTot + ' pontos críticos' + (M.nPrioAlerta ? '; ' + M.nPrioAlerta + (M.nPrioAlerta === 1 ? ' ponto em alerta com dor declarada' : ' pontos em alerta com dor declarada') : '') + '</div></div><div>' +
+      '<table><thead><tr><th style="width:5mm">#</th><th>Prioridade</th><th style="width:15mm">Pilar</th><th style="width:38mm">Fase de Implementação</th><th class="n wrap" style="width:24mm">Perda por mês sem tratamento</th></tr></thead>' +
+      '<tbody>' + crit + '<tr class="tot"><td></td><td>Total ' + (nC === 1 ? 'da prioridade' : 'das ' + nC + ' prioridades') + '</td><td></td><td></td><td class="n">' + ptMil(M.critMes, 1) + '/mês</td></tr>' +
       '<tr class="rec"><td></td><td colspan="3">Recuperável com o plano · ' + ptMult(M.critCapMes / M.cons.mensalidade) + ' mensalidade ref.</td><td class="n">' + ptMil(M.critCapMes, 1) + '/mês</td></tr></tbody></table></div></div>' });
   }
   return blocks;
@@ -374,24 +388,24 @@ function ptSecPerdaGanho(M) {
   var rows = itens.map(function(f) {
     var l = linked[f.key];
     return '<tr><td>' + f.labelTab + '</td><td class="n">' + ptMil(f.mes, 1) + '</td><td class="n">' + ptPct(f.fator) + '</td><td class="n">' + ptMil(f.cap / P, 1) + '</td><td style="padding-left:5mm">' +
-      (l ? (l.length === 1 ? 'Ponto crítico ' : 'Pontos críticos ') + ptLista(l.map(String)) : '—') + '</td></tr>';
+      (l ? ptPrioLista(l) : '—') + '</td></tr>';
   }).join('');
   var portf = porObra ? '<tr class="tot"><td>Total no portfólio (' + M.obras + ' obras)</td><td class="n">' + ptMil(M.roi.totalBase * M.obras / P, 1) + '</td><td class="n"></td><td class="n">' + ptMil(M.roi.totalPortfolio / P, 1) + '</td><td></td></tr>' : '';
-  var b2 = '<div class="row sec"><div><div class="lbl rule">Composição</div></div><div><table><thead><tr><th>Fonte de perda</th><th class="n" style="width:22mm">Perda/mês</th><th class="n" style="width:16mm">Captura</th><th class="n" style="width:24mm">Ganho/mês</th><th class="wrap" style="width:31mm;padding-left:5mm">Ponto crítico ligado</th></tr></thead><tbody>' + rows +
+  var b2 = '<div class="row sec"><div><div class="lbl rule">Composição</div></div><div><table><thead><tr><th>Fonte de perda</th><th class="n" style="width:22mm">Perda/mês</th><th class="n" style="width:16mm">Captura</th><th class="n" style="width:24mm">Ganho/mês</th><th class="wrap" style="width:31mm;padding-left:5mm">Prioridade ligada</th></tr></thead><tbody>' + rows +
     '<tr class="tot"><td>' + (porObra ? 'Total por obra' : 'Total, 1 obra') + '</td><td class="n perda">' + ptMil(perdaMes, 1) + '</td><td class="n">' + ptPct(capPct) + '</td><td class="n ganho">' + ptMil(ganhoMes, 1) + '</td><td></td></tr>' + portf + '</tbody></table></div></div>';
   return [{ sec:'02', html:b1 }, { sec:'02', html:b2 }];
 }
 
 function ptSecCriticos(M) {
-  var head = ptSec('03', 'Pontos críticos', true) +
-    '<div class="row" style="margin-top:5mm"><div class="lbl rule">Pilar mais crítico</div>' +
+  var head = ptSec('03', 'Prioridades', true) +
+    '<div class="row" style="margin-top:5mm"><div class="lbl rule">Pilar de menor maturidade</div>' +
     '<div style="border-top:.75pt solid var(--tinta);padding-top:2mm"><span class="b6">Pilar ' + M.worst.n + ', ' + M.worst.nome + '</span> · ' + ptNum(M.worst.pts, 0, 1) + ' de ' + M.worst.max + ' pontos (' + Math.round(M.worst.pct * 100) + '%), menor percentual</div></div>';
   var blocks = [];
   M.criticos.forEach(function(c, i) {
     var f = c.fonte;
     var html = '<div class="pc row"' + (i === 0 ? ' style="margin-top:4mm"' : '') + '>' +
-      '<div><div class="lbl">Ponto crítico ' + c.n + '</div><div class="note" style="margin-top:1mm">' + c.pilar + (c.fase ? '<br>Fase de Implementação ' + c.fase : '') + '</div>' +
-        (c.star ? '<div class="note" style="margin-top:1mm">Dor declarada pelo cliente</div>' : '') + '</div>' +
+      '<div><div class="lbl">Prioridade ' + c.n + '</div><div class="note" style="margin-top:1mm">' + c.pilar + (c.fase ? '<br>Fase de Implementação ' + c.fase : '') + '</div>' +
+        (c.star ? '<div class="note" style="margin-top:1mm">' + (c.alerta ? 'Em alerta · dor declarada pelo cliente' : 'Dor declarada pelo cliente') + '</div>' : '') + '</div>' +
       '<div><div class="tt">' + c.titulo + '</div><div class="in"><div>' +
         '<div class="kv"><span class="lbl">Situação registrada</span><div class="txt">' + ptEsc(c.situacao) + '</div>' + (c.frase ? '<span class="q" style="margin-bottom:1.6mm">“' + ptEsc(c.frase) + '”</span>' : '') + '</div>' +
         '<div class="kv"><span class="lbl">Consequência</span><div class="txt">' + ptEsc(c.conseq) + '</div></div>' +
@@ -408,19 +422,34 @@ function ptSecCriticos(M) {
   return blocks;
 }
 
+function ptAlertaTxt(M) {
+  var n = M.nAlerta;
+  if (!n) return '';
+  return (n === 1 ? 'Outro ponto está em alerta' : 'Outros ' + n + ' pontos estão em alerta') +
+    ': a prática existe, mas é informal. ' + (n === 1 ? 'Ele entra' : 'Eles entram') + ' no plano de implantação.';
+}
 function ptSecDemais(M) {
-  var tot = M.demais.length;
-  if (!tot) return [];
-  var head = ptSec('04', 'Demais pontos avaliados', true);
+  var tot = M.demais.length, alerta = ptAlertaTxt(M);
+  if (!tot && !alerta) return [];
+  var head = ptSec('04', 'Demais pontos críticos', true);
+  var nota = alerta ? '<p class="note" style="margin-top:3mm">' + alerta + '</p>' : '';
+  if (!tot) return [{ sec:'04', html:head + nota }];
+  var prioDa = {};
+  M.criticos.forEach(function(c){ (prioDa[c.fonte.key] = prioDa[c.fonte.key] || []).push(c.n); });
   var blocks = [];
   blocks.push({ sec:'04', head:head, rows:M.demais, render:function(rows, first, last) {
-    // Tighter vertical padding so the single table (all points) keeps its footnote on the same sheet.
-    var pd = ' style="padding-top:.45mm;padding-bottom:.45mm"';
-    var tr = rows.map(function(d) {
-      return '<tr><td' + pd + '>' + ptPad(d.n) + '</td><td class="b6"' + pd + '>' + d.titulo + '</td><td' + pd + '>' + d.pilar + '</td><td style="padding-top:.45mm;padding-bottom:.45mm;white-space:nowrap">' + d.faseCurta + '</td><td' + pd + '>' + d.fonte.label + '</td></tr>';
+    var tr = rows.map(function(d, i) {
+      var g = '';
+      if (d.grpFirst || i === 0) {
+        var f = d.fonte, nG = M.nGrp[d.fonteKey] || 0, pr = prioDa[d.fonteKey];
+        g = '<tr class="grp"><td colspan="4"><span class="gl">Fonte de perda</span><b class="b6">' + f.label + '</b>' + (d.grpFirst ? '' : ' (continuação)') +
+          '<div class="gsub">' + (f.mes != null ? ptMil(f.mes, 1) + ' por mês sem tratamento · ' : '') + nG + (nG === 1 ? ' ponto' : ' pontos') +
+          (pr ? ' · mesma fonte da ' + ptPrioLista(pr) : '') + '</div></td></tr>';
+      }
+      return g + '<tr><td>' + ptPad(d.n) + '</td><td class="b6">' + d.titulo + '</td><td>' + d.pilar + '</td><td style="white-space:nowrap">' + d.faseCurta + '</td></tr>';
     }).join('');
-    return '<div style="margin-top:5mm">' + (first ? '<div class="lbl" style="margin-bottom:2mm">Por fase e fonte de perda · ' + tot + ' pontos</div>' : '') +
-      '<table><thead><tr><th style="width:7mm">#</th><th>Ponto</th><th style="width:10mm">Pilar</th><th style="width:36.8mm">Fase</th><th style="width:46mm">Fonte de perda</th></tr></thead><tbody>' + tr + '</tbody></table></div>';
+    return '<div style="margin-top:5mm">' + (first ? '<div class="lbl" style="margin-bottom:2mm">Por fonte de perda · ' + tot + (tot === 1 ? ' ponto crítico' : ' pontos críticos') + '</div>' : '') +
+      '<table><thead><tr><th style="width:7mm">#</th><th>Ponto</th><th style="width:10mm">Pilar</th><th style="width:36.8mm">Fase</th></tr></thead><tbody>' + tr + '</tbody></table>' + (last ? nota : '') + '</div>';
   }});
   return blocks;
 }
@@ -482,18 +511,28 @@ function ptRegua() {
   var D = 150, x = function(v){ return (v / D * 100).toFixed(2) + '%'; };
   var ticks = [0, 30, 60, 90, 120, 150].map(function(v){ return '<span style="left:' + x(v) + '">' + v + '</span>'; }).join('');
   var lines = [0, 30, 60, 90, 120, 150].map(function(v){ return '<i style="left:' + x(v) + '"></i>'; }).join('');
-  var row = function(nome, a, b, cls, txt) { return '<div class="tl"><div class="nm">' + nome + '</div><div class="tp"><div class="tb ' + cls + '" style="left:' + x(a) + ';width:' + x(b - a) + '">' + txt + '</div></div></div>'; };
-  return '<div class="chart-t">As Fases I e II ocupam os primeiros 60 dias; a Fase III vai até cerca do dia 150</div>' +
+  // A label that does not fit inside its bar (short bars) goes right after it, on a paper background over the grid
+  var row = function(nome, a, b, cls, txt, sub) {
+    var dentro = (b - a) >= 45;
+    return '<div class="tl' + (sub ? ' sub' : '') + '"><div class="nm">' + nome + '</div><div class="tp"><div class="tb ' + cls + '" style="left:' + x(a) + ';width:' + x(b - a) + '">' + (dentro ? txt : '') + '</div>' +
+      (dentro ? '' : '<div class="tbl" style="left:' + x(b) + '">' + txt + '</div>') + '</div></div>';
+  };
+  var f3 = PT_FASES[2];
+  var frentes = (f3.frentes || []).map(function(fr){ return row(fr.nome, fr.ini, fr.fim, 'c', fr.rot, true); }).join('');
+  return '<div class="chart-t">As Fases I e II ocupam os primeiros 60 dias; na Fase III, o Controle de Empreiteiros termina no dia 80 e a Folha de Produção, por volta do dia 150</div>' +
     '<div style="position:relative"><div class="tgrid">' + lines + '</div>' +
-    row('Fase de Implementação I', 0, 60, 'a', 'até 60 dias') + row('Fase de Implementação II', 0, 60, 'b', 'até 60 dias, em paralelo') + row('Fase de Implementação III', 60, 150, 'c', 'até 90 dias, após I e II') +
+    row('Fase de Implementação I', 0, 60, 'a', 'até 60 dias') + row('Fase de Implementação II', 0, 60, 'b', 'até 60 dias, em paralelo') +
+    '<div class="tl grp"><div class="nm">Fase de Implementação III</div><div></div></div>' + frentes +
     '</div><div class="tticks">' + ticks + '</div>';
 }
 function ptResolve(M, faseId) {
   var cr = M.criticos.filter(function(c){ return c.fase === faseId; }).map(function(c){ return String(c.n); });
   var dm = M.demais.filter(function(d){ return d.fase === faseId; }).map(function(d){ return ptPad(d.n); });
   var parts = [];
-  if (cr.length) parts.push((cr.length === 1 ? 'ponto crítico ' : 'pontos críticos ') + ptLista(cr));
-  if (dm.length) parts.push((dm.length === 1 ? 'ponto ' : 'pontos ') + ptLista(dm));
+  var na = (M.alertaFase || {})[faseId] || 0;
+  if (cr.length) parts.push((cr.length === 1 ? 'prioridade ' : 'prioridades ') + ptLista(cr));
+  if (dm.length) parts.push((dm.length === 1 ? 'ponto crítico ' : 'pontos críticos ') + ptLista(dm));
+  if (na) parts.push(na + (na === 1 ? ' ponto em alerta' : ' pontos em alerta'));
   return parts.length ? 'Resolve: ' + parts.join('; ') + '.' : '';
 }
 
@@ -593,13 +632,13 @@ function ptSecAnexo(M) {
   };
   var a2rows = M.roi.items.map(function(it){ var f = F[it.key]; return '<tr><td>' + f.labelTab + '</td><td class="f">' + form[it.key] + '</td><td class="n">' + ptMil(f.perda, 1) + '</td></tr>'; }).join('');
   var mesRows = M.criticos.filter(function(c){ return c.mes != null; }).map(function(c, i) {
-    return '<tr><td>Ponto crítico ' + c.n + ' (' + c.fonte.label + ')</td><td class="f">' + (i === 0 ? 'Perda da fonte ÷ meses de obra: ' : '') + ptMil(c.fonte.perda, 1) + ' ÷ ' + P + '</td><td class="n">' + ptMil(c.mes, 1) + '</td></tr>';
+    return '<tr><td>Prioridade ' + c.n + ' (' + c.fonte.label + ')</td><td class="f">' + (i === 0 ? 'Perda da fonte ÷ meses de obra: ' : '') + ptMil(c.fonte.perda, 1) + ' ÷ ' + P + '</td><td class="n">' + ptMil(c.mes, 1) + '</td></tr>';
   }).join('');
   var nC = M.criticos.length;
   var a2 = '<div class="row sec"><div><div class="lbl rule">A.2 Perda por fonte</div></div><div><table class="ax"><thead><tr><th style="width:44mm">Fonte de perda</th><th>Fórmula (' + P + ' meses)</th><th class="n" style="width:20mm">Valor</th></tr></thead><tbody>' + a2rows +
     '<tr class="tot"><td>Total</td><td></td><td class="n">' + ptMil(M.roi.totalBase, 1) + '</td></tr></tbody></table>' +
     (nC ? '<table class="ax" style="margin-top:6mm"><thead><tr><th style="width:44mm">Perda por mês sem tratamento</th><th>Fórmula</th><th class="n" style="width:24mm">Valor</th></tr></thead><tbody>' + mesRows +
-      '<tr class="tot"><td>Total ' + (nC === 1 ? 'do ponto crítico' : 'dos ' + nC + ' pontos críticos') + '</td><td class="f">' + ptMil(M.critPerda, 1) + ' ÷ ' + P + '</td><td class="n">' + ptMil(M.critMes, 1) + '</td></tr>' +
+      '<tr class="tot"><td>Total ' + (nC === 1 ? 'da prioridade' : 'das ' + nC + ' prioridades') + '</td><td class="f">' + ptMil(M.critPerda, 1) + ' ÷ ' + P + '</td><td class="n">' + ptMil(M.critMes, 1) + '</td></tr>' +
       '<tr><td>Perda total do Mapa (contexto)</td><td class="f">' + ptMil(M.roi.totalBase, 1) + ' ÷ ' + P + '</td><td class="n">' + ptMil(M.mapaMes, 1) + '</td></tr></tbody></table>' : '') + '</div></div>';
   var a3rows = M.roi.items.map(function(it){ var f = F[it.key]; return '<tr><td>' + f.labelTab + '</td><td class="f">' + ptMil(f.perda, 1) + ' × ' + ptPct(f.fator) + '</td><td class="n">' + ptMil(f.cap, 1) + '</td></tr>'; }).join('');
   var a3 = '<div class="row sec"><div><div class="lbl rule">A.3 Fator de captura</div></div><div><table class="ax"><thead><tr><th style="width:44mm">Fonte de perda</th><th>Fórmula</th><th class="n" style="width:20mm">Ganho</th></tr></thead><tbody>' + a3rows +
@@ -632,8 +671,8 @@ function ptSecAnexo(M) {
 var PT_SECOES = {
   '01':{ run:'Resumo executivo', toc:'Resumo executivo', cls:'tight dense' },
   '02':{ run:'Perda e ganho mensal', toc:'Perda e ganho mensal', cls:'' },
-  '03':{ run:'Pontos críticos', toc:'Pontos críticos', cls:'tight' },
-  '04':{ run:'Demais pontos avaliados', toc:'Demais pontos avaliados', cls:'tight dense' },
+  '03':{ run:'Prioridades', toc:'Prioridades', cls:'tight' },
+  '04':{ run:'Demais pontos críticos', toc:'Demais pontos críticos', cls:'tight dense', flowIfWhole:true },
   '05':{ run:'Plano de Transformação Operacional', toc:null, cls:'', flow:true },
   '06':{ run:'Bases do diagnóstico', toc:'Bases do diagnóstico', cls:'tight' },
   'A':{ run:'Anexo A · Memória de cálculo', toc:'Anexo A · Memória de cálculo', cls:'', noCont:true }
@@ -677,7 +716,27 @@ function ptPaginate(root, M, blocks) {
   blocks.forEach(function(b) {
     var meta = PT_SECOES[b.sec];
     var secChange = !cur || cur.sec !== b.sec;
-    if (!cur || b.breakBefore === true || (secChange && !meta.flow)) newPage(b.sec, false);
+    // flowIfWhole: the section starts on the current sheet when it fits there entirely, or, for a
+    // row block, when at least its heading and 3 rows fit (the rest continues on the next sheet)
+    var flowHere = false;
+    if (cur && secChange && meta.flowIfWhole && b.breakBefore !== true) {
+      var noFirst = function(h) { return (h || '').replace('row sec first', 'row sec'); };
+      var shareRun = function() {
+        var run = cur.el.querySelector('.run span:last-child');
+        if (run) run.textContent += ' · ' + b.sec + ' ' + meta.run;
+        cur.sec = b.sec;
+      };
+      var wn = add(noFirst((b.head || '') + (b.rows ? b.render(b.rows, true, true) : b.html)));
+      if (fits()) { shareRun(); secStart[b.sec] = pages.length; cur.n++; return; }
+      remove(wn);
+      if (b.rows && b.rows.length > 3) {
+        var pn = add(noFirst(b.head) + b.render(b.rows.slice(0, 3), true, false));
+        flowHere = fits();
+        remove(pn);
+        if (flowHere) { shareRun(); b = Object.assign({}, b, { head:noFirst(b.head), noWidow:true }); }
+      }
+    }
+    if (!flowHere && (!cur || b.breakBefore === true || (secChange && !meta.flow))) newPage(b.sec, false);
     if (!b.rows) {
       var nodes = add((b.head || '') + b.html);
       if (!fits() && cur.n > 0) { remove(nodes); newPage(b.sec, !!secStart[b.sec]); add((b.head || '') + b.html); }
@@ -693,6 +752,10 @@ function ptPaginate(root, M, blocks) {
         var nd = add((first ? (b.head || '') : '') + b.render(rest.slice(0, k), first, k === rest.length));
         if (fits()) { placed = nd; break; }
         remove(nd);
+      }
+      if (placed && b.noWidow && rest.length - k === 1 && k > 3) {
+        remove(placed); k--;
+        placed = add((first ? (b.head || '') : '') + b.render(rest.slice(0, k), first, false));
       }
       if (!placed) {
         if (cur.n > 0) { newPage(b.sec, !!secStart[b.sec] || !first); continue; }

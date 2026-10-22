@@ -170,7 +170,8 @@ server.listen(PORT, async () => {
         execRet: document.getElementById('exec-retorno-card').innerText,
         execSnap: document.getElementById('exec-snapshot').innerText,
         gapsTile: document.getElementById('gaps-summary-stats').innerText,
-        oppRows: document.querySelectorAll('#opp-body tr').length,
+        oppRows: Array.prototype.filter.call(document.querySelectorAll('#opp-body tr'), function(tr){ return tr.children.length === 5; }).length,
+        oppCard: document.getElementById('opp-table-card').innerText,
         attnTxt: document.getElementById('opp-attn-card').innerText,
         roiTable: document.getElementById('roi-table-el').innerText,
         chain: document.getElementById('roi-chain-card').innerText,
@@ -188,19 +189,19 @@ server.listen(PORT, async () => {
     console.log('ROI 4 passos:\n' + rep.chain);
     console.log('Plano:\n' + rep.plano);
     check('24 gaps (sem limite de 14)', rep.total === 24, rep.total);
-    check('quadro mostra 24 gaps identificados', /24\s*\n?\s*Gaps identificados/i.test(rep.gapsTile), rep.gapsTile.replace(/\n/g,' | '));
+    check('quadro mostra 13 pontos críticos', /13\s*\n?\s*Pontos críticos/i.test(rep.gapsTile), rep.gapsTile.replace(/\n/g,' | '));
     check('3 gaps-âncora: HUB★, Bloqueios★, Aditivos', rep.anchors.join(',') === 'F4.3:Performance HUB — visão integrada:time★,MO.6:Comunicação de bloqueios de pagamento:retrabalho★,MO.3:Gestão de aditivos de verba:mo', rep.anchors.join(','));
     check('cards dos âncoras são filhos diretos do relatório (paginação do PDF)', rep.anchorCards === 3 && rep.anchorCardsDirect === 3, rep.anchorCards + '/' + rep.anchorCardsDirect);
-    check('tabela Gaps Identificados com os 21 pontos (10 críticos + 11 de atenção)', rep.oppRows === 21, rep.oppRows);
+    check('tabela Gaps Identificados só com os 10 demais críticos, e os 11 em alerta só contados', rep.oppRows === 10 && /Outros 11 pontos estão em alerta/.test(rep.oppCard), rep.oppRows);
     check('Pontos de atenção = 11, dentro da tabela única (card antigo oculto)', rep.attention === 11 && rep.attnTxt === '', rep.attention);
     check('títulos do Pilar 1 batem com as perguntas', rep.titulosF1.indexOf('F1.7=Cronograma bancário') >= 0 && rep.titulosF1.indexOf('F1.3=Duração dos pacotes por produtividade') >= 0 && rep.titulosF1.indexOf('F1.5=Integração planejamento × suprimentos') >= 0, JSON.stringify(rep.titulosF1));
     check('Síntese com 3 KPIs (Ganho capturável)', /Ganho Capturável/i.test(rep.execSnap));
     check('Síntese cita a frase do cliente', /o custo sou eu que compilo/.test(rep.execAnchors));
     check('retorno em uma linha: 120 h → 50 h → R$ 10,25 mil → 5,1×', /120 h\/mês/.test(rep.execRet) && /50 h\/mês/.test(rep.execRet) && /R\$ 10,25 mil/.test(rep.execRet) && /5,1×/.test(rep.execRet), rep.execRet.replace(/\n/g,' '));
     check('Síntese sem caixa de próximo passo', !/Próximo passo/i.test(rep.execAnchors + rep.execRet + rep.execSnap));
-    check('Perda ao Ganho com coluna Gap-âncora', /Gap-âncora/i.test(rep.roiTable) && /● Performance HUB/.test(rep.roiTable));
+    check('Perda ao Ganho com coluna Prioridade', /Prioridade/i.test(rep.roiTable) && !/Gap-âncora/i.test(rep.roiTable) && /● Performance HUB/.test(rep.roiTable));
     check('ROI em 4 passos com confirmação', /Dado de vocês/i.test(rep.chain) && /O retorno/i.test(rep.chain) && /faz sentido desenharmos o escopo/.test(rep.chain));
-    check('Plano com Resolve, O que ouvimos e Próximo passo', /Resolve: ponto crítico 1; pontos 04, 05/.test(rep.plano) && !/Gap-âncora|ato/i.test(rep.plano) && /O que ouvimos/i.test(rep.plano) && /Próximo passo/i.test(rep.plano));
+    check('Plano com Resolve, O que ouvimos e Próximo passo', /Resolve: prioridade 1; pontos críticos 04, 05/.test(rep.plano) && !/Gap-âncora|ato/i.test(rep.plano) && /O que ouvimos/i.test(rep.plano) && /Próximo passo/i.test(rep.plano));
     check('Fluxo Metodológico removido do corpo', !rep.hasFluxo);
     check('sem placeholder de case', !rep.hasPlaceholder);
     check('case Tack (Leonardo Aidar) no gap de retrabalho', rep.tack);

@@ -858,12 +858,22 @@ function getNavQs(bd, bk) {
 function escAttr(v) {
   return String(v == null ? '' : v).replace(/&/g,'&amp;').replace(/"/g,'&quot;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
 }
+// ★ on a structured answer (score 3) does not reach the report: warn the consultant.
+function dorScoreDoCode(code) {
+  var bk = code.indexOf('MO.') === 0 ? 'mo' : code.charAt(0).toLowerCase() + code.charAt(1);
+  return getScoreByCode(bk, code);
+}
+function dorAvisoOn(code) {
+  var d = (S.dores || {})[code] || {};
+  return !!d.star && dorScoreDoCode(code) === 3;
+}
 function renderDorHtml(code) {
   var d = (S.dores || {})[code] || {};
   var on = !!d.star;
   return '<div class="dor-box" id="dor-' + code + '">' +
     '<button type="button" class="dor-toggle' + (on ? ' on' : '') + '" onclick="toggleDor(\'' + code + '\')">★ Dor declarada pelo cliente</button>' +
     '<input class="text-input dor-frase" type="text" maxlength="180" placeholder="Frase do cliente, com as palavras dele (opcional)" value="' + escAttr(d.frase) + '" oninput="setDorFrase(\'' + code + '\', this.value)" style="display:' + (on ? 'block' : 'none') + '">' +
+    '<div class="dor-aviso" style="display:' + (dorAvisoOn(code) ? 'block' : 'none') + '">Esta resposta indica prática estruturada. A dor não entra no relatório; reveja a resposta se o cliente descreveu um problema.</div>' +
   '</div>';
 }
 function toggleDor(code) {
@@ -875,6 +885,7 @@ function toggleDor(code) {
     box.querySelector('.dor-toggle').classList.toggle('on', d.star);
     var inp = box.querySelector('.dor-frase');
     inp.style.display = d.star ? 'block' : 'none';
+    box.querySelector('.dor-aviso').style.display = dorAvisoOn(code) ? 'block' : 'none';
     if(d.star) inp.focus();
   }
   saveDraft();
@@ -1765,8 +1776,8 @@ function renderNextSteps() {
   var pct = function(v) { return (v / 150 * 100).toFixed(2) + '%'; };
   var faseHtml = function(fz, i) {
     // fd = "Até 60 dias. Linha de Balanço, ..." -> prazo ("Até 60 dias") + entrega
-    var m = /^(Até [^.]+)\.\s*(.*)$/.exec(fz.fd);
-    var prazo = m ? m[1] : fz.dur, entrega = m ? m[2] : fz.fd;
+    var m = /^((?:Até|A partir d)[^.]+)\.\s*(.*)$/.exec(fz.fd);
+    var prazo = fz.prazo || (m ? m[1] : fz.dur), entrega = m ? m[2] : fz.fd;
     var d = FASE_DIAS[fz.id] || [0, 0];
     var res = M ? ptResolve(M, fz.id) : '';
     var eixo = (i === PT_FASES.length - 1) ? '<div class="ns-axis"><span style="left:0">0</span><span style="left:' + pct(60) + '">60</span><span style="left:100%">150 dias</span></div>' : '';
@@ -1774,7 +1785,12 @@ function renderNextSteps() {
       '<span class="ns-n">0' + (i + 1) + '</span>' +
       '<div class="ns-txt"><strong>Fase de Implementação ' + fz.id + ' · ' + ptFaseNome(fz, M) + '</strong> — ' + entrega + '</div>' +
       '<div class="ns-meta"><div class="ns-prazo">' + prazo + '</div>' +
-        '<div class="ns-gantt" role="img" aria-label="Dia ' + d[0] + ' a ' + d[1] + '"><i class="ns-tick" style="left:' + pct(60) + '"></i><b style="left:' + pct(d[0]) + ';width:' + pct(d[1] - d[0]) + '"></b></div>' + eixo +
+        (fz.frentes ? fz.frentes.map(function(fr) {
+          // Phase III: one bar per front, both from day 60
+          return '<div class="ns-sub">' + fr.nome + ' · ' + (fr.fim - fr.ini) + ' dias</div>' +
+            '<div class="ns-gantt" role="img" aria-label="' + fr.nome + ': dia ' + fr.ini + ' a ' + fr.fim + '"><i class="ns-tick" style="left:' + pct(60) + '"></i><b style="left:' + pct(fr.ini) + ';width:' + pct(fr.fim - fr.ini) + '"></b></div>';
+        }).join('') :
+        '<div class="ns-gantt" role="img" aria-label="Dia ' + d[0] + ' a ' + d[1] + '"><i class="ns-tick" style="left:' + pct(60) + '"></i><b style="left:' + pct(d[0]) + ';width:' + pct(d[1] - d[0]) + '"></b></div>') + eixo +
       '</div>' +
       (res ? '<div class="ns-res">' + res + '</div>' : '') +
     '</div>';
@@ -2211,10 +2227,13 @@ function renderSinteseAnchors(plan, roi) {
       '<td style="text-align:right;font-weight:700;white-space:nowrap">'+(it ? fmtNum(it.baseValue*obras) : '—')+'</td>' +
     '</tr>';
   }).join('');
-  var outros = plan.all.length - plan.anchors.length;
-  el.innerHTML = repLbl('Onde o dinheiro vaza — ' + plan.anchors.length + ' gaps-âncora', '#ea580c') +
-    '<table class="opp-table"><thead><tr><th>#</th><th>Gap-âncora</th><th>Fonte de perda</th><th style="text-align:right">Perda bruta</th></tr></thead><tbody>' + rows + '</tbody></table>' +
-    (outros > 0 ? '<div style="font-size:11px;color:'+REP_TXT_MUT+';margin-top:8px">Os outros ' + outros + ' pontos estão nas páginas seguintes, para a equipe ler com calma.</div>' : '');
+  var nCrit = plan.rest.length, nAlerta = plan.attention.length;
+  var outrosTxt = [];
+  if(nCrit) outrosTxt.push(nCrit === 1 ? 'o outro ponto crítico está nas páginas seguintes' : 'os outros ' + nCrit + ' pontos críticos estão nas páginas seguintes');
+  if(nAlerta) outrosTxt.push(nAlerta + (nAlerta === 1 ? ' ponto está em alerta (prática informal)' : ' pontos estão em alerta (prática informal)'));
+  el.innerHTML = repLbl('Onde o dinheiro vaza — ' + plan.anchors.length + (plan.anchors.length === 1 ? ' prioridade' : ' prioridades'), '#ea580c') +
+    '<table class="opp-table"><thead><tr><th>#</th><th>Prioridade</th><th>Fonte de perda</th><th style="text-align:right">Perda bruta</th></tr></thead><tbody>' + rows + '</tbody></table>' +
+    (outrosTxt.length ? '<div style="font-size:11px;color:'+REP_TXT_MUT+';margin-top:8px">' + outrosTxt.join('; ').replace(/^./, function(c){ return c.toUpperCase(); }) + '.</div>' : '');
 }
 
 // Página 2 · Síntese Executiva (cont.): o retorno em uma linha.
@@ -2274,7 +2293,8 @@ function renderAnchorGapCards(plan, roi) {
     card.style.cssText = 'padding:18px 24px;margin-bottom:10px';
     card.innerHTML =
       '<div style="display:flex;justify-content:space-between;align-items:flex-start;gap:14px;margin-bottom:10px">' +
-        '<div><div style="font-size:9.5px;font-weight:700;letter-spacing:0.1em;text-transform:uppercase;color:#ea580c">Gap-âncora '+(i+1)+' · '+(pilarNumDoGap(o) ? 'Pilar '+pilarNumDoGap(o) : (pilarLabel[o.phase]||o.phase)) +
+        '<div><div style="font-size:9.5px;font-weight:700;letter-spacing:0.1em;text-transform:uppercase;color:#ea580c">Prioridade '+(i+1)+' · '+(pilarNumDoGap(o) ? 'Pilar '+pilarNumDoGap(o) : (pilarLabel[o.phase]||o.phase)) +
+          (o.severity !== 'critico' ? ' · Em alerta' : '') +
           (o.star ? ' · <span style="color:#eab308">★ dor declarada</span>' : '') + '</div>' +
           '<div style="font-family:Bai Jamjuree,sans-serif;font-size:17px;font-weight:700;color:'+REP_TXT_STRONG+';margin-top:2px">'+o.gap+'</div></div>' +
         '<div style="text-align:right;font-size:10.5px;color:'+REP_TXT_MUT+';white-space:nowrap">Fonte de perda<br><strong style="color:'+REP_TXT_STRONG+'">'+FONTE_LABEL[o.fonte]+'</strong></div>' +
@@ -2304,20 +2324,32 @@ function renderGapsIdentificados(plan) {
       oppTableCard.innerHTML = '<div style="padding:14px 16px;text-align:center;color:#888;font-size:12px">' +
         'Nenhum gap crítico ou oportunidade de melhoria identificada nesta fase do diagnóstico.</div>';
     } else {
-      var start = plan.anchors.length;
       var lista = gapsNumerados(plan);
-      var rows = lista.length ? lista.map(function(r) {
-        return '<tr><td style="color:var(--rep-text-mut, #999)">'+String(r.n).padStart(2,'0')+'</td>' +
+      var nAlerta = plan.attention.length;
+      var prioDa = {};
+      plan.anchors.forEach(function(o, i){ (prioDa[o.fonte] = prioDa[o.fonte] || []).push(i + 1); });
+      var nGrp = {};
+      lista.forEach(function(r){ nGrp[r.fonte] = (nGrp[r.fonte] || 0) + 1; });
+      var rows = lista.length ? lista.map(function(r, i) {
+        var g = '';
+        if(!i || lista[i - 1].fonte !== r.fonte) {
+          var pr = prioDa[r.fonte];
+          g = '<tr><td colspan="5" style="font-size:11px;padding-top:12px"><strong>' + (FONTE_LABEL[r.fonte] || '—') + '</strong>' +
+            '<span style="color:var(--rep-text-mut, #999)"> · ' + nGrp[r.fonte] + (nGrp[r.fonte] === 1 ? ' ponto' : ' pontos') +
+            (pr ? ' · mesma fonte da ' + (pr.length === 1 ? 'Prioridade ' : 'Prioridades ') + ptLista(pr.map(String)) : '') + '</span></td></tr>';
+        }
+        return g + '<tr><td style="color:var(--rep-text-mut, #999)">'+String(r.n).padStart(2,'0')+'</td>' +
           '<td><strong>'+r.gap+'</strong></td>' +
           '<td style="color:var(--rep-text-mut, #999)">'+(pilarNumDoGap(r) ? 'P'+pilarNumDoGap(r) : (pil[r.phase]||r.phase))+'</td>' +
-          '<td style="font-size:11px">'+(FONTE_LABEL[r.fonte] || '—')+'</td>' +
-          '<td style="font-size:11px">'+(r.score === 0 ? 'Sem prática' : 'Informal')+'</td>' +
+          '<td style="font-size:11px">'+(r.score === 0 ? 'Sem prática' : 'Sem controle')+'</td>' +
           '<td style="font-size:11px;white-space:nowrap">'+faseCurtaDoGap(r.code)+'</td></tr>';
-      }).join('') : '<tr><td colspan="6" style="color:var(--rep-text-mut, #999)">Nenhum outro gap crítico além dos gaps-âncora.</td></tr>';
+      }).join('') : '<tr><td colspan="5" style="color:var(--rep-text-mut, #999)">Nenhum outro ponto crítico além das prioridades.</td></tr>';
+      var alertaTxt = nAlerta ? '<p style="font-size:12px;color:#666;margin-top:10px">' + (nAlerta === 1 ? 'Outro ponto está em alerta' : 'Outros ' + nAlerta + ' pontos estão em alerta') +
+        ': a prática existe, mas é informal. ' + (nAlerta === 1 ? 'Ele entra' : 'Eles entram') + ' no plano de implantação.</p>' : '';
       oppTableCard.innerHTML = '<div class="rep-sec-title"><span class="rep-sec-num">03</span>Gaps Identificados</div>' +
-        '<p style="font-size:12px;color:#666;margin-bottom:10px">Todos os pontos desta lista, críticos e de atenção, são referência para a equipe e não precisam ser comentados na reunião; o foco são os 3 pontos críticos do topo. A Fase III vem após as Fases I e II porque o pagamento por evidência depende da base entregue nelas.</p>' +
-        '<div style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:0.08em;color:#999;margin-bottom:8px">Por fase e fonte de perda · '+lista.length+' pontos</div>' +
-        '<table class="opp-table" id="opp-table-el"><thead><tr><th>#</th><th>Gap Identificado</th><th>Pilar</th><th>Fonte de perda</th><th>Situação</th><th>Fase</th></tr></thead><tbody id="opp-body">'+rows+'</tbody></table>';
+        '<p style="font-size:12px;color:#666;margin-bottom:10px">Demais pontos críticos (nota 0 ou 1), por fonte de perda. São referência para a equipe e não precisam ser comentados na reunião; o foco são as prioridades do topo.</p>' +
+        '<div style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:0.08em;color:#999;margin-bottom:8px">Por fonte de perda · '+lista.length+(lista.length === 1 ? ' ponto crítico' : ' pontos críticos')+'</div>' +
+        '<table class="opp-table" id="opp-table-el"><thead><tr><th>#</th><th>Gap Identificado</th><th>Pilar</th><th>Situação</th><th>Fase</th></tr></thead><tbody id="opp-body">'+rows+'</tbody></table>' + alertaTxt;
     }
   }
   // Attention points (nota 1,5) now live in the single table above; the old card stays hidden.
@@ -2505,8 +2537,8 @@ function buildReport() {
     var radarWorstPct = (typeof RADAR_STATE !== 'undefined' && RADAR_STATE) ? Math.round(Math.max(0, RADAR_STATE.reference[RADAR_STATE.worstIdx] - RADAR_STATE.clientPct[RADAR_STATE.worstIdx]) * 100) + ' p.p.' : '—';
     gapsSummaryEl.innerHTML =
       '<div style="padding:12px 14px;background:#f8f8f8;border-radius:8px;border:1px solid #e8e8e8;text-align:center">' +
-        '<div style="font-family:\'Bai Jamjuree\';font-size:22px;font-weight:700;color:var(--orange)">' + opps.length + '</div>' +
-        '<div style="font-size:10px;color:#888;text-transform:uppercase;letter-spacing:0.06em;margin-top:2px">Gaps identificados</div>' +
+        '<div style="font-family:\'Bai Jamjuree\';font-size:22px;font-weight:700;color:var(--orange)">' + opps.filter(function(o){ return o.severity === 'critico'; }).length + '</div>' +
+        '<div style="font-size:10px;color:#888;text-transform:uppercase;letter-spacing:0.06em;margin-top:2px">Pontos críticos</div>' +
       '</div>' +
       '<div style="padding:12px 14px;background:#f8f8f8;border-radius:8px;border:1px solid #e8e8e8;text-align:center">' +
         '<div style="font-family:\'Bai Jamjuree\';font-size:16px;font-weight:700;color:#14141b">' + worstOppLabel + '</div>' +
@@ -2550,7 +2582,7 @@ function buildReport() {
     '<th style="text-align:right">Perda bruta (portfólio)</th>' +
     '<th style="text-align:center">Fator de captura</th>' +
     '<th style="text-align:right">Ganho capturável (portfólio)</th>' +
-    '<th>Gap-âncora</th>' +
+    '<th>Prioridade</th>' +
     '</tr></thead><tbody>';
   var anchorPorFonte = {};
   gapPlan.anchors.forEach(function(o){ if(!anchorPorFonte[o.fonte]) anchorPorFonte[o.fonte] = o.gap; });
@@ -3075,14 +3107,10 @@ function getGapPlan(roi) {
     var c = crit.filter(function(o){ return o.fonte === f; }).sort(byPick)[0];
     if(c) anchors.push(c);
   });
-  crit.filter(function(o){ return o.star && anchors.indexOf(o) < 0; }).sort(byPick).forEach(function(o) {
+  // ★ (declared pain) on a critical or alert point becomes a priority too, up to 5 in total
+  opps.filter(function(o){ return o.star && anchors.indexOf(o) < 0; }).sort(byPick).forEach(function(o) {
     if(anchors.length < 5) anchors.push(o);
   });
-  if(anchors.length < 3) {
-    opps.filter(function(o){ return anchors.indexOf(o) < 0; }).sort(byPick).forEach(function(o) {
-      if(anchors.length < 3) anchors.push(o);
-    });
-  }
   var rest = ordenarGapsPorFaseEFonte(crit.filter(function(o){ return anchors.indexOf(o) < 0; }), fontesOrd);
   var attention = opps.filter(function(o){ return o.severity === 'oportunidade' && anchors.indexOf(o) < 0; })
     .sort(function(a,b){ return a.order - b.order; });
@@ -3104,10 +3132,16 @@ var PT_FASE = {
 // official names in PT_FASES (relatorio-prancha.js). Phase II keeps "ERP e qualidade" in every case.
 var PT_FASE_CURTO = { I:'I · Planejamento e canteiro', II:'II · ERP e qualidade', III:'III · Pagamento da MO' };
 function faseCurtaDoGap(code) { return PT_FASE_CURTO[PT_FASE[code]] || '—'; }
-// Single numbering/ordering source for the Gaps table (tool) and sheet 05 (report): rest + attention
+// Single numbering/ordering source for the Gaps table (tool) and section 04 (report)
 // ordered by ordenarGapsPorFaseEFonte, numbered from anchors.length + 1.
+// Only the remaining critical points (score 0 or 1): points in alert (1.5) are only counted.
+// Order: loss source by fontesOrd (most expensive first), then phase I, II, III, then current order.
 function gapsNumerados(plan) {
-  var list = ordenarGapsPorFaseEFonte(plan.rest.concat(plan.attention), plan.fontesOrd);
+  var fIdx = function(o){ var i = plan.fontesOrd.indexOf(o.fonte); return i < 0 ? plan.fontesOrd.length : i; };
+  var fzIdx = function(o){ var i = ['I','II','III'].indexOf(PT_FASE[o.code]); return i < 0 ? 3 : i; };
+  var list = plan.rest.map(function(o, i){ return { o: o, i: i }; })
+    .sort(function(a, b){ return (fIdx(a.o) - fIdx(b.o)) || (fzIdx(a.o) - fzIdx(b.o)) || (a.i - b.i); })
+    .map(function(k){ return k.o; });
   list.forEach(function(o, i){ o.n = plan.anchors.length + i + 1; });
   return list;
 }
