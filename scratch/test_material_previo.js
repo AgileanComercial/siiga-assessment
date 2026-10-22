@@ -219,8 +219,13 @@ server.listen(PORT, async () => {
       check(T.toUpperCase().includes('PRESENTES EM 22 ESTADOS') && T.includes('70 mi') && T.includes('Alessandra Silva') && T.includes('Natalia V. de Dios'), 'Portfólio, números e depoimentos');
       check(!/PENDENTE|gap|Jornada|R\$/i.test(T), 'Sem [PENDENTE], "gap", "Jornada" ou preço');
       check(c.f.link ? T.includes('· videochamada') : !T.includes('videochamada'), 'Videochamada só com link');
-      if (c.f.decisor) check(T.includes('Nos 15 minutos finais, com ' + c.f.decisor + ', ' + c.f.decisorCargo) && T.includes(c.f.decisor + ' participa.'), 'Decisor no documento');
-      else check(T.includes('Nos 15 minutos finais, com quem aprova a contratação') && T.includes('Quem aprova a contratação participa.'), 'Sem decisor: "quem aprova a contratação"');
+      if (c.f.decisor) check(T.includes(c.f.decisor + ', ' + c.f.decisorCargo + ', participa como decisor.'), 'Decisor (nome e cargo) na Reunião 2, como decisor');
+      else check(T.includes('Quem aprova a contratação participa como decisor.'), 'Sem decisor: "Quem aprova a contratação participa como decisor."');
+      // v5: "Como funciona" with two meetings; the report content sits inside Reunião 1
+      check(!/15 minutos/.test(T) && !/Enviado após a Reunião 1/.test(T) && !/Data definida na Reunião 1/.test(T), 'Sem "15 minutos", "Enviado após a Reunião 1" nem "Data definida"');
+      check(T.includes('Leitura do Relatório do Diagnóstico, enviado em PDF após a reunião: a avaliação por pilar, os pontos críticos com a prioridade de cada um e a perda por mês sem tratamento.') &&
+        T.includes('O Plano de Transformação Operacional e o ganho mensal esperado com ele.') && T.includes('Data combinada na Reunião 1'), 'Reunião 1 com o conteúdo do relatório; Reunião 2 "Data combinada na Reunião 1"');
+      check(T.includes('Assistir ao vídeo do case') && T.includes('youtube.com/watch?v=cxprJ6c4Z70') && T.includes('youtube.com/watch?v=nkNP6LssCzE'), 'Depoimentos com o endereço do vídeo do case');
       console.log('       encaixe por folha: ' + dom.fit.join(', ') + ' · cabeçalho: ' + dom.run[0]);
 
       // arquivo
@@ -228,6 +233,8 @@ server.listen(PORT, async () => {
       const buf = Buffer.from(last.data.split(',')[1], 'base64');
       const out = path.join(OUT_DIR, last.nome.replace('.pdf', '_' + c.id + '.pdf'));
       fs.writeFileSync(out, buf);
+      const pdfTxt = buf.toString('latin1');
+      check(pdfTxt.includes('https://www.youtube.com/watch?v=cxprJ6c4Z70') && pdfTxt.includes('https://www.youtube.com/watch?v=nkNP6LssCzE'), 'PDF com os 2 links clicáveis dos vídeos');
       check(/^SIIGA_Preparacao_Diagnostico_[A-Za-z0-9_]+_\d{4}-\d{2}-\d{2}\.pdf$/.test(last.nome), 'Nome do arquivo: ' + last.nome);
       const parteEmp = last.nome.replace(/^SIIGA_Preparacao_Diagnostico_/, '').replace(/_\d{4}-\d{2}-\d{2}\.pdf$/, '');
       check(parteEmp.length <= 40 && !parteEmp.endsWith('_'), 'Parte da empresa no nome ≤ 40 caracteres, sem "_" no fim (' + parteEmp.length + ')');
@@ -248,8 +255,10 @@ server.listen(PORT, async () => {
       check(msg.every(m => m.length > 0), '3 mensagens exibidas');
       if (c.f.link) check(msg[0].includes(c.f.link) && msg[1].includes('Link: ' + c.f.link) && msg[2].includes('Link: ' + c.f.link), 'Link nas 3 mensagens');
       else check(!/Link:|videochamada:/.test(msg.join(' ')), 'Sem link: linha do link some');
-      if (c.f.decisor) check(msg.every(m => m.includes(c.f.decisor)), 'Decisor nas 3 mensagens');
-      else check(msg[0].includes('quem aprova a contratação na ' + c.f.empresa) && msg[1].includes('Peço que quem aprova a contratação') && msg[2].includes('Conto com quem aprova a contratação'), 'Sem decisor: "quem aprova a contratação"');
+      // v5: the decision-maker is named in the e-mail and the scheduling WhatsApp; the 24 h reminder no longer mentions the final 15 minutes
+      if (c.f.decisor) check(msg[0].includes(c.f.decisor + ' participa como decisor') && msg[1].includes('com ' + c.f.decisor + ' como decisor'), 'Decisor no e-mail e no WhatsApp de agendamento');
+      else check(msg[0].includes('quem aprova a contratação na ' + c.f.empresa + ' participa como decisor') && msg[1].includes('com quem aprova a contratação como decisor'), 'Sem decisor: "quem aprova a contratação" nas mensagens');
+      check(msg.every(m => !/15 minutos/.test(m)), 'Mensagens sem "15 minutos finais"');
       check(/Pré-vendedor Teste, Agilean$/.test(msg[1]) && /Pré-vendedor Teste, Agilean$/.test(msg[2]), 'WhatsApps assinados pelo pré-vendedor');
       const nBotoes = await page.$$eval('#ag-msgs button', bs => bs.filter(b => b.textContent === 'Copiar').length);
       check(nBotoes === 3, '3 botões Copiar');

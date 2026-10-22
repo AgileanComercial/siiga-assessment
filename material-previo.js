@@ -32,9 +32,9 @@ var MPV_PILARES = ['Planejamento estratégico do fluxo de produção', 'Proteç�
 // Depoimentos aprovados, texto literal da proposta (buildPropostaDepoimentos em script.js).
 var MPV_DEPOIMENTOS = [
   ['“Uma das maiores vantagens que o Agilean nos trouxe foi a capacidade de rastrear e monitorar o progresso das nossas obras em tempo real, permitindo decisões rápidas com dados confiáveis de canteiro. Aumentamos consideravelmente o cumprimento dos prazos.”',
-    'Alessandra Silva', 'Coordenação de Planejamento e Controle · CONX'],
+    'Alessandra Silva', 'Coordenação de Planejamento e Controle · CONX', 'https://www.youtube.com/watch?v=cxprJ6c4Z70'],
   ['“O Agilean nos trouxe praticidade e soluções reais para acompanhar a mão de obra em grandes construções. Nossas obras têm entre 150 e 200 pessoas e era um desafio gerenciar e integrar todos os recursos. Agora tenho tempo para analisar, criar estratégias e focar no que agrega valor.”',
-    'Natalia V. de Dios', 'Gerência de Processos e Qualidade · Dimas Construções']
+    'Natalia V. de Dios', 'Gerência de Processos e Qualidade · Dimas Construções', 'https://www.youtube.com/watch?v=nkNP6LssCzE']
 ];
 
 function mpvEsc(s) {
@@ -89,8 +89,7 @@ function mpvLogosHtml() {
 
 function mpvDocumentoHtml(a) {
   var emp = mpvEsc(a.empresa);
-  var quemAprova = a.decisor ? mpvEsc(a.decisor) + (a.decisor_cargo ? ', ' + mpvEsc(a.decisor_cargo) : '') : 'quem aprova a contratação';
-  var quemAprovaR2 = a.decisor ? mpvEsc(a.decisor) : 'Quem aprova a contratação';
+  var quemDecide = a.decisor ? mpvEsc(a.decisor) + (a.decisor_cargo ? ', ' + mpvEsc(a.decisor_cargo) + ',' : '') : 'Quem aprova a contratação';
   var contato = mpvEsc(a.contato) + (a.cargo ? '<small>' + mpvEsc(a.cargo) + '</small>' : '');
   var reuniao = mpvDataLonga(a.data) + ', ' + mpvHora(a.hora) + (a.link ? ' · videochamada' : '');
   var cons = a.consultor;
@@ -115,7 +114,8 @@ function mpvDocumentoHtml(a) {
 
   var pil = MPV_PILARES.map(function (p, i) { return '<div><span>Pilar ' + (i + 1) + '</span>' + p + '</div>'; }).join('');
   var deps = MPV_DEPOIMENTOS.map(function (d) {
-    return '<div class="dep"><p>' + d[0] + '</p><div class="quem"><b>' + d[1] + '</b>' + d[2] + '</div></div>';
+    return '<div class="dep"><p>' + d[0] + '</p><div class="quem"><b>' + d[1] + '</b>' + d[2] + '</div>' +
+      (d[3] ? '<div class="vid" data-url="' + d[3] + '"><b>Assistir ao vídeo do case</b>' + d[3].replace(/^https:\/\/www\./, '') + '</div>' : '') + '</div>';
   }).join('');
   var p2 = '<div class="page">' + mpvRun(a, 'O Diagnóstico') +
     '<div class="sec row" style="margin-top:7mm"><div class="secnum">02</div><div><div class="sectit">O Diagnóstico SIIGA</div>' +
@@ -124,22 +124,28 @@ function mpvDocumentoHtml(a) {
     '<p class="txt">As respostas vêm da conversa com a equipe na Reunião 1. Com elas, o diagnóstico mostra os pontos críticos, estima quanto cada obra perde por mês sem tratá-los e organiza o Plano de Transformação Operacional em três Fases de Implementação.</p>' +
     '</div></div>' +
     '<div class="sec row"><div class="secnum">03</div><div><div class="sectit">Como funciona</div></div></div>' +
-    '<div class="tl">' +
+    '<div class="tl two">' +
       '<div class="m"><h3>Reunião 1 · Diagnóstico</h3><div class="q">' + mpvDataCurta(a.data) + ', ' + mpvHora(a.hora) + ' · cerca de 55 minutos</div>' +
         '<ul><li>Conversa com o responsável pelo planejamento e controle das obras sobre a rotina de vocês.</li>' +
-        '<li>Leitura dos resultados: os pilares, os pontos críticos e quanto cada obra perde por mês sem tratá-los.</li>' +
-        '<li>O ganho mensal esperado com o plano.</li>' +
-        '<li>Nos 15 minutos finais, com ' + quemAprova + ': definição da data da Reunião 2.</li></ul></div>' +
-      '<div class="m"><h3>Relatório do diagnóstico</h3><div class="q">Enviado após a Reunião 1</div>' +
-        '<ul><li>A avaliação por pilar.</li><li>Os pontos críticos, com a prioridade de cada um.</li><li>A perda por mês sem tratamento.</li><li>O Plano de Transformação Operacional.</li></ul></div>' +
-      '<div class="m sec2"><h3>Reunião 2 · Escopo</h3><div class="q">Data definida na Reunião 1</div>' +
+        '<li>Leitura do Relatório do Diagnóstico, enviado em PDF após a reunião: a avaliação por pilar, os pontos críticos com a prioridade de cada um e a perda por mês sem tratamento.</li>' +
+        '<li>O Plano de Transformação Operacional e o ganho mensal esperado com ele.</li></ul></div>' +
+      '<div class="m sec2"><h3>Reunião 2 · Escopo</h3><div class="q">Data combinada na Reunião 1</div>' +
         '<ul><li>Apresentação do desenho do escopo do programa, para validação com vocês, a partir dos pontos críticos do diagnóstico.</li>' +
-        '<li>' + quemAprovaR2 + ' participa.</li></ul></div>' +
+        '<li>' + quemDecide + ' participa como decisor.</li></ul></div>' +
     '</div>' +
     '<div class="sec row"><div class="secnum">04</div><div><div class="sectit">Depoimentos de clientes Agilean</div></div></div>' +
     '<div class="deps">' + deps + '</div>' +
     mpvCarimbo(a, 2) + '</div>';
   return p1 + p2;
+}
+
+// Clickable areas: the page is an image, so each [data-url] element gets a PDF link at the same place (mm).
+function mpvLinks(pdf, page) {
+  var pr = page.getBoundingClientRect(), k = 210 / pr.width;
+  Array.prototype.forEach.call(page.querySelectorAll('[data-url]'), function (el) {
+    var r = el.getBoundingClientRect();
+    pdf.link((r.left - pr.left) * k, (r.top - pr.top) * k, r.width * k, r.height * k, { url: el.getAttribute('data-url') });
+  });
 }
 
 // ---------- encaixe ----------
@@ -232,6 +238,7 @@ function gerarMaterialPrevio(a, opts) {
         html2canvas(pages[idx], { scale: 2, useCORS: true, backgroundColor: '#FFFFFF', logging: false }).then(function (cv) {
           if (idx) pdf.addPage();
           pdf.addImage(cv.toDataURL('image/jpeg', 0.92), 'JPEG', 0, 0, 210, 297, undefined, 'FAST');
+          mpvLinks(pdf, pages[idx]);
           idx++; next();
         }).catch(reject);
       }
@@ -261,15 +268,15 @@ var MPV_MODELOS_PADRAO = {
     'Videochamada: {link}\n' +
     'A reunião será conduzida por {consultor}, consultor da Agilean.\n\n' +
     'Em anexo está a Preparação para o Diagnóstico: quem é a Agilean, como funciona a reunião e o que vocês recebem depois dela. A leitura leva 3 minutos e nos deixa a reunião inteira para falar das obras de vocês.\n\n' +
-    'Um pedido: que {quem_aprova_na_empresa} participe dos 15 minutos finais. É nesse momento que definimos juntos a data da reunião de escopo.\n\n' +
+    'Ao fim da conversa combinamos a data da reunião de escopo, da qual {quem_aprova_na_empresa} participa como decisor.\n\n' +
     '{pre_vendedor}\nAgilean',
   whatsapp_agendamento: '{contato}, confirmado o Diagnóstico SIIGA da {empresa}: {data_longa}, às {hora}.\n' +
     'Link: {link}\n' +
-    'Segue a preparação em PDF (3 minutos de leitura). Peço que {quem_aprova} participe dos 15 minutos finais, para definirmos a reunião de escopo. Quem conduz é {consultor}, consultor da Agilean.\n' +
+    'Segue a preparação em PDF (3 minutos de leitura). Quem conduz é {consultor}, consultor da Agilean. Ao fim da conversa combinamos a data da reunião de escopo, com {quem_aprova} como decisor.\n' +
     '{pre_vendedor}, Agilean',
   whatsapp_lembrete: '{contato}, amanhã às {hora} é o Diagnóstico SIIGA da {empresa}.\n' +
     'Link: {link}\n' +
-    'Conto com {quem_aprova} nos 15 minutos finais. Até amanhã. {pre_vendedor}, Agilean'
+    'Até amanhã. {pre_vendedor}, Agilean'
 };
 var MPV_VARIAVEIS = [
   ['contato', 'primeiro nome do contato'], ['contato_completo', 'nome completo do contato'], ['empresa', 'empresa'],
