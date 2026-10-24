@@ -183,7 +183,7 @@ server.listen(8098, async () => {
     await sleep(400);
     await page.evaluate(() => document.querySelector('button[onclick="revealAha(\'mid\')"]').click());
     await sleep(400);
-    await page.evaluate(() => document.querySelector('button[onclick="showReport()"]').click());
+    await page.evaluate(() => (showConfirmacao(), document.getElementById('btn-conf-relatorio').click()));
     await sleep(800);
 
     const onReport = await page.evaluate(() => {

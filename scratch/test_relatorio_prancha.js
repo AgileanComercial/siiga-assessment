@@ -44,6 +44,8 @@ const CASES = {
 CASES.pcl2 = Object.assign({}, CASES.pcl, { dores: Object.assign({}, CASES.pcl.dores, { 'F3.4':'a gente paga o empreiteiro e depois descobre o retrabalho', 'F2.1':'a gente sempre corre atrás de material' }) });
 // PCL with own labor only (Phase III = Folha de Produção, 90 days)
 CASES.prop = Object.assign({}, CASES.pcl, { b0: Object.assign({}, CASES.pcl.b0, { modeloMO: 'propria' }) });
+// PCL with the vendedor's adjustment from the Conferência screen: priority 3 (Estouro de MO, MO.3) taken out of the priorities
+CASES.ajuste = Object.assign({}, CASES.pcl, { ajustes: { travados: [], excluidos: ['MO.3'] } });
 const C = CASES[CASE];
 const MO = C.b0.modeloMO;
 const avisos = {}; // code -> warning visible after the star (score 3 only)
@@ -96,7 +98,7 @@ server.listen(PORT, async () => {
         addReuniao2Participante('', 'Sem nome');
       });
     }
-    await page.click('#btn-diagnostico-continuar'); await sleep(300); await page.click('#btn-pilares-continuar'); await sleep(300); await page.click('#btn-metodo-iniciar');
+    await page.click('#btn-diagnostico-continuar');  await sleep(300); await page.click('#btn-metodo-iniciar');
     await sleep(300);
 
     for (let i = 0; i < 30; i++) {
@@ -173,11 +175,16 @@ server.listen(PORT, async () => {
       await sleep(200);
     }
     check('tela de horas preenchida', horasOk);
+    let roiAntes = null, roiDepois = null;
+    if (C.ajustes) {
+      const r = await page.evaluate(aj => { var a = calculateROI().totalBase; S.prioAjustes = aj; return { a: a, b: calculateROI().totalBase }; }, C.ajustes);
+      roiAntes = r.a; roiDepois = r.b;
+    }
     await sleep(1200);
     await page.evaluate(() => { var m = document.getElementById('save-modal'); if (m) m.style.display = 'none'; });
     await page.evaluate(() => document.querySelector('button[onclick="showAhaScreen()"]').click()); await sleep(400);
     await page.evaluate(() => document.querySelector('button[onclick="revealAha(\'mid\')"]').click()); await sleep(400);
-    await page.evaluate(() => document.querySelector('button[onclick="showReport()"]').click()); await sleep(1200);
+    await page.evaluate(() => (showConfirmacao(), document.getElementById('btn-conf-relatorio').click())); await sleep(1200);
 
     // Uses the on-screen dark toggle first: the PDF must come out in the light Direction A anyway.
     await page.evaluate(() => changeReportTheme('dark'));
@@ -206,6 +213,12 @@ server.listen(PORT, async () => {
       // Points model (critical + others): n, code, phase, priority, for before/after comparison
       const pts = await page.evaluate(() => { const M = ptModel('detalhado'); return M.criticos.concat(M.demais).map(p => [p.n, p.code, p.fase, p.prioridade].join('|')); });
       fs.writeFileSync(process.env.DUMP_PONTOS, pts.join(String.fromCharCode(10)));
+    }
+    if (C.ajustes) {
+      const aj = await page.evaluate(() => { const M = ptModel('detalhado'); return { crit: M.criticos.map(c => c.code).join(','), tit: M.criticos.map(c => c.titulo), demais: M.demais.map(d => d.code + ':' + d.n).join(','), pdf: document.getElementById('ptr-root').innerText }; });
+      check('caso com ajuste: prioridades do relat\u00f3rio = F4.3, MO.6, F4.4 (a vaga da n\u00ba 3 foi para a pr\u00f3xima fonte)', aj.crit === 'F4.3,MO.6,F4.4', aj.crit);
+      check('caso com ajuste: o PDF traz o t\u00edtulo da nova n\u00ba 3 e MO.3 volta para a tabela de pontos cr\u00edticos', aj.pdf.replace(/\u00a0/g, ' ').indexOf(aj.tit[2]) >= 0 && /MO\.3:\d+/.test(aj.demais), aj.tit[2] + ' | ' + aj.demais);
+      check('caso com ajuste: a perda total do ROI n\u00e3o muda (' + roiAntes + ' = ' + roiDepois + ')', roiAntes === roiDepois && roiAntes > 0);
     }
     const all = dom.pages.join('\n').replace(/\u00a0/g, ' ');
     const allLow = all.toLowerCase();
@@ -381,6 +394,11 @@ server.listen(PORT, async () => {
       ['R$ 172,5 mil', 'R$ 140,0 mil', 'R$ 82,7 mil', 'R$ 526,4 mil', 'R$ 20,5 mil', 'R$ 10,25 mil', '5,1×', '3,1×', 'R$ 6,15 mil', 'R$ 52,5 mil', 'R$ 78,8 mil', 'R$ 375,3 mil'].forEach(s => check('PCL ' + (MODE === 'resumido' ? 'sem' : 'com (Anexo)') + ' "' + s + '"', (allLow.indexOf(s.toLowerCase()) >= 0) === (MODE !== 'resumido')));
       check('PCL sem "custa R$ 26 mil" e sem bloco horas+folha no resumo', !/custa R\$ 26 mil/.test(all) && !/Perda em horas de gestão e folha/i.test(all));
       check('PCL folhas = ' + EXP_FOLHAS, dom.pages.length === EXP_FOLHAS, dom.pages.length);
+    } else if (CASE === 'ajuste') {
+      // PCL with MO.3 taken out of the priorities: the 3rd priority is the best critical of the next source (F4.4); MO.3 goes back to section 04
+      ['Total das 3 prioridades', 'Digitalização do controle financeiro do fechamento (ERP)', 'Por fonte de perda · 10 pontos críticos', 'Outros 11 pontos estão em alerta', 'R$ 526 mil', 'R$ 5,3 mil'].forEach(s => check('ajuste contém "' + s + '"', allLow.indexOf(s.toLowerCase()) >= 0));
+      check('ajuste: MO.3 (aditivos de verba) segue no relatório, só como ponto crítico', /Implantação da gestão de aditivos de verba/.test(all) && !/PRIORIDADE 3[\s\S]{0,80}aditivos/i.test(dom.pages[3] || ''));
+      check('ajuste folhas = ' + EXP_FOLHAS, dom.pages.length === EXP_FOLHAS, dom.pages.length);
     } else if (CASE === 'prop') {
       // Own labor: payroll lines stay (Annex A.4 in the Detalhado), no contractors front
       check('própria: "MO própria" no escopo', /MO própria/.test(all));

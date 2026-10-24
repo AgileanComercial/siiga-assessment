@@ -110,7 +110,7 @@ server.listen(PORT, async () => {
     await page.evaluate(() => { var m = document.getElementById('save-modal'); if (m) m.style.display = 'none'; });
     await page.evaluate(() => document.querySelector('button[onclick="showAhaScreen()"]').click()); await sleep(400);
     await page.evaluate(() => document.querySelector('button[onclick="revealAha(\'mid\')"]').click()); await sleep(400);
-    await page.evaluate(() => document.querySelector('button[onclick="showReport()"]').click()); await sleep(1200);
+    await page.evaluate(() => (showConfirmacao(), document.getElementById('btn-conf-relatorio').click())); await sleep(1200);
     check('Diagnóstico preenchido (tela report)', (await active(page)) === 'screen-report');
 
     // Números de referência (defaults resolvidos por getPropostaCfg).

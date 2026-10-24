@@ -53,7 +53,7 @@ server.listen(PORT, async () => {
     await page.type('#c-email', 'ana@exemploe2e.com.br');
     await page.type('#c-telefone', '(11) 98888-7777');
     await page.click('button[onclick="startAssessment()"]');
-    await sleep(300); await page.click('#btn-diagnostico-continuar'); await sleep(300); await page.click('#btn-pilares-continuar'); await sleep(300); await page.click('#btn-metodo-iniciar');
+    await sleep(300); await page.click('#btn-diagnostico-continuar');  await sleep(300); await page.click('#btn-metodo-iniciar');
     await sleep(300);
 
     // Bloco 0 — respostas medianas (2ª opção) e ROI realista
@@ -107,7 +107,7 @@ server.listen(PORT, async () => {
     await page.evaluate(() => { var m = document.getElementById('save-modal'); if (m) m.style.display = 'none'; });
     await page.evaluate(() => document.querySelector('button[onclick="showAhaScreen()"]').click()); await sleep(400);
     await page.evaluate(() => document.querySelector('button[onclick="revealAha(\'mid\')"]').click()); await sleep(400);
-    await page.evaluate(() => document.querySelector('button[onclick="showReport()"]').click()); await sleep(1200);
+    await page.evaluate(() => (showConfirmacao(), document.getElementById('btn-conf-relatorio').click())); await sleep(1200);
 
     // ── Números canônicos (motores do app) ──
     const canon = await page.evaluate(() => {

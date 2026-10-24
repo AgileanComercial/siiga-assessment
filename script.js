@@ -34,7 +34,9 @@ var S = {
   // Dores declaradas pelo cliente na entrevista (botão ★ em cada pergunta):
   // { 'F4.3': { star:true, frase:'...' } }. Alimenta a escolha dos gaps-âncora
   // e o campo "Em suas palavras" do relatório.
-  dores: {}
+  dores: {},
+  // Ajustes do vendedor na Conferência (ver getGapPlan): travados [{code,tipo:'fin'|'extra'}] e excluidos [code].
+  prioAjustes: { travados: [], excluidos: [] }
 };
 
 var currentBlock = 'b0';
@@ -532,7 +534,7 @@ function diagnosticoVoltar() {
 function diagnosticoContinuar() {
   readReuniao2();
   saveDraft();
-  showPilares();
+  showMetodo();
 }
 
 // ── 2º encontro (agendamento opcional): S.reuniao2 = { data, hora, participantes:[{nome,cargo}] } ──
@@ -574,10 +576,6 @@ function readReuniao2() {
   S.reuniao2 = { data: document.getElementById('reuniao2-data').value || '', hora: document.getElementById('reuniao2-hora').value || '', participantes: parts };
 }
 
-function showPilares() {
-  document.getElementById('nav-step').textContent = 'Pilares SIIGA';
-  showScreen('screen-pilares');
-}
 function showMetodo() {
   document.getElementById('nav-step').textContent = 'Método SIIGA';
   showScreen('screen-metodo');
@@ -1691,6 +1689,122 @@ function buildAndShowRadar() {
 function showReport() {
   buildReport();
   showScreen('screen-report');
+}
+
+// ═══════════════════════════════════════════
+//  CONFERÊNCIA ANTES DO RELATÓRIO (uso interno)
+//  Prioridades, comentário do cliente e perda por mês antes de gerar o relatório.
+//  Cada ação regrava S.prioAjustes, salva o rascunho e redesenha a partir de
+//  getGapPlan() (fonte única). Só o comentário é editável (S.dores[code].frase).
+// ═══════════════════════════════════════════
+function showConfirmacao() {
+  renderConfirmacao();
+  document.getElementById('nav-step').textContent = 'Conferência antes do relatório';
+  showScreen('screen-confirmacao');
+}
+function confEsc(t) {
+  return String(t == null ? '' : t).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+}
+function confAcao(el, fn) {
+  fn(el.closest('[data-code]').getAttribute('data-code'), el.value);
+}
+function confAjustes() {
+  if(!S.prioAjustes || typeof S.prioAjustes !== 'object') S.prioAjustes = {};
+  if(!Array.isArray(S.prioAjustes.travados)) S.prioAjustes.travados = [];
+  if(!Array.isArray(S.prioAjustes.excluidos)) S.prioAjustes.excluidos = [];
+  return S.prioAjustes;
+}
+function confSemTravado(aj, code) {
+  aj.travados = aj.travados.filter(function(t){ return t.code !== code; });
+}
+// Travar: vira 'fin' se já é a prioridade financeira da sua fonte, 'extra' se é uma extra.
+function confTravar(code) {
+  var plan = getGapPlan(), aj = confAjustes();
+  var o = plan.anchors.filter(function(x){ return x.code === code; })[0];
+  if(!o) return;
+  confSemTravado(aj, code);
+  aj.travados.push({ code: code, tipo: o.prioTipo === 'extra' ? 'extra' : 'fin' });
+  confSalvar();
+}
+function confDestravar(code) {
+  confSemTravado(confAjustes(), code);
+  confSalvar();
+}
+function confTirar(code) {
+  var aj = confAjustes();
+  confSemTravado(aj, code);
+  if(aj.excluidos.indexOf(code) < 0) aj.excluidos.push(code);
+  confSalvar();
+}
+// Tornar prioridade: desfaz a retirada (se houver) e trava o ponto como prioridade extra.
+function confPromover(code) {
+  var plan = getGapPlan(), aj = confAjustes();
+  if(plan.anchors.length >= 5) return;
+  aj.excluidos = aj.excluidos.filter(function(c){ return c !== code; });
+  confSemTravado(aj, code);
+  aj.travados.push({ code: code, tipo: 'extra' });
+  confSalvar();
+}
+// Comentário: grava a frase sem ligar a ★ (setDorFrase cria a dor com star:true).
+function confSetFrase(code, val) {
+  if(!S.dores || typeof S.dores !== 'object') S.dores = {};
+  var d = S.dores[code] || (S.dores[code] = { star:false, frase:'' });
+  d.frase = val;
+  saveDraft();
+}
+function confSalvar() {
+  saveDraft();
+  renderConfirmacao();
+}
+function renderConfirmacao() {
+  var roi = calculateROI();
+  var plan = getGapPlan(roi);
+  var prazo = S.prazoMedio || 18;
+  var teto = plan.anchors.length >= 5;
+  var mil = function(v){ return ptMil(v, 1).replace(/ /g, '&nbsp;'); };
+  var primeiraDaFonte = {};
+  var cards = plan.anchors.map(function(o, i) {
+    var n = i + 1;
+    var txtMes;
+    if(primeiraDaFonte[o.fonte] === undefined) {
+      primeiraDaFonte[o.fonte] = n;
+      txtMes = 'Perda por mês: <b>' + mil(plan.base[o.fonte] / prazo) + '</b>';
+    } else {
+      txtMes = 'Perda por mês: mesma fonte da nº ' + primeiraDaFonte[o.fonte];
+    }
+    var frase = o.frase ? ptCap(o.frase).replace(/[.\s]+$/, '') + '.' : '';
+    var cod = confEsc(o.code);
+    return '<div class="conf-card' + (o.travado ? ' trav' : '') + '" data-code="' + cod + '">' +
+      '<div class="conf-n">' + n + '</div>' +
+      '<div><div class="conf-titulo">' + confEsc(ptTituloGap(o)) +
+        (o.star ? '<span class="conf-tag conf-star">★ dor declarada</span>' : '') +
+        (o.travado ? '<span class="conf-tag conf-lock">Travada</span>' : '') + '</div>' +
+        '<div class="conf-meta"><span>' + ptPilarGap(o, true) + '</span><span>Fonte de perda: <b>' + confEsc(fonteLabel(o.fonte)) + '</b></span><span>' + txtMes + '</span></div></div>' +
+      '<div class="conf-acoes">' +
+        '<button class="btn btn-s" data-acao="' + (o.travado ? 'destravar' : 'travar') + '" onclick="confAcao(this, ' + (o.travado ? 'confDestravar' : 'confTravar') + ')">' + (o.travado ? 'Destravar' : 'Travar') + '</button>' +
+        '<button class="btn btn-s" data-acao="tirar" onclick="confAcao(this, confTirar)">Tirar das prioridades</button></div>' +
+      '<div class="conf-com"><label>Comentário do cliente (aparece no relatório)</label>' +
+        '<input class="text-input" type="text" value="' + confEsc(frase) + '" placeholder="Sem comentário. O texto digitado aparece no relatório como a fala do cliente." oninput="confAcao(this, confSetFrase)"></div>' +
+      '</div>';
+  }).join('');
+  var li = function(o, n, alerta) {
+    var cod = confEsc(o.code);
+    return '<div class="conf-li" data-code="' + cod + '"><span class="nn">' + (n ? ('0' + n).slice(-2) : '—') + '</span>' +
+      '<span class="t">' + confEsc(ptTituloGap(o)) + (alerta ? '<span class="conf-tag conf-star">★ em alerta</span>' : (o.star ? '<span class="conf-tag conf-star">★</span>' : '')) +
+        (o.retirado ? '<span class="conf-tag conf-ret">Retirado das prioridades</span>' : '') + '</span>' +
+      '<span>' + ptPilarGap(o, false) + '</span><span>' + confEsc(fonteLabel(o.fonte)) + '</span>' +
+      '<button class="btn btn-s" data-acao="promover"' + (teto ? ' disabled title="Teto de 5 prioridades"' : '') + ' onclick="confAcao(this, confPromover)">Tornar prioridade</button></div>';
+  };
+  var demais = gapsNumerados(plan);
+  var alertasStar = plan.attention.filter(function(o){ return o.star; });
+  var lista = demais.map(function(o){ return li(o, o.n, false); }).join('') + alertasStar.map(function(o){ return li(o, 0, true); }).join('');
+  var cont = demais.length + ' pontos críticos · ' + plan.attention.length + ' pontos em alerta' +
+    (alertasStar.length ? ' (' + alertasStar.length + ' com ★ listado abaixo; os demais só contados)' : ' (nenhum com ★)');
+  document.getElementById('conf-body').innerHTML =
+    '<div class="conf-sec">Prioridades <span>' + plan.anchors.length + ' de 5 · perda por mês da fonte de perda, em ' + prazo + ' meses de obra</span></div>' + cards +
+    '<div class="conf-sec">Demais pontos críticos <span>' + cont + '</span></div>' +
+    (teto ? '<div class="conf-teto">Teto de 5 prioridades atingido: tire uma das prioridades acima para promover outro ponto.</div>' : '') +
+    '<div class="conf-lista">' + lista + '</div>';
 }
 
 function renderQualitativeGains() {
@@ -3111,20 +3225,33 @@ function answerLabelFor(bk, code, score) {
 }
 
 // Plano de gaps do relatório:
-//   anchors   — 3 gaps-âncora (até 5): 1 por fonte de perda, das fontes mais
+//   anchors   — 3 gaps-âncora financeiros (1 por fonte de perda, das fontes mais
 //               caras para as mais baratas; dentro da fonte, o gap marcado com
-//               ★ (dor declarada na entrevista) vem primeiro, depois a menor nota.
-//               ★ críticos de outras fontes entram até o teto de 5.
+//               ★ (dor declarada na entrevista) vem primeiro, depois a menor nota),
+//               seguidos das prioridades extras (até 5 no total): os pontos que o
+//               vendedor promoveu na Conferência e as ★ de outras fontes.
+//               ★ além do teto substituem a financeira não travada e sem ★ da
+//               fonte mais barata, uma a uma.
 //   rest      — demais gaps críticos, ordenados por fase, fonte de perda e ordem
 //               atual (ordenarGapsPorFaseEFonte()).
 //               (o.prioridade é um campo interno e não é exibido.)
 //   attention — notas 1,5 (prática existe, mas informal).
+// Ajustes do vendedor (S.prioAjustes, vazio nos diagnósticos antigos):
+//   travados  — [{code, tipo:'fin'|'extra'}]: fixos como prioridade, nunca substituídos.
+//               'fin' cobre a vaga financeira da sua fonte; 'extra' ocupa as vagas 4 e 5.
+//   excluidos — [code]: fora das prioridades. A FONTE do ponto retirado também sai da
+//               escolha financeira e a vaga passa à próxima fonte mais cara. O ponto
+//               volta para rest (nota 0/1) ou attention (1,5) com o.retirado = true.
+// Sem ajustes a saída é a mesma de antes.
 function getGapPlan(roi) {
   roi = roi || calculateROI();
   var opps = generateOpportunities();
   var base = {};
   roi.items.forEach(function(i){ base[i.key] = i.baseValue; });
   var dores = S.dores || {};
+  var aj = S.prioAjustes || {};
+  var travados = (aj.travados || []).filter(function(t){ return t && t.code; });
+  var excluidos = aj.excluidos || [];
   opps.forEach(function(o) {
     var f = GAP_FONTE[o.code] || 'velocidade';
     if(base[f] === undefined) f = 'velocidade'; // ex.: MO terceirizada não tem a fonte "mo"
@@ -3132,21 +3259,55 @@ function getGapPlan(roi) {
     o.prioridade = prioridadeDaFase(o.code);
     o.star = !!(dores[o.code] && dores[o.code].star);
     o.frase = (dores[o.code] && dores[o.code].frase) ? String(dores[o.code].frase).trim() : '';
+    o.retirado = excluidos.indexOf(o.code) >= 0;
+    o.travado = false;
+    o.prioTipo = '';
   });
   var fontesOrd = Object.keys(base).sort(function(a,b){ return base[b] - base[a]; });
   var top3 = fontesOrd.slice(0, 3);
   var byPick = function(a,b){ return (b.star - a.star) || (a.score - b.score) || (a.order - b.order); };
   var crit = opps.filter(function(o){ return o.severity === 'critico'; });
-  var anchors = [];
+  var byCode = function(code){ return opps.filter(function(o){ return o.code === code; })[0]; };
+  var trav = function(tipo){
+    return travados.filter(function(t){ return t.tipo === tipo; })
+      .map(function(t){ return byCode(t.code); })
+      .filter(function(o){ return o && !o.retirado; });
+  };
+  var travCodes = travados.map(function(t){ return t.code; });
+  var fin = [], extras = [], coberta = {};
+  // 1) financeiras travadas cobrem a sua fonte
+  trav('fin').forEach(function(o){ if(fin.length < 3) { fin.push(o); coberta[o.fonte] = true; o.travado = true; } });
+  // 2) demais fontes, da mais cara à mais barata; a fonte de um ponto retirado é pulada
+  var fontesRetiradas = {};
+  opps.forEach(function(o){ if(o.retirado) fontesRetiradas[o.fonte] = true; });
   fontesOrd.forEach(function(f) {
-    if(anchors.length >= 3) return;
-    var c = crit.filter(function(o){ return o.fonte === f; }).sort(byPick)[0];
-    if(c) anchors.push(c);
+    if(fin.length >= 3 || coberta[f] || fontesRetiradas[f]) return;
+    var c = crit.filter(function(o){ return o.fonte === f && !o.retirado && travCodes.indexOf(o.code) < 0; }).sort(byPick)[0];
+    if(c) { fin.push(c); coberta[f] = true; }
   });
-  // ★ (declared pain) on a critical or alert point becomes a priority too, up to 5 in total
-  opps.filter(function(o){ return o.star && anchors.indexOf(o) < 0; }).sort(byPick).forEach(function(o) {
-    if(anchors.length < 5) anchors.push(o);
+  // 3) extras: promovidos (travados 'extra') e depois as ★ (crítico ou alerta), até 5 no total
+  trav('extra').forEach(function(o){ if(fin.indexOf(o) < 0 && fin.length + extras.length < 5) { extras.push(o); o.travado = true; } });
+  var estrelas = opps.filter(function(o){ return o.star && !o.retirado && fin.indexOf(o) < 0 && extras.indexOf(o) < 0; }).sort(byPick);
+  var sobra = [];
+  estrelas.forEach(function(o) {
+    if(fin.length + extras.length < 5) extras.push(o); else sobra.push(o);
   });
+  // 4) ★ além do teto substituem a financeira não travada e sem ★ da fonte mais barata
+  sobra.forEach(function(o) {
+    var cand = fin.filter(function(x){ return !x.travado && !x.star; })
+      .sort(function(a,b){ return fontesOrd.indexOf(b.fonte) - fontesOrd.indexOf(a.fonte); })[0];
+    if(!cand) return;
+    fin.splice(fin.indexOf(cand), 1);
+    extras.push(o);
+  });
+  // 5) exibição: financeiras pela ordem de custo da fonte, depois as extras
+  var fIdx = function(o){ return fontesOrd.indexOf(o.fonte); };
+  fin = fin.map(function(o, i){ return { o:o, i:i }; })
+    .sort(function(a,b){ return (fIdx(a.o) - fIdx(b.o)) || (a.i - b.i); })
+    .map(function(k){ return k.o; });
+  fin.forEach(function(o){ o.prioTipo = 'fin'; });
+  extras.forEach(function(o){ o.prioTipo = 'extra'; });
+  var anchors = fin.concat(extras);
   var rest = ordenarGapsPorFaseEFonte(crit.filter(function(o){ return anchors.indexOf(o) < 0; }), fontesOrd);
   var attention = opps.filter(function(o){ return o.severity === 'oportunidade' && anchors.indexOf(o) < 0; })
     .sort(function(a,b){ return a.order - b.order; });
@@ -3756,7 +3917,7 @@ function restartAssessment() {
     ferramentas:{planejamento:'',medicao:'',qualidade:'',contratos:'',folha:''},
     scores:{b03:0,f1:[0,0,0,0,0,0,0,0],f2:[0,0,0,0],f3:[0,0,0,0,0,0],mo:{},f4:[0,0,0,0,0]},showMO:false,
     roi2:{folha:0,hPlanejar:0,hCurtoMedio:0,hMedicao:0,hQualidade:0,hConsolidar:0},
-    mensalidade:2000, captura:0.50, mensalidadeManual:false, dores:{}};
+    mensalidade:2000, captura:0.50, mensalidadeManual:false, dores:{}, prioAjustes:{travados:[],excluidos:[]}};
   currentBlock='b0'; currentQIdx=0; currentPhaseIdx=0; phaseOrder=['f1','f2','f3','f4'];
   radarChartInst=null;
   document.getElementById('c-empresa').value='';

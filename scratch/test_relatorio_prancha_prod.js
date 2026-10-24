@@ -87,7 +87,7 @@ server.listen(PORT, async () => {
         addReuniao2Participante('', 'Sem nome');
       });
     }
-    await page.click('#btn-diagnostico-continuar'); await sleep(300); await page.click('#btn-pilares-continuar'); await sleep(300); await page.click('#btn-metodo-iniciar');
+    await page.click('#btn-diagnostico-continuar');  await sleep(300); await page.click('#btn-metodo-iniciar');
     await sleep(300);
 
     for (let i = 0; i < 30; i++) {
@@ -163,7 +163,7 @@ server.listen(PORT, async () => {
     await page.evaluate(() => { var m = document.getElementById('save-modal'); if (m) m.style.display = 'none'; });
     await page.evaluate(() => document.querySelector('button[onclick="showAhaScreen()"]').click()); await sleep(400);
     await page.evaluate(() => document.querySelector('button[onclick="revealAha(\'mid\')"]').click()); await sleep(400);
-    await page.evaluate(() => document.querySelector('button[onclick="showReport()"]').click()); await sleep(1200);
+    await page.evaluate(() => (showConfirmacao(), document.getElementById('btn-conf-relatorio').click())); await sleep(1200);
 
     // Uses the on-screen dark toggle first: the PDF must come out in the light Direction A anyway.
     await page.evaluate(() => changeReportTheme('dark'));

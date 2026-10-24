@@ -15,6 +15,8 @@ const WANT_PDF = process.env.PDF === '1';
 const MODE = process.env.MODE || 'resumido';
 const OUT = process.env.OUT || ('SIIGA_TESTE_GAPS_ANCORA_' + MODE.toUpperCase() + '.pdf');
 const PORT = 8241;
+const G2DIR = process.env.G2DIR || path.join(__dirname, 'shots_g2');
+fs.mkdirSync(G2DIR, { recursive: true });
 
 // Respostas da PCL (score por código) e dores ★ com a frase do cliente.
 const RESP = {
@@ -66,7 +68,7 @@ server.listen(PORT, async () => {
     await page.type('#c-email', 'teste@pcl-teste.com.br');
     await page.type('#c-telefone', '(83) 91234-5678');
     await page.click('button[onclick="startAssessment()"]');
-    await sleep(300); await page.click('#btn-diagnostico-continuar'); await sleep(300); await page.click('#btn-pilares-continuar'); await sleep(300); await page.click('#btn-metodo-iniciar');
+    await sleep(300); await page.click('#btn-diagnostico-continuar');  await sleep(300); await page.click('#btn-metodo-iniciar');
     await sleep(300);
     check('capa aceita e Bloco 0 aberto', await active(page) === 'screen-b0', await active(page));
 
@@ -154,7 +156,7 @@ server.listen(PORT, async () => {
 
     await page.evaluate(() => document.querySelector('button[onclick="showAhaScreen()"]').click()); await sleep(400);
     await page.evaluate(() => document.querySelector('button[onclick="revealAha(\'mid\')"]').click()); await sleep(400);
-    await page.evaluate(() => document.querySelector('button[onclick="showReport()"]').click()); await sleep(1200);
+    await page.evaluate(() => (showConfirmacao(), document.getElementById('btn-conf-relatorio').click())); await sleep(1200);
 
     const rep = await page.evaluate(() => {
       var plan = getGapPlan();
@@ -206,6 +208,91 @@ server.listen(PORT, async () => {
     check('sem placeholder de case', !rep.hasPlaceholder);
     check('case Tack (Leonardo Aidar) no gap de retrabalho', rep.tack);
     check('numeração sequencial das seções', JSON.stringify(rep.secs.map(s => s.slice(0,2))) === JSON.stringify(['01','02','03','04','05','06','07','07'].slice(0, rep.secs.length)), JSON.stringify(rep.secs.map(s => s.slice(0,2))));
+
+    // ── Ajustes do vendedor (S.prioAjustes) e tela de Conferência ──
+    const AJ = async (aj, dores) => page.evaluate((aj, dores) => {
+      S.prioAjustes = aj;
+      var salvo = JSON.parse(JSON.stringify(S.dores));
+      Object.keys(dores || {}).forEach(function(c){ S.dores[c] = { star: true, frase: dores[c] }; });
+      var p = getGapPlan();
+      var r = { anchors: p.anchors.map(function(o){ return o.code + ':' + o.prioTipo + (o.travado ? '!' : ''); }), rest: p.rest.map(function(o){ return o.code + (o.retirado ? '*' : ''); }), att: p.attention.map(function(o){ return o.code + (o.retirado ? '*' : ''); }),
+        total: calculateROI().totalBase };
+      S.dores = salvo;
+      return r;
+    }, aj, dores);
+    const base0 = await AJ({}, {});
+    check('sem ajustes: prioridades iguais às de antes (F4.3, MO.6, MO.3)', base0.anchors.join(',') === 'F4.3:fin,MO.6:fin,MO.3:fin', base0.anchors.join(','));
+    const nulo = await AJ({ travados: [], excluidos: [] }, {});
+    check('ajustes vazios = sem ajustes', JSON.stringify(nulo) === JSON.stringify(base0));
+    const ret3 = await AJ({ travados: [], excluidos: ['MO.3'] }, {});
+    check('retirar a nº 3 (Estouro de MO): a vaga vai para a PRÓXIMA FONTE (Erros de medição e folha: F4.4), não para MO.2', ret3.anchors.join(',') === 'F4.3:fin,MO.6:fin,F4.4:fin', ret3.anchors.join(','));
+    check('retirado volta para o rest com a marca', ret3.rest.indexOf('MO.3*') >= 0, ret3.rest.join(','));
+    const retAlerta = await AJ({ travados: [], excluidos: ['F3.4'] }, { 'F3.4': 'qualidade só no fechamento' });
+    check('★ em alerta retirada volta para attention (1,5), com a marca', retAlerta.att.indexOf('F3.4*') >= 0 && retAlerta.anchors.indexOf('F3.4:extra') < 0, retAlerta.anchors.join(',') + ' | ' + retAlerta.att.join(','));
+    const comAlerta = await AJ({}, { 'F3.4': 'qualidade só no fechamento' });
+    check('★ em alerta entra como extra (nº 4) sem ajustes', comAlerta.anchors.join(',') === 'F4.3:fin,MO.6:fin,MO.3:fin,F3.4:extra', comAlerta.anchors.join(','));
+    const prom = await AJ({ travados: [{ code: 'F4.1', tipo: 'extra' }], excluidos: [] }, {});
+    check('promovido ocupa vaga extra (4) e não conta como financeiro', prom.anchors.join(',') === 'F4.3:fin,MO.6:fin,MO.3:fin,F4.1:extra!', prom.anchors.join(','));
+    const prom2 = await AJ({ travados: [{ code: 'F4.1', tipo: 'extra' }, { code: 'F1.7', tipo: 'extra' }, { code: 'F3.2', tipo: 'extra' }], excluidos: [] }, {});
+    check('teto 5: o 3º promovido não entra', prom2.anchors.length === 5 && prom2.anchors.indexOf('F3.2:extra!') < 0, prom2.anchors.join(','));
+    const seis = await AJ({ travados: [], excluidos: [] }, { 'F3.2': 'a', 'F4.1': 'b', 'F4.2': 'c' });
+    check('6ª ★ (3 ★ extras) substitui a financeira não travada e sem ★ da fonte mais barata (MO.3), teto 5', seis.anchors.length === 5 && seis.anchors.join(',').indexOf('MO.3') < 0 && seis.anchors.filter(a => /:extra/.test(a)).length === 3, seis.anchors.join(','));
+    const trav6 = await AJ({ travados: [{ code: 'MO.3', tipo: 'fin' }], excluidos: [] }, { 'F3.2': 'a', 'F4.1': 'b', 'F4.2': 'c' });
+    check('travado sobrevive a 6 ★ e o teto continua 5', trav6.anchors.length === 5 && trav6.anchors.indexOf('MO.3:fin!') >= 0, trav6.anchors.join(','));
+    const tr3 = await AJ({ travados: [{ code: 'F4.1', tipo: 'fin' }], excluidos: [] }, {});
+    check('travado fin cobre a sua fonte (F4.1 = fonte time): F4.3 não duplica a vaga', tr3.anchors.join(',') === 'F4.1:fin!,MO.6:fin,MO.3:fin,F4.3:extra', tr3.anchors.join(','));
+    check('perda total do ROI não muda com nenhum ajuste', [ret3, prom, prom2, seis, trav6, tr3].every(r => r.total === base0.total));
+
+    // Tela de Conferência (cliques reais)
+    await page.evaluate(() => { S.prioAjustes = { travados: [], excluidos: [] }; showConfirmacao(); }); await sleep(300);
+    check('Conferência ativa, com aviso de uso interno', await active(page) === 'screen-confirmacao' && /Uso interno: não é mostrada ao cliente/.test(await page.$eval('#screen-confirmacao', e => e.innerText)));
+    check('3 prioridades na Conferência e botões Travar / Tirar', await page.evaluate(() => document.querySelectorAll('#conf-body .conf-card').length === 3 && document.querySelectorAll('#conf-body [data-acao="travar"]').length === 3 && document.querySelectorAll('#conf-body [data-acao="tirar"]').length === 3));
+    const perdas = await page.$$eval('#conf-body .conf-meta', els => els.map(e => e.innerText.replace(/\s+/g, ' ')));
+    check('perda por mês por fonte (mesma conta do relatório): R$ 11,5 / 9,3 / 5,5 mil', /11,5 mil/.test(perdas[0]) && /9,3 mil/.test(perdas[1]) && /5,5 mil/.test(perdas[2]), JSON.stringify(perdas));
+    await page.setViewport({ width: 1366, height: 768, deviceScaleFactor: 1 }); await sleep(300);
+    await page.screenshot({ path: path.join(G2DIR, 'conferencia_pcl_normal_1366x768.png'), fullPage: true });
+    // comentário sem ligar a ★
+    await page.evaluate(() => { var i = document.querySelectorAll('#conf-body .conf-card')[2].querySelector('input'); i.value = 'aditivo fica no e-mail'; i.dispatchEvent(new Event('input', { bubbles: true })); });
+    const dorMO3 = await page.evaluate(() => JSON.stringify(S.dores['MO.3']));
+    check('comentário grava S.dores[code].frase com star:false (não vira dor declarada)', dorMO3 === JSON.stringify({ star: false, frase: 'aditivo fica no e-mail' }), dorMO3);
+    check('o comentário não muda as prioridades', await page.evaluate(() => getGapPlan().anchors.map(o => o.code).join(',') === 'F4.3,MO.6,MO.3'));
+    // travar e destravar
+    await page.evaluate(() => document.querySelectorAll('#conf-body .conf-card')[0].querySelector('[data-acao="travar"]').click());
+    check('Travar grava travado fin', await page.evaluate(() => JSON.stringify(S.prioAjustes.travados) === JSON.stringify([{ code: 'F4.3', tipo: 'fin' }]) && !!document.querySelector('#conf-body .conf-card.trav .conf-lock')));
+    await page.evaluate(() => document.querySelector('#conf-body [data-acao="destravar"]').click());
+    check('Destravar limpa', await page.evaluate(() => S.prioAjustes.travados.length === 0));
+    // tirar a nº 3
+    await page.evaluate(() => document.querySelectorAll('#conf-body .conf-card')[2].querySelector('[data-acao="tirar"]').click()); await sleep(200);
+    const tirou = await page.evaluate(() => ({ aj: JSON.stringify(S.prioAjustes), cards: Array.prototype.map.call(document.querySelectorAll('#conf-body .conf-card'), c => c.getAttribute('data-code')).join(','),
+      ret: Array.prototype.map.call(document.querySelectorAll('#conf-body .conf-li'), l => l.getAttribute('data-code') + ':' + /Retirado das prioridades/.test(l.innerText)).filter(x => x.indexOf('true') >= 0).join(','),
+      draft: JSON.parse(localStorage.getItem(DRAFT_KEY)).state.prioAjustes }));
+    check('Tirar das prioridades: MO.3 sai, entra F4.4 (próxima fonte), MO.3 volta em Demais com "Retirado das prioridades"', tirou.cards === 'F4.3,MO.6,F4.4' && tirou.ret === 'MO.3:true', JSON.stringify(tirou));
+    check('S.prioAjustes gravado no rascunho (saveDraft)', JSON.stringify(tirou.draft) === JSON.stringify({ travados: [], excluidos: ['MO.3'] }), JSON.stringify(tirou.draft));
+    await page.screenshot({ path: path.join(G2DIR, 'conferencia_pcl_nr3_retirada_1366x768.png'), fullPage: true });
+    // Ver relatório reflete o ajuste
+    await page.evaluate(() => document.getElementById('btn-conf-relatorio').click()); await sleep(1200);
+    const repAj = await page.evaluate(() => ({ scr: document.querySelector('.screen.active').id, cards: document.querySelectorAll('#screen-report .anchor-gap-card').length, txt: document.getElementById('screen-report').innerText, plan: ptModel('detalhado').criticos.map(c => c.code).join(','), g3: getGapPlan().anchors[2].gap }));
+    check('relatório mostra as prioridades ajustadas (F4.3, MO.6, F4.4)', repAj.scr === 'screen-report' && repAj.cards === 3 && repAj.plan === 'F4.3,MO.6,F4.4' && repAj.txt.indexOf(repAj.g3) >= 0 && repAj.txt.indexOf('Estouro') >= 0, repAj.scr + ' ' + repAj.cards + ' ' + repAj.plan);
+    // botão ← Conferência no relatório
+    await page.evaluate(() => document.querySelector('#screen-report button[onclick="showConfirmacao()"]').click()); await sleep(300);
+    check('botão "← Conferência" no relatório volta à Conferência', await active(page) === 'screen-confirmacao');
+    // Tornar prioridade (desfaz a retirada e trava como extra) até o teto
+    await page.evaluate(() => document.querySelector('#conf-body .conf-li[data-code="MO.3"] [data-acao="promover"]').click());
+    const p1 = await page.evaluate(() => ({ aj: JSON.stringify(S.prioAjustes), n: document.querySelectorAll('#conf-body .conf-card').length }));
+    check('Tornar prioridade em ponto retirado: sai de excluídos e vira travado extra (4 prioridades)', p1.aj === JSON.stringify({ travados: [{ code: 'MO.3', tipo: 'extra' }], excluidos: [] }) && p1.n === 4, p1.aj);
+    await page.evaluate(() => document.querySelector('#conf-body .conf-li [data-acao="promover"]').click());
+    const p2 = await page.evaluate(() => ({ n: document.querySelectorAll('#conf-body .conf-card').length, dis: Array.prototype.every.call(document.querySelectorAll('#conf-body [data-acao="promover"]'), b => b.disabled), teto: /Teto de 5 prioridades atingido/.test(document.getElementById('conf-body').innerText) }));
+    check('com 5 prioridades "Tornar prioridade" fica desabilitado, com a explicação do teto', p2.n === 5 && p2.dis && p2.teto, JSON.stringify(p2));
+    await page.screenshot({ path: path.join(G2DIR, 'conferencia_pcl_teto_1366x768.png'), fullPage: true });
+    // Voltar da Conferência -> AHA
+    await page.evaluate(() => document.getElementById('btn-conf-voltar').click()); await sleep(300);
+    check('← Voltar da Conferência -> tela AHA', await active(page) === 'screen-aha');
+    // Retomada/admin: showReport direto, com os ajustes salvos aplicados
+    await page.evaluate(() => { showReport(); }); await sleep(800);
+    check('retomada vai direto ao relatório, com os ajustes salvos', await page.evaluate(() => document.querySelector('.screen.active').id === 'screen-report' && document.querySelectorAll('#screen-report .anchor-gap-card').length === 5));
+    // volta ao estado original para os testes seguintes (PDF)
+    await page.evaluate(() => { S.prioAjustes = { travados: [], excluidos: [] }; delete S.dores['MO.3']; buildReport(); });
+    await sleep(300);
 
     if (WANT_PDF) {
       await page.evaluate((m, t) => { window.__PDF_MODE = m; window.__PDF_THEME = t; if (t === 'light') changeReportTheme('light'); }, MODE, process.env.THEME || 'dark');

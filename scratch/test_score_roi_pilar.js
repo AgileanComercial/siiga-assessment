@@ -57,7 +57,7 @@ server.listen(PORT, async () => {
     await page.type('#c-email', 'teste@teste-pilar.com.br');
     await page.type('#c-telefone', '(11) 91234-5678');
     await page.click('button[onclick="startAssessment()"]');
-    await sleep(300); await page.click('#btn-diagnostico-continuar'); await sleep(300); await page.click('#btn-pilares-continuar'); await sleep(300); await page.click('#btn-metodo-iniciar');
+    await sleep(300); await page.click('#btn-diagnostico-continuar');  await sleep(300); await page.click('#btn-metodo-iniciar');
     await sleep(300);
 
     // Bloco 0 — B0.3 na opção máxima (3 pts) para provar que ela NÃO entra no total
@@ -143,7 +143,7 @@ server.listen(PORT, async () => {
 
     await page.evaluate(() => document.querySelector('button[onclick="showAhaScreen()"]').click()); await sleep(400);
     await page.evaluate(() => document.querySelector('button[onclick="revealAha(\'mid\')"]').click()); await sleep(400);
-    await page.evaluate(() => document.querySelector('button[onclick="showReport()"]').click()); await sleep(1000);
+    await page.evaluate(() => (showConfirmacao(), document.getElementById('btn-conf-relatorio').click())); await sleep(1000);
 
     const rep = await page.evaluate(() => {
       var snap = document.getElementById('exec-snapshot').innerText;

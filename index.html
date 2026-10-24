@@ -162,48 +162,17 @@ function maskPhone(input){var d=input.value.replace(/\D/g,'');if(d.length>11)d=d
   </div>
 </div>
 
-<!-- PILARES SIIGA (apresentação) -->
-<div class="screen" id="screen-pilares">
-  <div class="pres-wrap">
-    <div class="pres-head"><div class="pres-logo">SIIGA</div><div class="pres-sub">Sistema Integrado e Inteligente de Gestão Agilean</div></div>
-    <div class="pilar-grid">
-    <div class="pilar-card" id="pilar-card-1">
-      <div class="pilar-num">PILAR 01</div>
-      <div class="pilar-nome">Planejamento estratégico do fluxo de produção</div>
-      <ul class="pilar-list"><li>Lean EAP</li><li>Modelo de produção</li><li>Ensaio de recursos</li><li>Linha de base</li></ul>
-    </div>
-    <div class="pilar-card" id="pilar-card-2">
-      <div class="pilar-num">PILAR 02</div>
-      <div class="pilar-nome">Proteção e garantia da execução do plano</div>
-      <ul class="pilar-list"><li>Restrições</li><li>Lookahead Planning</li><li>Comprometimento de MO</li><li>Reprogramação tática</li></ul>
-    </div>
-    <div class="pilar-card" id="pilar-card-3">
-      <div class="pilar-num">PILAR 03</div>
-      <div class="pilar-nome">Gestão integrada da produção</div>
-      <ul class="pilar-list"><li>Plano mensal</li><li>Ciclo diário</li><li>Avanço físico</li><li>Controle de produção MO</li></ul>
-    </div>
-    <div class="pilar-card" id="pilar-card-4">
-      <div class="pilar-num">PILAR 04</div>
-      <div class="pilar-nome">Controle real e performance da produção</div>
-      <ul class="pilar-list"><li>Performance HUB</li><li>Pagamento por evidência</li><li>Reunião de inteligência</li></ul>
-    </div>
-    </div>
-    <div class="pres-stats">
-      <div class="pres-stat"><div class="pres-stat-v">+10.000</div><div class="pres-stat-l">obras reais</div></div>
-      <div class="pres-stat"><div class="pres-stat-v">+25 anos</div><div class="pres-stat-l">exp. campo</div></div>
-      <div class="pres-stat"><div class="pres-stat-v">+10 anos</div><div class="pres-stat-l">de dados</div></div>
-    </div>
-    <div class="pres-btns">
-      <button class="btn btn-s" id="btn-pilares-voltar" onclick="showDiagnostico()">← Voltar</button>
-      <button class="btn btn-p" id="btn-pilares-continuar" onclick="showMetodo()">Continuar →</button>
-    </div>
-  </div>
-</div>
-
 <!-- ORIGEM DO MÉTODO / O QUE O SIIGA GARANTE (apresentação) -->
 <div class="screen" id="screen-metodo">
   <div class="pres-wrap">
     <div class="pres-head"><div class="pres-logo">SIIGA</div><div class="pres-sub">Sistema Integrado e Inteligente de Gestão Agilean</div></div>
+    <div class="mp-faixa" id="metodo-pilares">
+      <div class="mp-pil" id="pilar-card-1"><div class="pilar-num">PILAR 01</div><div class="mp-nome">Planejamento estratégico do fluxo de produção</div><div class="mp-pr">Lean EAP · Modelo de produção · Ensaio de recursos · Linha de base</div></div>
+      <div class="mp-pil" id="pilar-card-2"><div class="pilar-num">PILAR 02</div><div class="mp-nome">Proteção e garantia da execução do plano</div><div class="mp-pr">Restrições · Lookahead Planning · Comprometimento de MO · Reprogramação tática</div></div>
+      <div class="mp-pil" id="pilar-card-3"><div class="pilar-num">PILAR 03</div><div class="mp-nome">Gestão integrada da produção</div><div class="mp-pr">Plano mensal · Ciclo diário · Avanço físico · Controle de produção MO</div></div>
+      <div class="mp-pil" id="pilar-card-4"><div class="pilar-num">PILAR 04</div><div class="mp-nome">Controle real e performance da produção</div><div class="mp-pr">Performance HUB · Pagamento por evidência · Reunião de inteligência</div></div>
+      <div class="mp-stat"><div class="v">+10.000</div><div class="l">obras reais</div></div>
+    </div>
     <div class="metodo-grid">
       <div class="metodo-card metodo-origem" id="metodo-origem">
         <div class="metodo-tit">Origem do método</div>
@@ -231,7 +200,7 @@ function maskPhone(input){var d=input.value.replace(/\D/g,'');if(d.length>11)d=d
       </div>
     </div>
     <div class="pres-btns">
-      <button class="btn btn-s" id="btn-metodo-voltar" onclick="showPilares()">← Voltar</button>
+      <button class="btn btn-s" id="btn-metodo-voltar" onclick="showDiagnostico()">← Voltar</button>
       <button class="btn btn-p" id="btn-metodo-iniciar" onclick="beginB0()">Iniciar diagnóstico →</button>
     </div>
   </div>
@@ -502,6 +471,16 @@ function maskPhone(input){var d=input.value.replace(/\D/g,'');if(d.length>11)d=d
   </div>
   <div class="btn-row" style="max-width:920px">
     <button class="btn btn-p" onclick="showAhaScreen()">Ver o que Você Está Perdendo →</button>
+  </div>
+</div>
+
+<!-- CONFERÊNCIA ANTES DO RELATÓRIO (uso interno) -->
+<div class="screen" id="screen-confirmacao">
+  <div class="conf-wrap">
+    <div class="conf-top"><div class="conf-tit"><small>Antes do relatório</small>Conferência antes do relatório</div><div class="conf-aviso">Uso interno: não é mostrada ao cliente</div></div>
+    <div class="conf-regra">Regra das prioridades: 3 pela maior perda financeira (1 por fonte de perda) e até 2 por dor declarada. Uma 6ª dor substitui a prioridade financeira da fonte mais barata que não esteja travada. A perda total do ROI não muda. Ponto travado fica fixo como prioridade.</div>
+    <div id="conf-body"></div>
+    <div class="conf-btns"><button class="btn btn-s" id="btn-conf-voltar" onclick="showScreen('screen-aha')">← Voltar</button><button class="btn btn-p" id="btn-conf-relatorio" onclick="showReport()">Ver relatório →</button></div>
   </div>
 </div>
 
@@ -780,7 +759,10 @@ function maskPhone(input){var d=input.value.replace(/\D/g,'');if(d.length>11)d=d
     </div>
 
     <div class="btn-row no-print" style="max-width:920px;justify-content:space-between;flex-wrap:wrap;gap:12px">
-      <button class="btn btn-s" onclick="showScreen('screen-radar')">← Voltar ao Radar</button>
+      <div style="display:flex;gap:10px;flex-wrap:wrap">
+        <button class="btn btn-s" onclick="showScreen('screen-radar')">← Voltar ao Radar</button>
+        <button class="btn btn-s" onclick="showConfirmacao()">← Conferência</button>
+      </div>
       <div style="display:flex;gap:10px;flex-wrap:wrap;justify-content:flex-end;align-items:center">
         <!-- Seletor de tema da TELA (Escuro/Claro) do relatório ao vivo. O PDF não
              depende mais dele: generatePDF() sempre gera a direção A "Prancha
@@ -1548,7 +1530,7 @@ function maskPhone(input){var d=input.value.replace(/\D/g,'');if(d.length>11)d=d
             Na próxima conversa, mostramos exatamente como — pilar por pilar, com metodologia, tecnologia e consultoria integradas. Cada real dessa perda tem um caminho estruturado para ser recuperado.
           </p>
           <div style="display:flex;gap:12px;flex-wrap:wrap">
-            <button onclick="showReport()" style="flex:1;min-width:200px;padding:14px 24px;background:var(--orange);border:none;border-radius:10px;color:white;font-family:'Bai Jamjuree';font-size:14px;font-weight:700;cursor:pointer;transition:all 0.2s" onmouseover="this.style.background='#e05010'" onmouseout="this.style.background='var(--orange)'">
+            <button onclick="showConfirmacao()" style="flex:1;min-width:200px;padding:14px 24px;background:var(--orange);border:none;border-radius:10px;color:white;font-family:'Bai Jamjuree';font-size:14px;font-weight:700;cursor:pointer;transition:all 0.2s" onmouseover="this.style.background='#e05010'" onmouseout="this.style.background='var(--orange)'">
               Ver Relatório Completo →
             </button>
             <button onclick="showScreen('screen-radar')" style="padding:14px 24px;background:rgba(255,255,255,0.06);border:1px solid rgba(255,255,255,0.12);border-radius:10px;color:rgba(255,255,255,0.7);font-family:'Bai Jamjuree';font-size:14px;font-weight:600;cursor:pointer">

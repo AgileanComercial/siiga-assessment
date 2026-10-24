@@ -1,4 +1,4 @@
-// E2E for the presentation screens (cover > pilares > metodo > B0): navigation, back buttons,
+// E2E for the presentation screens (cover > diagnostico > metodo > B0): navigation, back buttons,
 // draft resume and screenshots (1920x1080 and 390x844). Supabase writes and AI calls are blocked.
 // Usage: SHOTS="<dir>" node scratch/test_navegacao_apresentacao.js
 const http = require('http');
@@ -68,41 +68,45 @@ server.listen(PORT, async () => {
     });
     await page.screenshot({ path: path.join(SHOTS, 'diagnostico_1920x1080_preenchida.png') });
     await page.click('#btn-diagnostico-continuar'); await sleep(700);
-    check('Diagnóstico -> Pilares', await active(page) === 'screen-pilares');
+    check('Diagnóstico -> Método', await active(page) === 'screen-metodo');
+    check('screen-pilares removida', !(await page.$('#screen-pilares')));
     const r2 = await page.evaluate(() => JSON.stringify(S.reuniao2));
     check('S.reuniao2 gravado (nome vazio descartado)', r2 === JSON.stringify({ data: '2026-10-28', hora: '14:00', participantes: [{ nome: 'Thiago Toscano', cargo: 'Diretor Comercial' }, { nome: 'Marina Alves', cargo: 'Diretora de Engenharia' }] }), r2);
     check('S.reuniao2 no rascunho', await page.evaluate(() => JSON.parse(localStorage.getItem(DRAFT_KEY)).state.reuniao2.participantes.length === 2));
-    await page.click('#btn-pilares-voltar'); await sleep(500);
-    check('Voltar dos Pilares -> Diagnóstico', await active(page) === 'screen-diagnostico');
+    await page.click('#btn-metodo-voltar'); await sleep(500);
+    check('Voltar do Método -> Diagnóstico', await active(page) === 'screen-diagnostico');
     check('campos restaurados ao voltar', await page.evaluate(() => document.getElementById('reuniao2-data').value === '2026-10-28' && document.getElementById('reuniao2-hora').value === '14:00' && document.querySelectorAll('#reuniao2-participantes .dg-prow').length === 2));
     await page.click('#btn-diagnostico-continuar'); await sleep(500);
-    check('capa -> Pilares', await active(page) === 'screen-pilares');
-    check('nav-step Pilares SIIGA', await page.$eval('#nav-step', e => e.textContent) === 'Pilares SIIGA');
-    check('4 cards de pilar', (await page.$$('#screen-pilares [id^="pilar-card-"]')).length === 4);
-    const txtP = await page.$eval('#screen-pilares', e => e.innerText);
-    check('Pilares: textos do slide', ['+10.000', '+25 anos', '+10 anos', 'Lean EAP', 'Reunião de inteligência', 'Controle de produção MO', 'Proteção e garantia da execução do plano'].every(s => txtP.toUpperCase().indexOf(s.toUpperCase()) >= 0), txtP.slice(0,120));
-    check('Pilares sem travessão', txtP.indexOf('—') < 0 && txtP.indexOf('–') < 0);
-    await page.screenshot({ path: path.join(SHOTS, 'pilares_1920x1080.png') });
-    const scr1 = await page.evaluate(() => ({ sh: document.documentElement.scrollHeight, ih: window.innerHeight }));
-    console.log('Pilares 1920x1080 scrollHeight/innerHeight:', JSON.stringify(scr1));
-
-    // Pilares -> Metodo
-    await page.click('#btn-pilares-continuar'); await sleep(700);
-    check('Pilares -> Método', await active(page) === 'screen-metodo');
     check('nav-step Método SIIGA', await page.$eval('#nav-step', e => e.textContent) === 'Método SIIGA');
     const txtM = (await page.$eval('#screen-metodo', e => e.innerText)).replace(/\s+/g, ' ');
     check('Método: textos do slide', ['Last Planner System', 'Nenhuma big tech tem esses dados', 'O PLANO CHEGA', 'MARGEM PROTEGIDA'].every(s => txtM.toUpperCase().indexOf(s.toUpperCase()) >= 0));
+    check('Método: 4 pilares com práticas e +10.000 obras reais', (await page.$$('#screen-metodo [id^="pilar-card-"]')).length === 4 && ['+10.000', 'obras reais', 'Lean EAP', 'Reunião de inteligência', 'Controle de produção MO', 'Proteção e garantia da execução do plano'].every(s => txtM.toUpperCase().indexOf(s.toUpperCase()) >= 0), txtM.slice(0, 160));
+    check('Método sem repetir +25 anos / +10 anos da faixa (só nos itens da Origem)', (txtM.match(/\+25 anos/g) || []).length === 1 && (txtM.match(/\+10 anos/g) || []).length === 1);
+    // Nada do que existia no HEAD pode sumir: textos da tela Método atual + pilares/práticas e "+10.000 obras reais" da tela Pilares removida
+    const headHtml = require('child_process').execSync('git show HEAD:index.html', { cwd: BASE_DIR, maxBuffer: 64 * 1024 * 1024 }).toString('utf8');
+    const bloco = (ini, fim) => headHtml.slice(headHtml.indexOf(ini), headHtml.indexOf(fim));
+    const linhas = html => html.replace(/<(script|style)[\s\S]*?<\/(script|style)>/g, '').replace(/<[^>]+>/g, '\n').split('\n').map(t => t.replace(/\s+/g, ' ').trim()).filter(Boolean);
+    const norm = t => t.replace(/\s+/g, ' ').toUpperCase();
+    const novoTxt = norm(txtM);
+    const metodoHead = linhas(bloco('<div class="screen" id="screen-metodo">', '<!-- B0 SCREEN -->')).filter(t => !/^(← Voltar|Iniciar diagnóstico →|SIIGA|Sistema Integrado e Inteligente de Gestão Agilean)$/.test(t));
+    const pilaresHtml = bloco('<div class="screen" id="screen-pilares">', '<!-- ORIGEM DO MÉTODO');
+    const pilaresHead = linhas(pilaresHtml.slice(pilaresHtml.indexOf('<div class="pilar-grid">'), pilaresHtml.indexOf('<div class="pres-stats">'))).concat(['+10.000', 'obras reais']);
+    const faltam = metodoHead.concat(pilaresHead).filter(t => novoTxt.indexOf(norm(t)) < 0);
+    check('todos os textos do Método atual (' + metodoHead.length + ') e dos Pilares (' + pilaresHead.length + ') aparecem na tela nova', faltam.length === 0, JSON.stringify(faltam));
     check('Método sem travessão', txtM.indexOf('—') < 0 && txtM.indexOf('–') < 0);
     check('Método: origem e garantias', !!(await page.$('#metodo-origem')) && !!(await page.$('#metodo-garantias')));
     await page.screenshot({ path: path.join(SHOTS, 'metodo_1920x1080.png') });
-    const scr2 = await page.evaluate(() => ({ sh: document.documentElement.scrollHeight, ih: window.innerHeight }));
-    console.log('Método 1920x1080 scrollHeight/innerHeight:', JSON.stringify(scr2));
+    const scr2 = await page.evaluate(() => ({ fim: document.querySelector('#screen-metodo .pres-btns').getBoundingClientRect().bottom, ih: window.innerHeight }));
+    check('Método cabe em 1920x1080 sem rolagem', scr2.fim <= scr2.ih, JSON.stringify(scr2));
+    await page.setViewport({ width: 1366, height: 768, deviceScaleFactor: 1 }); await sleep(400);
+    const scr3 = await page.evaluate(() => ({ fim: document.querySelector('#screen-metodo .pres-btns').getBoundingClientRect().bottom, ih: window.innerHeight }));
+    await page.screenshot({ path: path.join(SHOTS, 'metodo_1366x768.png') });
+    check('Método cabe em 1366x768 sem rolagem', scr3.fim <= scr3.ih, JSON.stringify(scr3));
+    await page.setViewport({ width: 1920, height: 1080, deviceScaleFactor: 1 }); await sleep(300);
 
-    // Voltar: Metodo -> Pilares -> capa (campos preenchidos)
+    // Voltar: Método -> Diagnóstico -> capa (campos preenchidos)
     await page.click('#btn-metodo-voltar'); await sleep(500);
-    check('Voltar do Método -> Pilares', await active(page) === 'screen-pilares');
-    await page.click('#btn-pilares-voltar'); await sleep(500);
-    check('Voltar dos Pilares -> Diagnóstico', await active(page) === 'screen-diagnostico');
+    check('Voltar do Método -> Diagnóstico', await active(page) === 'screen-diagnostico');
     await page.click('#btn-diagnostico-voltar'); await sleep(500);
     check('Voltar do Diagnóstico -> capa', await active(page) === 'screen-cover');
     const campos = await page.evaluate(() => ['c-empresa', 'c-contato', 'c-cargo', 'c-consultor', 'c-email', 'c-telefone'].map(id => document.getElementById(id).value));
@@ -112,7 +116,6 @@ server.listen(PORT, async () => {
     await page.click('button[onclick="startAssessment()"]'); await sleep(500);
     check('campos do agendamento mantidos após voltar à capa e seguir', await page.evaluate(() => document.getElementById('reuniao2-data').value === '2026-10-28'));
     await page.click('#btn-diagnostico-continuar'); await sleep(500);
-    await page.click('#btn-pilares-continuar'); await sleep(500);
     await page.click('#btn-metodo-iniciar'); await sleep(500);
     check('Iniciar -> B0', await active(page) === 'screen-b0');
     check('B0 na 1ª pergunta', await page.evaluate(() => currentQIdx === 0 && currentBlock === 'b0'));
@@ -178,7 +181,7 @@ server.listen(PORT, async () => {
     check('retomada restaura S.reuniao2 nos campos', await page.evaluate(() => document.getElementById('reuniao2-data').value === '2026-10-28' && document.querySelectorAll('#reuniao2-participantes .dg-prow').length === 2));
     await page.evaluate(() => { document.getElementById('reuniao2-data').value = ''; document.getElementById('reuniao2-hora').value = ''; document.querySelectorAll('#reuniao2-participantes input').forEach(i => i.value = ''); });
     await page.click('#btn-diagnostico-continuar'); await sleep(400);
-    check('campos vazios não bloqueiam o avanço', await active(page) === 'screen-pilares' && await page.evaluate(() => S.reuniao2.data === '' && S.reuniao2.participantes.length === 0));
+    check('campos vazios não bloqueiam o avanço', await active(page) === 'screen-metodo' && await page.evaluate(() => S.reuniao2.data === '' && S.reuniao2.participantes.length === 0));
     // Mobile screenshots (fresh page state: go to each presentation screen directly)
     await page.setViewport({ width: 390, height: 844, deviceScaleFactor: 2, isMobile: true });
     // setViewport(isMobile) reloads the page: restore S from the draft first
@@ -190,8 +193,6 @@ server.listen(PORT, async () => {
       addReuniao2Participante('Marina Alves', 'Diretora de Engenharia'); window.scrollTo(0, 0);
     }); await sleep(500);
     await page.screenshot({ path: path.join(SHOTS, 'diagnostico_390x844_preenchida.png'), fullPage: true });
-    await page.evaluate(() => { showPilares(); window.scrollTo(0, 0); }); await sleep(800);
-    await page.screenshot({ path: path.join(SHOTS, 'pilares_390x844.png'), fullPage: true });
     await page.evaluate(() => showMetodo()); await sleep(600);
     await page.screenshot({ path: path.join(SHOTS, 'metodo_390x844.png'), fullPage: true });
     const ov = await page.evaluate(() => document.documentElement.scrollWidth - window.innerWidth);

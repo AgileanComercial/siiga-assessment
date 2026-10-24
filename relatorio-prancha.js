@@ -189,6 +189,16 @@ function ptToken(name) {
 }
 
 // ── Data model (read-only use of the existing engines) ───────────────────
+// Title and pillar of a point, shared by the report and the Conferência screen (script.js)
+function ptPilarGap(o, longo) {
+  var n;
+  if (o.bk === 'mo') {
+    n = PT_MO_PILAR[o.code];
+    if (!n) throw new Error('PT_MO_PILAR: código de mão de obra sem pilar mapeado: ' + o.code);
+  } else { n = o.bk.charAt(1); }
+  return (longo ? 'Pilar ' : 'P') + n;
+}
+function ptTituloGap(o) { return (o.score === 0 ? 'Implantação ' : 'Digitalização ') + (PT_PRATICA[o.code] || ('de ' + ptLow(o.gap))); }
 function ptModel(mode) {
   var det = (mode !== 'resumido');
   var roi = calculateROI();
@@ -218,15 +228,8 @@ function ptModel(mode) {
   });
 
   // Points: critical (anchors); the rest and attention share one table
-  var pilarLbl = function(o, longo) {
-    var n;
-    if (o.bk === 'mo') {
-      n = PT_MO_PILAR[o.code];
-      if (!n) throw new Error('PT_MO_PILAR: código de mão de obra sem pilar mapeado: ' + o.code);
-    } else { n = o.bk.charAt(1); }
-    return (longo ? 'Pilar ' : 'P') + n;
-  };
-  var titulo = function(o) { return (o.score === 0 ? 'Implantação ' : 'Digitalização ') + (PT_PRATICA[o.code] || ('de ' + ptLow(o.gap))); };
+  var pilarLbl = ptPilarGap;
+  var titulo = ptTituloGap;
   var fonteVista = {};
   var criticos = plan.anchors.map(function(o, i) {
     var f = fontes[o.fonte];
