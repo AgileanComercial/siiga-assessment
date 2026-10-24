@@ -276,10 +276,13 @@ server.listen(PORT, async () => {
     // botão ← Conferência no relatório
     await page.evaluate(() => document.querySelector('#screen-report button[onclick="showConfirmacao()"]').click()); await sleep(300);
     check('botão "← Conferência" no relatório volta à Conferência', await active(page) === 'screen-confirmacao');
-    // Tornar prioridade (desfaz a retirada e trava como extra) até o teto
+    // Tornar prioridade em ponto retirado só desfaz a retirada: retirar MO.3 e restaurar devolve as prioridades originais (MO.3 travada como fin)
     await page.evaluate(() => document.querySelector('#conf-body .conf-li[data-code="MO.3"] [data-acao="promover"]').click());
-    const p1 = await page.evaluate(() => ({ aj: JSON.stringify(S.prioAjustes), n: document.querySelectorAll('#conf-body .conf-card').length }));
-    check('Tornar prioridade em ponto retirado: sai de excluídos e vira travado extra (4 prioridades)', p1.aj === JSON.stringify({ travados: [{ code: 'MO.3', tipo: 'extra' }], excluidos: [] }) && p1.n === 4, p1.aj);
+    const p1 = await page.evaluate(() => ({ aj: JSON.stringify(S.prioAjustes), cards: Array.prototype.map.call(document.querySelectorAll('#conf-body .conf-card'), c => c.getAttribute('data-code')).join(',') }));
+    check('Tornar prioridade em ponto retirado: sai de excluídos e volta travado fin (3 prioridades, sem fonte duplicada)', p1.aj === JSON.stringify({ travados: [{ code: 'MO.3', tipo: 'fin' }], excluidos: [] }) && p1.cards === 'F4.3,MO.6,MO.3', p1.aj + ' | ' + p1.cards);
+    check('restaurar devolve as prioridades originais (F4.3, MO.6, MO.3)', p1.cards === base0.anchors.map(a => a.split(':')[0]).join(','), p1.cards);
+    // promove mais dois pontos até o teto de 5
+    await page.evaluate(() => document.querySelector('#conf-body .conf-li [data-acao="promover"]').click());
     await page.evaluate(() => document.querySelector('#conf-body .conf-li [data-acao="promover"]').click());
     const p2 = await page.evaluate(() => ({ n: document.querySelectorAll('#conf-body .conf-card').length, dis: Array.prototype.every.call(document.querySelectorAll('#conf-body [data-acao="promover"]'), b => b.disabled), teto: /Teto de 5 prioridades atingido/.test(document.getElementById('conf-body').innerText) }));
     check('com 5 prioridades "Tornar prioridade" fica desabilitado, com a explicação do teto', p2.n === 5 && p2.dis && p2.teto, JSON.stringify(p2));

@@ -1736,13 +1736,22 @@ function confTirar(code) {
   if(aj.excluidos.indexOf(code) < 0) aj.excluidos.push(code);
   confSalvar();
 }
-// Tornar prioridade: desfaz a retirada (se houver) e trava o ponto como prioridade extra.
+// Tornar prioridade: num ponto retirado, só desfaz a retirada: se a regra devolve o ponto como
+// prioridade financeira, ele é travado como 'fin' (retirar e restaurar devolve as prioridades
+// originais); senão é travado como 'extra' (teto 5). Em ponto que nunca foi prioridade, trava 'extra'.
 function confPromover(code) {
-  var plan = getGapPlan(), aj = confAjustes();
-  if(plan.anchors.length >= 5) return;
+  var aj = confAjustes();
+  var estavaRetirado = aj.excluidos.indexOf(code) >= 0;
   aj.excluidos = aj.excluidos.filter(function(c){ return c !== code; });
   confSemTravado(aj, code);
-  aj.travados.push({ code: code, tipo: 'extra' });
+  var plan = getGapPlan();
+  var o = plan.anchors.filter(function(x){ return x.code === code; })[0];
+  if(estavaRetirado && o) {
+    aj.travados.push({ code: code, tipo: o.prioTipo === 'fin' ? 'fin' : 'extra' });
+  } else {
+    if(plan.anchors.length >= 5) { if(estavaRetirado) aj.excluidos.push(code); return; }
+    aj.travados.push({ code: code, tipo: 'extra' });
+  }
   confSalvar();
 }
 // Comentário: grava a frase sem ligar a ★ (setDorFrase cria a dor com star:true).
