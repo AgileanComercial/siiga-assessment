@@ -74,7 +74,7 @@ server.listen(PORT, async () => {
     await page.type('#c-email', 'ana@cenarios.com.br');
     await page.type('#c-telefone', '(11) 98888-7777');
     await page.click('button[onclick="startAssessment()"]');
-    await sleep(300); await page.click('#btn-diagnostico-continuar');  await sleep(300); await page.click('#btn-metodo-iniciar');
+    await sleep(300); await page.click('#btn-diagnostico-continuar');  await sleep(300); await page.click('#btn-metodo-continuar'); await sleep(250); await page.click('#btn-portfolio-continuar'); await sleep(250); await page.click('#btn-premios-iniciar');
     await sleep(300);
     for (let i = 0; i < 30; i++) {
       if (await active(page) !== 'screen-b0') break;

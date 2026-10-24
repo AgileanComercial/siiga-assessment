@@ -98,7 +98,7 @@ server.listen(PORT, async () => {
         addReuniao2Participante('', 'Sem nome');
       });
     }
-    await page.click('#btn-diagnostico-continuar');  await sleep(300); await page.click('#btn-metodo-iniciar');
+    await page.click('#btn-diagnostico-continuar');  await sleep(300); await page.click('#btn-metodo-continuar'); await sleep(250); await page.click('#btn-portfolio-continuar'); await sleep(250); await page.click('#btn-premios-iniciar');
     await sleep(300);
 
     for (let i = 0; i < 30; i++) {

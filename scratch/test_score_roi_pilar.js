@@ -57,7 +57,7 @@ server.listen(PORT, async () => {
     await page.type('#c-email', 'teste@teste-pilar.com.br');
     await page.type('#c-telefone', '(11) 91234-5678');
     await page.click('button[onclick="startAssessment()"]');
-    await sleep(300); await page.click('#btn-diagnostico-continuar');  await sleep(300); await page.click('#btn-metodo-iniciar');
+    await sleep(300); await page.click('#btn-diagnostico-continuar');  await sleep(300); await page.click('#btn-metodo-continuar'); await sleep(250); await page.click('#btn-portfolio-continuar'); await sleep(250); await page.click('#btn-premios-iniciar');
     await sleep(300);
 
     // Bloco 0 — B0.3 na opção máxima (3 pts) para provar que ela NÃO entra no total

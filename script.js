@@ -580,6 +580,14 @@ function showMetodo() {
   document.getElementById('nav-step').textContent = 'Método SIIGA';
   showScreen('screen-metodo');
 }
+function showPortfolio() {
+  document.getElementById('nav-step').textContent = 'Portfólio';
+  showScreen('screen-portfolio');
+}
+function showPremios() {
+  document.getElementById('nav-step').textContent = 'Prêmios';
+  showScreen('screen-premios');
+}
 // Enters the questionnaire; idx (optional) preserves the saved question on resume.
 function beginB0(idx) {
   currentBlock = 'b0';
@@ -1113,7 +1121,7 @@ function nextQ() {
 function prevQ() {
   if(currentBlock === 'b0') {
     if(currentQIdx > 0) { currentQIdx--; renderB0(); saveDraft(); }
-    else showMetodo();
+    else showPremios();
   } else if(currentBlock === 'phase') {
     if(currentQIdx > 0) {
       currentQIdx--;
@@ -4506,13 +4514,13 @@ PRODUTOS AGILEAN:
 - Integracao ERP: API nativa com Sienge, TOTVS, Informakon, Mega e UAU.
 
 BENCHMARKS REAIS (use com precisao):
-- Media de 10% de reducao de custos operacionais
-- Media de 15% de ganho de produtividade no canteiro
+- Media de 10% de economia em obras
+- Media de 25% de ganho de produtividade no canteiro
 - 2x mais aderencia entre planejado e realizado
 - Reducao de mais de 50% da carga operacional da equipe tecnica
 - Fechamento de folha e medicao: de semanas para horas
 - Planejamento e reprogramacao: de meses para horas
-- +1.500 canteiros impactados, 70M m2 construidos com Agilean
+- +5.000 canteiros impactados, 70M m2 construidos com Agilean
 
 REGRAS DE DEPENDENCIA (inviolaveis):
 1. Pilar 1 fraco: priorize planejamento antes de tudo
@@ -6021,7 +6029,7 @@ function buildPropostaDepoimentos(mode) {
       '</div>' +
     '</div>';
   }).join('');
-  var stats = [['22','estados com operação'],['70 mi','m² construídos com Agilean'],['+1.500','canteiros impactados'],['+5 mil','gestores usando por dia'],['15%','de ganho médio de produtividade']];
+  var stats = [['22','estados com operação'],['70 mi','m² construídos com Agilean'],['+5.000','canteiros impactados'],['+5 mil','gestores usando por dia'],['25%','de ganho médio de produtividade']];
   var statCells = stats.map(function(s){
     return '<div style="text-align:center"><div style="font-family:Bai Jamjuree;font-size:24px;font-weight:700;color:#ea580c">'+s[0]+'</div><div style="font-size:10px;color:#94a3b8;line-height:1.3;margin-top:2px">'+s[1]+'</div></div>';
   }).join('');

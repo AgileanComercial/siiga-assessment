@@ -68,7 +68,7 @@ server.listen(PORT, async () => {
     await page.type('#c-email', 'teste@pcl-teste.com.br');
     await page.type('#c-telefone', '(83) 91234-5678');
     await page.click('button[onclick="startAssessment()"]');
-    await sleep(300); await page.click('#btn-diagnostico-continuar');  await sleep(300); await page.click('#btn-metodo-iniciar');
+    await sleep(300); await page.click('#btn-diagnostico-continuar');  await sleep(300); await page.click('#btn-metodo-continuar'); await sleep(250); await page.click('#btn-portfolio-continuar'); await sleep(250); await page.click('#btn-premios-iniciar');
     await sleep(300);
     check('capa aceita e Bloco 0 aberto', await active(page) === 'screen-b0', await active(page));
 

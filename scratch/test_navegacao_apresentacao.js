@@ -1,4 +1,4 @@
-// E2E for the presentation screens (cover > diagnostico > metodo > B0): navigation, back buttons,
+// E2E for the presentation screens (cover > diagnostico > metodo > portfolio > premios > B0): navigation, back buttons,
 // draft resume and screenshots (1920x1080 and 390x844). Supabase writes and AI calls are blocked.
 // Usage: SHOTS="<dir>" node scratch/test_navegacao_apresentacao.js
 const http = require('http');
@@ -83,7 +83,7 @@ server.listen(PORT, async () => {
     check('Método: 4 pilares com práticas e +10.000 obras reais', (await page.$$('#screen-metodo [id^="pilar-card-"]')).length === 4 && ['+10.000', 'obras reais', 'Lean EAP', 'Reunião de inteligência', 'Controle de produção MO', 'Proteção e garantia da execução do plano'].every(s => txtM.toUpperCase().indexOf(s.toUpperCase()) >= 0), txtM.slice(0, 160));
     check('Método sem repetir +25 anos / +10 anos da faixa (só nos itens da Origem)', (txtM.match(/\+25 anos/g) || []).length === 1 && (txtM.match(/\+10 anos/g) || []).length === 1);
     // Nada do que existia no HEAD pode sumir: textos da tela Método atual + pilares/práticas e "+10.000 obras reais" da tela Pilares removida
-    const headHtml = require('child_process').execSync('git show HEAD:index.html', { cwd: BASE_DIR, maxBuffer: 64 * 1024 * 1024 }).toString('utf8');
+    const headHtml = require('child_process').execSync('git show 52b8ff9:index.html', { cwd: BASE_DIR, maxBuffer: 64 * 1024 * 1024 }).toString('utf8');
     const bloco = (ini, fim) => headHtml.slice(headHtml.indexOf(ini), headHtml.indexOf(fim));
     const linhas = html => html.replace(/<(script|style)[\s\S]*?<\/(script|style)>/g, '').replace(/<[^>]+>/g, '\n').split('\n').map(t => t.replace(/\s+/g, ' ').trim()).filter(Boolean);
     const norm = t => t.replace(/\s+/g, ' ').toUpperCase();
@@ -104,6 +104,46 @@ server.listen(PORT, async () => {
     check('Método cabe em 1366x768 sem rolagem', scr3.fim <= scr3.ih, JSON.stringify(scr3));
     await page.setViewport({ width: 1920, height: 1080, deviceScaleFactor: 1 }); await sleep(300);
 
+    // Método -> Portfólio -> Prêmios -> B0
+    const falhasRede = [];
+    page.on('response', r => { if (r.status() >= 400 && /img\/portfolio/.test(r.url())) falhasRede.push(r.status() + ' ' + r.url()); });
+    await page.click('#btn-metodo-continuar'); await sleep(700);
+    check('Método -> Portfólio (botão "Continuar →")', await active(page) === 'screen-portfolio' && await page.$eval('#btn-metodo-continuar', e => e.textContent) === 'Continuar →');
+    check('nav-step Portfólio', await page.$eval('#nav-step', e => e.textContent) === 'Portfólio');
+    const pf = await page.evaluate(() => {
+      const imgs = Array.prototype.slice.call(document.querySelectorAll('#portfolio-logos img'));
+      return { n: imgs.length, ok: imgs.every(i => i.complete && i.naturalWidth > 0), txt: document.getElementById('screen-portfolio').innerText.replace(/\s+/g, ' ') };
+    });
+    check('Portfólio: 30 logos carregados, sem 404', pf.n === 30 && pf.ok && falhasRede.length === 0, pf.n + ' ' + pf.ok + ' ' + falhasRede.join(','));
+    check('Portfólio: números 70 MILHÕES de m² construídos com Agilean, 50 MIL usuários, 10% de economia em obras', ['MAIS DE', '70 MILHÕES', 'de m² construídos com Agilean', '50 MIL', 'usuários', '10%', 'de economia em obras'].every(t => pf.txt.toUpperCase().indexOf(t.toUpperCase()) >= 0), pf.txt.slice(0, 160));
+    check('Portfólio sem bloco "a preencher" nem "Clientes de referência por região"', !/a preencher|Clientes de referência/i.test(pf.txt));
+    check('Portfólio sem travessão', pf.txt.indexOf('—') < 0 && pf.txt.indexOf('–') < 0);
+    await page.screenshot({ path: path.join(SHOTS, 'portfolio_1920x1080.png') });
+    await page.setViewport({ width: 1366, height: 768, deviceScaleFactor: 1 }); await sleep(400);
+    const pf2 = await page.evaluate(() => ({ fim: document.querySelector('#screen-portfolio .pres-btns').getBoundingClientRect().bottom, ih: window.innerHeight, sh: document.documentElement.scrollHeight }));
+    await page.screenshot({ path: path.join(SHOTS, 'portfolio_1366x768.png') });
+    check('Portfólio cabe em 1366x768 sem rolagem', pf2.fim <= pf2.ih && pf2.sh <= pf2.ih, JSON.stringify(pf2));
+    await page.setViewport({ width: 1920, height: 1080, deviceScaleFactor: 1 }); await sleep(300);
+    await page.click('#btn-portfolio-continuar'); await sleep(700);
+    check('Portfólio -> Prêmios', await active(page) === 'screen-premios' && await page.$eval('#nav-step', e => e.textContent) === 'Prêmios');
+    const pr = await page.evaluate(() => {
+      const imgs = Array.prototype.slice.call(document.querySelectorAll('#premios-cartoes img'));
+      return { n: imgs.length, ok: imgs.every(i => i.complete && i.naturalWidth > 0), txt: document.getElementById('screen-premios').innerText.replace(/\s+/g, ' ') };
+    });
+    check('Prêmios: 5 selos carregados, sem 404', pr.n === 5 && pr.ok && falhasRede.length === 0, pr.n + ' ' + pr.ok + ' ' + falhasRede.join(','));
+    check('Prêmios: título e textos dos 5 cartões do slide', ['Solução reconhecida e premiada', 'Solução referência pelo alto impacto gerado no setor', 'Bicampeã do Prêmio CBIC na categoria de inovação', 'A primeira empresa investida pelo Açolab - ArcelorMittal', 'Utilizada no ensino do Lean Construction em universidades', 'TOP 10 Construtec Brasil no 100 Open Startups'].every(t => pr.txt.indexOf(t) >= 0), pr.txt.slice(0, 200));
+    check('Prêmios: botão "Iniciar diagnóstico →"', await page.$eval('#btn-premios-iniciar', e => e.textContent) === 'Iniciar diagnóstico →');
+    await page.screenshot({ path: path.join(SHOTS, 'premios_1920x1080.png') });
+    await page.setViewport({ width: 1366, height: 768, deviceScaleFactor: 1 }); await sleep(400);
+    const pr2 = await page.evaluate(() => ({ fim: document.querySelector('#screen-premios .pres-btns').getBoundingClientRect().bottom, ih: window.innerHeight, sh: document.documentElement.scrollHeight }));
+    await page.screenshot({ path: path.join(SHOTS, 'premios_1366x768.png') });
+    check('Prêmios cabe em 1366x768 sem rolagem', pr2.fim <= pr2.ih && pr2.sh <= pr2.ih, JSON.stringify(pr2));
+    await page.setViewport({ width: 1920, height: 1080, deviceScaleFactor: 1 }); await sleep(300);
+    await page.click('#btn-premios-voltar'); await sleep(400);
+    check('Voltar dos Prêmios -> Portfólio', await active(page) === 'screen-portfolio');
+    await page.click('#btn-portfolio-voltar'); await sleep(400);
+    check('Voltar do Portfólio -> Método', await active(page) === 'screen-metodo');
+
     // Voltar: Método -> Diagnóstico -> capa (campos preenchidos)
     await page.click('#btn-metodo-voltar'); await sleep(500);
     check('Voltar do Método -> Diagnóstico', await active(page) === 'screen-diagnostico');
@@ -116,14 +156,14 @@ server.listen(PORT, async () => {
     await page.click('button[onclick="startAssessment()"]'); await sleep(500);
     check('campos do agendamento mantidos após voltar à capa e seguir', await page.evaluate(() => document.getElementById('reuniao2-data').value === '2026-10-28'));
     await page.click('#btn-diagnostico-continuar'); await sleep(500);
-    await page.click('#btn-metodo-iniciar'); await sleep(500);
+    await page.click('#btn-metodo-continuar'); await sleep(250); await page.click('#btn-portfolio-continuar'); await sleep(250); await page.click('#btn-premios-iniciar'); await sleep(500);
     check('Iniciar -> B0', await active(page) === 'screen-b0');
     check('B0 na 1ª pergunta', await page.evaluate(() => currentQIdx === 0 && currentBlock === 'b0'));
 
     // "Anterior" on first B0 question -> Metodo
     await page.click('.screen.active .btn-s[onclick="prevQ()"]'); await sleep(500);
-    check('Anterior na 1ª pergunta do B0 -> Método', await active(page) === 'screen-metodo');
-    await page.click('#btn-metodo-iniciar'); await sleep(500);
+    check('Anterior na 1ª pergunta do B0 -> Prêmios', await active(page) === 'screen-premios');
+    await page.click('#btn-premios-iniciar'); await sleep(500);
 
     // Answer 3 questions (select an option when present, then Próximo)
     for (let i = 0; i < 3; i++) {
@@ -195,8 +235,13 @@ server.listen(PORT, async () => {
     await page.screenshot({ path: path.join(SHOTS, 'diagnostico_390x844_preenchida.png'), fullPage: true });
     await page.evaluate(() => showMetodo()); await sleep(600);
     await page.screenshot({ path: path.join(SHOTS, 'metodo_390x844.png'), fullPage: true });
-    const ov = await page.evaluate(() => document.documentElement.scrollWidth - window.innerWidth);
-    check('mobile sem rolagem horizontal', ov <= 0, ov);
+    const ovs = [];
+    for (const [fn, nome] of [['showMetodo', 'metodo'], ['showPortfolio', 'portfolio'], ['showPremios', 'premios']]) {
+      await page.evaluate(f => { window[f](); window.scrollTo(0, 0); }, fn); await sleep(600);
+      if (nome !== 'metodo') await page.screenshot({ path: path.join(SHOTS, nome + '_390x844.png'), fullPage: true });
+      ovs.push(nome + ':' + await page.evaluate(() => document.documentElement.scrollWidth - window.innerWidth));
+    }
+    check('mobile sem rolagem horizontal (Método, Portfólio, Prêmios)', ovs.every(o => parseInt(o.split(':')[1], 10) <= 0), ovs.join(' '));
   } catch (e) {
     console.log('ERRO:', e && e.stack || e); fails.push('exception');
   } finally {

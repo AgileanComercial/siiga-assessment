@@ -10,19 +10,19 @@
 var MPV_DIAS = ['domingo', 'segunda-feira', 'terça-feira', 'quarta-feira', 'quinta-feira', 'sexta-feira', 'sábado'];
 var MPV_MESES = ['janeiro', 'fevereiro', 'março', 'abril', 'maio', 'junho', 'julho', 'agosto', 'setembro', 'outubro', 'novembro', 'dezembro'];
 
-// Os 29 logos do slide de portfólio, na ordem do slide; w/h = tamanho do recorte
+// Os 30 logos do slide de portfólio (2026-10), na ordem do slide; w/h = tamanho do recorte
 // original em px, usado para a altura óptica (área constante, limitada pela célula).
 var MPV_LOGOS = [
-  ['mda', 'MDA Construções', 109, 54], ['fama', 'Construtora Fama', 84, 54], ['ascen', 'Ascen', 117, 24],
-  ['bambui', 'Bambuí', 111, 36], ['kallas', 'Grupo Kallas', 113, 41], ['longitude', 'Longitude', 136, 30],
-  ['conx', 'CONX', 112, 43], ['cortez', 'Cortez Engenharia', 131, 38], ['crolim', 'C. Rolim Engenharia', 134, 30],
-  ['dimas', 'Dimas Construções', 122, 26], ['planoeplano', 'Plano&Plano', 137, 29], ['constel', 'Constel', 133, 47],
-  ['rb', 'RB Construtora', 128, 40], ['morana', 'Morana', 137, 35], ['patriani', 'Patriani', 130, 18],
-  ['fontanive', 'Grupo Fontanive', 131, 34], ['tack', 'Tack', 122, 33], ['silvabranco', 'Grupo Silvabranco', 138, 24],
-  ['vortex', 'Vórtex', 122, 31], ['pacto', 'Pacto Engenharia', 100, 48], ['mirantes', 'Mirantes', 125, 39],
-  ['grifo', 'Grifo Engenharia', 134, 42], ['normatel', 'Normatel Engenharia', 126, 39], ['afonsofranca', 'Afonso França Engenharia', 124, 48],
-  ['marquise', 'Marquise', 80, 67], ['jsimoes', 'J.Simões', 90, 69], ['motamachado', 'Mota Machado', 60, 65],
-  ['azur', 'Azur', 50, 71], ['bspar', 'BSPAR Incorporações', 76, 74]
+  ['bambui', 'Bambuí', 251, 84], ['fama', 'Construtora Fama', 134, 84], ['ascen', 'Ascen', 350, 69],
+  ['jsimoes', 'J.Simões', 256, 82], ['cortez', 'Cortez Engenharia', 288, 84], ['dimas', 'Dimas Construções', 352, 52],
+  ['motamachado', 'Mota Machado', 317, 82], ['rb', 'RB Construtora', 268, 83], ['morana', 'Morana', 325, 82],
+  ['azur', 'Azur', 234, 82], ['fontanive', 'Grupo Fontanive', 169, 83], ['vortex', 'Vórtex', 351, 77],
+  ['bspar', 'BSPAR Incorporações', 351, 68], ['planoeplano', 'Plano&Plano', 352, 74], ['dalle', 'Dallé Incorporadora', 252, 84],
+  ['diasdesousa', 'Dias de Sousa', 202, 83], ['trinus', 'Trinus', 235, 83], ['faenge', 'Faenge', 354, 68],
+  ['alliance', 'Alliance', 352, 76], ['kprrodan', 'KPRRodan', 125, 86], ['fan', 'FAN Construções', 193, 83],
+  ['sbr', 'SBR Empreendimentos', 191, 84], ['atr', 'ATR', 195, 85], ['mcdi', 'MCDI', 206, 82],
+  ['doisa', 'DoisA', 274, 82], ['gpl', 'GPL Incorporadora', 163, 84], ['conx', 'CONX', 215, 84],
+  ['realiza', 'Realiza Construtora', 281, 83], ['alfa', 'Alfa Construtora', 298, 82], ['cmm', 'CMM Engenharia', 218, 82]
 ];
 var MPV_LOGO_AREA = 104, MPV_LOGO_WMAX = 24, MPV_LOGO_HMAX = 6.6; // mm², mm, mm
 
@@ -84,7 +84,7 @@ function mpvLogosHtml() {
     var h = Math.min(Math.sqrt(MPV_LOGO_AREA / ar), MPV_LOGO_HMAX, MPV_LOGO_WMAX / ar);
     return '<div><img src="img/portfolio/logos/' + l[0] + '.png" alt="' + mpvEsc(l[1]) + '" style="height:' +
       h.toFixed(2) + 'mm;width:' + (h * ar).toFixed(2) + 'mm"></div>';
-  }).join('') + '<div class="vazio"></div>';
+  }).join('');
 }
 
 function mpvDocumentoHtml(a) {
@@ -108,8 +108,8 @@ function mpvDocumentoHtml(a) {
     '<div class="sec"><div class="lbl" style="border-top:.75pt solid var(--fio-forte);padding-top:2mm">Construtoras que trabalham com a Agilean</div>' +
     '<div class="port"><div class="mapa"><img src="img/portfolio/mapa_pinos.svg" alt="Mapa do Brasil com a presença da Agilean"><div class="leg lbl">Presentes em 22 estados</div></div>' +
     '<div class="logos">' + mpvLogosHtml() + '</div></div>' +
-    '<div class="nums"><div><b>70 mi</b><span>m² construídos com Agilean</span></div><div><b>+1.500</b><span>canteiros impactados</span></div>' +
-    '<div><b>+5 mil</b><span>gestores usando por dia</span></div><div><b>15%</b><span>de ganho médio de produtividade</span></div></div>' +
+    '<div class="nums"><div><b>70 mi</b><span>m² construídos com Agilean</span></div><div><b>+5.000</b><span>canteiros impactados</span></div>' +
+    '<div><b>+5 mil</b><span>gestores usando por dia</span></div><div><b>25%</b><span>de ganho médio de produtividade</span></div></div>' +
     '</div>' + mpvCarimbo(a, 1) + '</div>';
 
   var pil = MPV_PILARES.map(function (p, i) { return '<div><span>Pilar ' + (i + 1) + '</span>' + p + '</div>'; }).join('');

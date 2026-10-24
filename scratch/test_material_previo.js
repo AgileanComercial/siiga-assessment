@@ -211,7 +211,7 @@ server.listen(PORT, async () => {
       });
       const T = dom.texto.replace(/\s+/g, ' ');
       check(dom.paginas === 2, '2 páginas montadas');
-      check(dom.logos === 29 && dom.imgsOk && dom.mapa, '29 logos + mapa + carimbos carregados');
+      check(dom.logos === 30 && dom.imgsOk && dom.mapa, '30 logos + mapa + carimbos carregados');
       check(dom.fonts, 'Fontes Bai Jamjuree e Manrope carregadas');
       check(T.includes(c.f.empresa), 'Empresa no documento');
       check(T.includes(c.f.contato), 'Contato no documento');
