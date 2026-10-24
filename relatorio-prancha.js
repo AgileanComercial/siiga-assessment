@@ -86,6 +86,7 @@ var PT_FONTE_BASE = {
   retrabalho:'Orçamento da obra informado e referência de mercado de retrabalho (10%).',
   velocidade:'Orçamento da obra informado e referência de mercado de ganho de prazo (10%).',
   erros:'Orçamento da obra informado, mão de obra como 45% do custo e desvio médio de medição e folha (5%).',
+  errosTerc:'Orçamento da obra informado, mão de obra como 45% do custo e desvio médio de medição (5%).',
   mo:'Orçamento da obra informado, mão de obra como 45% do custo e estouro médio de mercado (15%).'
 };
 // Same names as the Pilares screen of the tool (sales slide)
@@ -101,15 +102,26 @@ var PT_FASES = [
   { id:'I', nome:'Planejamento e Controle Integrado com o Canteiro',
     dur:'até 60 dias (dia 0 a 60)', fd:'Até 60 dias. Linha de Balanço, apontamento diário, lookahead e painéis de indicadores.' },
   { id:'II', nome:'Integração com o ERP e o Sistema de Qualidade',
-    dur:'até 60 dias, em paralelo à Fase I', fd:'Até 60 dias, em paralelo à Fase I. FVS digital vinculada ao avanço e integração com o sistema de gestão.' },
-  { id:'III', nome:'Controle de Pagamento da Mão de Obra Integrado',
-    dur:'após as Fases I e II, a partir do dia 60: Controle de Empreiteiros em 20 dias (até o dia 80) e Folha de Produção em 90 dias (até o dia 150)',
-    fd:'A partir do dia 60, após as Fases I e II. Controle de Empreiteiros em 20 dias (medição de empreiteiros por evidência de avanço) e Folha de Produção em 90 dias (fechamento de folha por evidência de avanço).',
-    prazo:'A partir do dia 60',
-    // Two fronts, both starting on day 60 (timeline in the report and in the tool)
-    frentes:[{ nome:'Folha de Produção', ini:60, fim:150, rot:'90 dias, após I e II' },
-             { nome:'Controle de Empreiteiros', ini:60, fim:80, rot:'20 dias, após I e II' }] }
+    dur:'até 60 dias, em paralelo à Fase I', fd:'Até 60 dias, em paralelo à Fase I. FVS digital vinculada ao avanço e integração com o sistema de gestão.' }
 ];
+// Phase III fronts, both from day 60: outsourced labor -> Controle de Empreiteiros (30 days),
+// own labor -> Folha de Produção (90 days), mixed (or not informed) -> both.
+var PT_FRENTES_III = {
+  terc:{ nome:'Controle de Empreiteiros', art:'o ', ini:60, fim:90, oque:'medição de empreiteiros por evidência de avanço' },
+  propria:{ nome:'Folha de Produção', art:'a ', ini:60, fim:150, oque:'fechamento de folha por evidência de avanço' }
+};
+function ptFrentesIII(mo) {
+  var F = PT_FRENTES_III;
+  return mo === 'terceirizada' ? [F.terc] : (mo === 'propria' ? [F.propria] : [F.terc, F.propria]);
+}
+// Phases I, II and III for the labor model (report and tool); Phase III texts follow its fronts.
+function ptFases(mo) {
+  var fr = ptFrentesIII(mo).map(function(f){ return Object.assign({ dias:f.fim - f.ini, rot:(f.fim - f.ini) + ' dias, após I e II' }, f); });
+  var em = function(f){ return f.nome + ' em ' + f.dias + ' dias'; };
+  return PT_FASES.concat([{ id:'III', nome:'Controle de Pagamento da Mão de Obra Integrado', prazo:'A partir do dia 60', frentes:fr,
+    dur:'após as Fases I e II, a partir do dia 60: ' + ptLista(fr.map(function(f){ return em(f) + ' (até o dia ' + f.fim + ')'; })),
+    fd:'A partir do dia 60, após as Fases I e II. ' + ptLista(fr.map(function(f){ return em(f) + ' (' + f.oque + ')'; })) + '.' }]);
+}
 
 var PT_VERSAO = '1.0';
 var PT_LOGO = 'img/agilean_logo_relatorio.png';
@@ -199,7 +211,7 @@ function ptModel(mode) {
   // Loss sources (per project, raw = baseValue; capturable = porObra)
   var fontes = {};
   roi.items.forEach(function(it) {
-    var label = PT_FONTE_LABEL[it.key] || it.label;
+    var label = fonteLabel(it.key) || it.label;
     var labelTab = (it.key === 'mo' && mo === 'mista') ? label + ' (50% própria)' : label;
     fontes[it.key] = { key:it.key, label:label, labelTab:labelTab, perda:it.baseValue, cap:it.porObra, fator:it.fator,
       mes:it.baseValue / prazo, basis:it.basis };
@@ -230,7 +242,7 @@ function ptModel(mode) {
       faseCurta:faseCurtaDoGap(o.code), star:o.star, frase:frase, situacao:situacao,
       conseq:PT_CONSEQ[o.code] || (GAP_INFO[o.code] || {}).impact || '',
       fonte:f, mes:first ? f.mes : null,
-      base:(o.fonte === 'time' && !roi.horasDoCliente) ? PT_FONTE_BASE.timeRef : (PT_FONTE_BASE[o.fonte] || ''),
+      base:(o.fonte === 'time' && !roi.horasDoCliente) ? PT_FONTE_BASE.timeRef : ((o.fonte === 'erros' && semMOPropria()) ? PT_FONTE_BASE.errosTerc : (PT_FONTE_BASE[o.fonte] || '')),
       dep:(cs && cs.quote) ? cs.quote.replace(/^…\s*([a-zà-ú])/, function(m, c){ return '…' + c.toUpperCase(); }) : '',
       depA:(cs && cs.quote) ? (cs.nome + ' · ' + cs.papel) : ''
     };
@@ -272,7 +284,7 @@ function ptModel(mode) {
     nPrioAlerta:criticos.filter(function(c){ return c.alerta; }).length,
     critPerda:critPerda, critMes:critMes, critCapMes:critCapMes, mapaMes:roi.totalBase / prazo,
     cons:cons, pleno:pleno, pess:pess, perdaMes:comp(pleno), ganhoMes:comp(cons), ganhoPess:comp(pess),
-    folha:(S.roi2 && S.roi2.folha) || 0, horasInf:cons.operacional.horasInformadas, horasPot:cons.operacional.potPleno,
+    folha:folhaPropria(), horasInf:cons.operacional.horasInformadas, horasPot:cons.operacional.potPleno,
     ferr:f
   };
 }
@@ -376,8 +388,7 @@ function ptSecPerdaGanho(M) {
   var baseInf = '<div class="meta"><div class="lbl rule" style="margin-bottom:2.4mm">Base informada</div>' +
     '<div><span class="lbl">' + (porObra ? 'Orçamento médio por obra' : 'Orçamento da obra') + '</span>' + ptMilVar(M.orc) + '</div>' +
     '<div><span class="lbl">Prazo</span>' + P + ' meses</div>' +
-    '<div><span class="lbl">' + (porObra ? 'Obras' : 'Obra') + '</span>' + M.obras + (M.moTxt ? ' · ' + M.moTxt : '') + '</div>' +
-    '<div><span class="lbl">Perda total estimada</span>' + ptMil(M.roi.totalBase, 1) + ' em ' + P + ' meses' + (porObra ? ' por obra' : '') + '</div></div>';
+    '<div><span class="lbl">' + (porObra ? 'Obras' : 'Obra') + '</span>' + M.obras + (M.moTxt ? ' · ' + M.moTxt : '') + '</div></div>';
   var b1 = ptSec('02', 'Perda e ganho mensal', true) +
     '<div class="row" style="margin-top:5mm">' + baseInf + '<div>' +
       '<div class="strip four"><div><div class="lbl">Perda total por mês</div><div class="big p">' + ptMil(perdaMes, 1) + '</div></div>' +
@@ -412,7 +423,7 @@ function ptSecCriticos(M) {
         (c.mes != null ? '<div class="mes">Perda por mês sem tratamento: <b>' + ptMil(c.mes, 1) + '</b></div>' : '') +
       '</div><div>' +
         '<div class="kv"><span class="lbl">Fonte de perda</span><div class="txt b6">' + f.label + '</div>' +
-          '<div class="vals"><div>' + ptMil(f.perda, 1) + '<small>Perda, ' + M.prazo + ' meses</small></div><div class="ganho">' + ptMil(f.cap, 1) + '<small>Capturável</small></div></div>' +
+          '<div class="vals"><div>' + ptMil(f.mes, 1) + '<small>Perda por mês</small></div><div class="ganho">' + ptMil(f.cap / M.prazo, 1) + '<small>Ganho por mês</small></div></div>' +
           '<div class="note">' + c.base + '</div></div>' +
         (c.dep ? '<div class="kv"><span class="lbl">Depoimento de Cliente Agilean</span><div class="dep">“' + ptEsc(c.dep) + '”</div><div class="dep-a">' + ptEsc(c.depA) + '</div></div>' : '') +
       '</div></div></div></div>';
@@ -462,7 +473,7 @@ function ptRotinas(M) {
   if (ERP[erpV]) {
     erpNome = ERP[erpV];
     erpSit = 'ERP com integração nativa disponível, mas isolado do canteiro; dados só sobem no fechamento.';
-    erpEnt = 'Integração nativa com o ' + ERP[erpV] + ': orçamento, medição e folha sincronizados, sem digitação duplicada.';
+    erpEnt = 'Integração nativa com o ' + ERP[erpV] + ': ' + (M.mo === 'terceirizada' ? 'orçamento e medição' : 'orçamento, medição e folha') + ' sincronizados, sem digitação duplicada.';
   } else if (erpV === 'outro') {
     erpNome = (f.erpOutro || '').trim() || '—';
     erpSit = 'Sistema de gestão sem integração automática com o canteiro; dados lançados manualmente.';
@@ -486,14 +497,16 @@ function ptRotinas(M) {
     1.5:'Painel parcial com prazo e custo; qualidade e ritmo de produção fora do painel.',
     3:'Painel integrado com prazo, ritmo, restrições, qualidade e custo.' }[f43] || 'Indicadores compilados manualmente antes de cada reunião.';
   var semErp = (erpV === 'nenhum');
+  // Phase III: one routine per front of the labor model (no payroll row without own labor)
+  var rotIII = { 'Controle de Empreiteiros':['Controle de Contratos / Empreiteiros', ptFerrLabel(f.contratos), 'Negociação de medição desgastante; sem evidência objetiva para liberar pagamento.', 'Medição de empreiteiros baseada em avanço apontado e FVS aprovada.'],
+    'Folha de Produção':['Folha de Produção / Fechamento de MO', ptFerrLabel(f.folha), 'Fechamento manual e lento; produtividade por equipe sem rastreabilidade.', 'Fechamento de folha e produtividade por HH em horas' + (semErp ? '.' : ', integrado ao ERP.')] };
   return {
     I:[['Planejamento & Reprogramação', ptFerrLabel(f.planejamento), planSit, planEnt],
        ['Medição de Avanço Físico', ptFerrLabel(f.medicao), 'Sistemas desconectados; avanço apurado manualmente, sem rastreio diário.', 'Apontamento diário via app; lookahead de 4 semanas com remoção de restrições medida pelo IRR.'],
        ['Painéis de indicadores', '—', p4Sit, 'Painéis de indicadores e reunião executiva com dados consolidados.']],
     II:[['Qualidade (FVS)', ptFerrLabel(f.qualidade), 'Retrabalhos identificados tarde; qualidade tratada como auditoria separada do pagamento.', 'FVS digital vinculada ao avanço físico.'],
         ['ERP / Sistema de Gestão', ptEsc(erpNome), erpSit, erpEnt]],
-    III:[['Controle de Contratos / Empreiteiros', ptFerrLabel(f.contratos), 'Negociação de medição desgastante; sem evidência objetiva para liberar pagamento.', 'Medição de empreiteiros baseada em avanço apontado e FVS aprovada.'],
-         ['Folha de Produção / Fechamento de MO', ptFerrLabel(f.folha), 'Fechamento manual e lento; produtividade por equipe sem rastreabilidade.', 'Fechamento de folha e produtividade por HH em horas' + (semErp ? '.' : ', integrado ao ERP.')]]
+    III:ptFrentesIII(M.mo).map(function(fr){ return rotIII[fr.nome]; })
   };
 }
 var PT_PLANO_THEAD = '<thead><tr><th style="width:34mm">Rotina</th><th style="width:30mm">Ferramenta hoje</th><th>Situação observada</th><th>Entrega prevista</th></tr></thead>';
@@ -507,19 +520,24 @@ function ptFaseGroup(fase, linhas, M) {
     '<div class="gsub">' + fase.dur + '</div></td></tr>' +
     linhas.map(function(l){ return '<tr><td class="b6">' + l[0] + '</td><td>' + l[1] + '</td><td>' + l[2] + '</td><td>' + l[3] + '</td></tr>'; }).join('');
 }
-function ptRegua() {
-  var D = 150, x = function(v){ return (v / D * 100).toFixed(2) + '%'; };
-  var ticks = [0, 30, 60, 90, 120, 150].map(function(v){ return '<span style="left:' + x(v) + '">' + v + '</span>'; }).join('');
-  var lines = [0, 30, 60, 90, 120, 150].map(function(v){ return '<i style="left:' + x(v) + '"></i>'; }).join('');
+function ptRegua(M) {
+  var fr = ptFases(M.mo)[2].frentes;
+  // The axis ends at the last Phase III front (day 90 or 150), in 30-day steps
+  var D = Math.max.apply(null, fr.map(function(f){ return f.fim; })), x = function(v){ return (v / D * 100).toFixed(2) + '%'; };
+  var marks = [];
+  for (var v = 0; v <= D; v += 30) marks.push(v);
+  var ticks = marks.map(function(v){ return '<span style="left:' + x(v) + '">' + v + '</span>'; }).join('');
+  var lines = marks.map(function(v){ return '<i style="left:' + x(v) + '"></i>'; }).join('');
   // A label that does not fit inside its bar (short bars) goes right after it, on a paper background over the grid
   var row = function(nome, a, b, cls, txt, sub) {
-    var dentro = (b - a) >= 45;
+    var dentro = (b - a) / D >= 0.30;
     return '<div class="tl' + (sub ? ' sub' : '') + '"><div class="nm">' + nome + '</div><div class="tp"><div class="tb ' + cls + '" style="left:' + x(a) + ';width:' + x(b - a) + '">' + (dentro ? txt : '') + '</div>' +
       (dentro ? '' : '<div class="tbl" style="left:' + x(b) + '">' + txt + '</div>') + '</div></div>';
   };
-  var f3 = PT_FASES[2];
-  var frentes = (f3.frentes || []).map(function(fr){ return row(fr.nome, fr.ini, fr.fim, 'c', fr.rot, true); }).join('');
-  return '<div class="chart-t">As Fases I e II ocupam os primeiros 60 dias; na Fase III, o Controle de Empreiteiros termina no dia 80 e a Folha de Produção, por volta do dia 150</div>' +
+  var frentes = fr.map(function(f){ return row(f.nome, f.ini, f.fim, 'c', f.rot, true); }).join('');
+  var tit = fr.length === 1 ? fr[0].art + fr[0].nome + ' vai do dia ' + fr[0].ini + ' ao dia ' + fr[0].fim
+    : fr[0].art + fr[0].nome + ' termina no dia ' + fr[0].fim + ' e ' + fr[1].art + fr[1].nome + ', no dia ' + fr[1].fim;
+  return '<div class="chart-t">As Fases I e II ocupam os primeiros 60 dias; na Fase III, ' + tit + '</div>' +
     '<div style="position:relative"><div class="tgrid">' + lines + '</div>' +
     row('Fase de Implementação I', 0, 60, 'a', 'até 60 dias') + row('Fase de Implementação II', 0, 60, 'b', 'até 60 dias, em paralelo') +
     '<div class="tl grp"><div class="nm">Fase de Implementação III</div><div></div></div>' + frentes +
@@ -538,15 +556,15 @@ function ptResolve(M, faseId) {
 
 // Section 05: Plano de Transformação Operacional (the former loss-by-source table now lives in section 02).
 function ptSecPlano(M) {
-  var R = ptRotinas(M);
+  var R = ptRotinas(M), FZ = ptFases(M.mo);
   var blocks = [];
   // Phases I+II, timeline, Phase III, action card, signatures (pilot order)
   blocks.push({ sec:'05', head:ptSec('05', ptPlano06(M)), rows:[0, 1], render:function(rows) {
-    return '<div style="margin-top:5mm"><table>' + PT_PLANO_THEAD + '<tbody>' + rows.map(function(i){ return ptFaseGroup(PT_FASES[i], R[PT_FASES[i].id], M); }).join('') + '</tbody></table></div>';
+    return '<div style="margin-top:5mm"><table>' + PT_PLANO_THEAD + '<tbody>' + rows.map(function(i){ return ptFaseGroup(FZ[i], R[FZ[i].id], M); }).join('') + '</tbody></table></div>';
   }});
-  blocks.push({ sec:'05', html:'<div style="margin-top:7mm">' + ptRegua() + '</div>' });
-  blocks.push({ sec:'05', html:'<div style="margin-top:7mm"><table>' + PT_PLANO_THEAD + '<tbody>' + ptFaseGroup(PT_FASES[2], R.III, M) + '</tbody></table></div>' });
-  var frentes = PT_FASES.map(function(fz, i) {
+  blocks.push({ sec:'05', html:'<div style="margin-top:7mm">' + ptRegua(M) + '</div>' });
+  blocks.push({ sec:'05', html:'<div style="margin-top:7mm"><table>' + PT_PLANO_THEAD + '<tbody>' + ptFaseGroup(FZ[2], R.III, M) + '</tbody></table></div>' });
+  var frentes = FZ.map(function(fz, i) {
     var res = ptResolve(M, fz.id);
     return '<div class="fr"><div class="nn">0' + (i + 1) + '</div><div><div class="ft">Fase de Implementação ' + fz.id + ' · ' + ptFaseNome(fz, M) + '</div><div class="fd">' + fz.fd + '</div>' + (res ? '<div class="fz">' + res + '</div>' : '') + '</div></div>';
   }).join('');
@@ -599,10 +617,10 @@ function ptSecBases(M) {
   if (M.folha > 0) oper.push(['Folha de produção', ptMilVar(M.folha) + '/mês']);
   oper.push(['Cenário adotado', ptPct(ROI_CAPTURA_FIXA) + ' · ' + roiCapturaLabel(ROI_CAPTURA_FIXA)]);
   var glos = [['P1 a P4', 'Pilares: P1 ' + PT_PILAR_NOME.f1 + '; P2 ' + PT_PILAR_NOME.f2 + '; P3 ' + PT_PILAR_NOME.f3 + '; P4 ' + PT_PILAR_NOME.f4 + '.'],
-    ['EAP','Estrutura analítica do projeto.'],['FVS','Ficha de verificação de serviço.'],['HH','Homem-hora.'],['IRR','Índice de remoção de restrições.'],
+    ['EAP','Estrutura analítica do projeto.'],['FVS','Ficha de verificação de serviço.']].concat(semMOPropria() ? [] : [['HH','Homem-hora.']], [['IRR','Índice de remoção de restrições.'],
     ['Lookahead','Planejamento de médio prazo, com janela de semanas à frente da execução.'],['MO','Mão de obra.'],['PPC','Percentual de planos concluídos.'],
     ['Fator de captura','Fração da perda de cada fonte que se estima recuperar, conforme a maturidade dos pilares ligados à fonte.'],
-    ['Mensalidade de referência', ptRefBRL(MENSALIDADE_ROI_POR_OBRA) + ' por obra; base de cálculo, não é proposta comercial.']];
+    ['Mensalidade de referência', ptRefBRL(MENSALIDADE_ROI_POR_OBRA) + ' por obra; base de cálculo, não é proposta comercial.']]);
   var t2 = function(rows) { return rows.map(function(r){ return '<tr><td>' + r[0] + '</td><td class="n">' + r[1] + '</td></tr>'; }).join(''); };
   return [
     { sec:'06', breakBefore:true, html:ptSec('06', 'Bases do diagnóstico', true) + '<div class="row" style="margin-top:5mm"><div><div class="lbl rule">Referências de mercado</div></div><div><table><thead><tr><th>Parâmetro</th><th class="n">Valor</th></tr></thead><tbody>' + t2(refs) + '</tbody></table></div></div>' },
@@ -619,7 +637,7 @@ function ptSecAnexo(M) {
   var pres = [['Mão de obra como % do custo da obra', '45%']];
   if (hasMo) pres.push(['Estouro médio de mão de obra', '15%'], ['Redução do estouro com o SIIGA', '70%']);
   pres.push(['Retrabalho de referência de mercado', '10% do portfólio'], ['Redução do retrabalho com o SIIGA', '40%'], ['Ganho de velocidade', '10% do prazo × 15% dos custos proporcionais'],
-    ['Desvio médio de medição e folha', '5%'], ['Horas de gestão recuperáveis', ptNum(M.roi.horasRecup, 0, 1) + ' h/mês' + (M.roi.horasDoCliente ? '' : ' (referência de mercado)')], ['Prazo da obra', P + ' meses'], ['Hora técnica', 'R$ ' + custoH + '/h']);
+    [semMOPropria() ? 'Desvio médio de medição' : 'Desvio médio de medição e folha', '5%'], ['Horas de gestão recuperáveis', ptNum(M.roi.horasRecup, 0, 1) + ' h/mês' + (M.roi.horasDoCliente ? '' : ' (referência de mercado)')], ['Prazo da obra', P + ' meses'], ['Hora técnica', 'R$ ' + custoH + '/h']);
   var a1 = ptSec('A', 'Anexo A · Memória de cálculo', true) + '<div class="row" style="margin-top:5mm"><div><div class="lbl rule">A.1 Pressupostos</div></div><div><table class="ax"><thead><tr><th>Parâmetro</th><th class="n">Valor</th></tr></thead><tbody>' +
     pres.map(function(r){ return '<tr><td>' + r[0] + '</td><td class="n">' + r[1] + '</td></tr>'; }).join('') + '</tbody></table></div></div>';
   var hR = ptNum(M.roi.horasRecup, 0, 1);
@@ -659,7 +677,7 @@ function ptSecAnexo(M) {
     ['Cenário Pessimista (30%)', ptHoras(M.pess.operacional.hMes) + '; ganho ' + ptMil(gp, 2) + ' ÷ ' + ptRefBRL(mens), ptMult(gp / mens)]];
   var a4 = '<div class="row sec"><div><div class="lbl rule">A.4 Retorno mensal</div></div><div><p class="note" style="margin-top:4mm">Premissas: mensalidade de referência ' + ptRefBRL(mens) + ' por obra; captura do cenário ' + cap + ' (Conservador)' +
       (M.folha > 0 ? '; folha de MO própria ' + ptMilVar(M.folha) + '/mês' : '') + '; hora técnica R$ ' + custoH + '/h; horas de gestão informadas ' + ptNum(M.horasInf, 0, 1) + ' h/mês.</p>' +
-    '<div style="margin-top:4mm"><table class="ax"><thead><tr><th style="width:44mm">Componente</th><th>Fórmula</th><th class="n wrap" style="width:22mm">Perda/mês (horas e folha)</th><th class="n" style="width:20mm">Ganho/mês</th></tr></thead><tbody>' + compR +
+    '<div style="margin-top:4mm"><table class="ax"><thead><tr><th style="width:44mm">Componente</th><th>Fórmula</th><th class="n wrap" style="width:22mm">Perda/mês (' + (temFolha ? 'horas e folha' : 'horas') + ')</th><th class="n" style="width:20mm">Ganho/mês</th></tr></thead><tbody>' + compR +
       '<tr class="tot"><td>Total</td><td></td><td class="n">' + ptMil(Pm.total, 2) + '</td><td class="n">' + ptMil(G.total, 2) + '</td></tr></tbody></table></div>' +
     '<div style="margin-top:5mm"><table class="ax"><thead><tr><th style="width:44mm">Indicador</th><th>Fórmula</th><th class="n" style="width:24mm">Valor</th></tr></thead><tbody>' +
       ind.map(function(r){ return '<tr><td>' + r[0] + '</td><td class="f">' + r[1] + '</td><td class="n">' + r[2] + '</td></tr>'; }).join('') + '</tbody></table>' +

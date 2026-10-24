@@ -298,7 +298,18 @@ var PQ = {
       { code:'F4.3', text:'Quando analisam o período, vocês conseguem ter simultaneamente a visão de prazo, ritmo de produção, restrições abertas, qualidade e custo do projeto em um único painel — ou cada informação está em uma fonte diferente e alguém precisa compilar manualmente?', reveals:'Integração dos dados e maturidade analítica. O que separa análise real de análise parcial é ter os cinco blocos disponíveis ao mesmo tempo para tomada de decisão.',
         opts:[{l:'Cada informação em um lugar diferente',s:'Ninguém tem a visão completa simultaneamente',score:0},{l:'Alguns indicadores compilados manualmente em planilha antes de cada reunião',s:'Processo manual e demorado, sujeito a erro',score:1},{l:'Painel parcial com prazo e custo, mas qualidade e ritmo de produção ainda fora',s:'Visão incompleta — decisões sem base total',score:1.5},{l:'Painel integrado com prazo, ritmo, restrições, qualidade e custo atualizado automaticamente',s:'Gerência chega à reunião com diagnóstico pronto — tempo dedicado à decisão, não à montagem do dado',score:3}]
       },
-      { code:'F4.4', text:'O fechamento mensal de folha e medição de empreiteiros passa por um fluxo de aprovação hierárquica integrado ao ERP — com registro auditável de exceções — ou é mais um fechamento sem governança formal sobre o que foi liberado para pagamento?', reveals:'Maturidade da governança financeira do ciclo mensal. Aplica-se a MO própria (folha) e terceirizada (medição). O que diferencia não é o tipo de MO — é o nível de auditoria, aprovação por instâncias e integração com o ERP por trás do pagamento.',
+      // Text and reveals follow the labor model (outsourced: contractors' measurement only; own: payroll only;
+      // mixed or not informed: both). Options, score and code do not change.
+      { code:'F4.4',
+        get text() {
+          var o = { terceirizada:'medição de empreiteiros', propria:'folha' }[S.modeloMO] || 'folha e medição de empreiteiros';
+          return 'O fechamento mensal de ' + o + ' passa por um fluxo de aprovação hierárquica integrado ao ERP — com registro auditável de exceções — ou é mais um fechamento sem governança formal sobre o que foi liberado para pagamento?';
+        },
+        get reveals() {
+          var a = { terceirizada:'Aplica-se à medição de empreiteiros. O que diferencia', propria:'Aplica-se à folha de MO própria. O que diferencia' }[S.modeloMO] ||
+            'Aplica-se a MO própria (folha) e terceirizada (medição). O que diferencia não é o tipo de MO —';
+          return 'Maturidade da governança financeira do ciclo mensal. ' + a + ' é o nível de auditoria, aprovação por instâncias e integração com o ERP por trás do pagamento.';
+        },
         opts:[{l:'Fechamento sem governança formal',s:'Aprovado por estimativa ou negociação — sem fluxo de aprovação nem registro auditável',score:0},{l:'Aprovação informal baseada em observação',s:'Engenheiro ou gestor aprova pelo que viu — sem instância hierárquica nem registro',score:1},{l:'Fluxo de aprovação definido, mas manual e fora do ERP',s:'Existe hierarquia de aprovação, mas roda em planilha, sem integração e sem registro de exceções',score:1.5},{l:'Fluxo de aprovação hierárquica integrado ao ERP, com exceções registradas e justificadas',s:'Ciclo financeiro auditável de ponta a ponta — cada exceção tem instância aprovadora e justificativa registrada',score:3}]
       }
     ]
@@ -618,7 +629,7 @@ function renderB0() {
   }
 
   if(q.type === 'ferramentas') {
-    var ferrFieldsHtml = q.fields.map(function(f) {
+    var ferrFieldsHtml = q.fields.filter(ferrCampoVisivel).map(function(f) {
       if (f.type === 'select') {
         var savedSel = S.ferramentas[f.key] || '';
         var optsHtml = f.options.map(function(o) {
@@ -743,8 +754,10 @@ var HORAS_GESTAO_CAMPOS = [
     hint:'Montar o planejamento inicial / linha de balanço', placeholder:'Ex: 16' },
   { key:'hCurtoMedio', ganho:0.90, label:'Curto e médio prazo e reprogramação',
     hint:'Programação semanal, lookahead, restrições e reprogramar o plano', placeholder:'Ex: 20' },
-  { key:'hMedicao',    ganho:0.90, label:'Medir avanço e fechar medição / folha',
-    hint:'Levantar o avanço físico, fechar medição de empreiteiros ou folha e lançar no ERP', placeholder:'Ex: 40' },
+  { key:'hMedicao',    ganho:0.90, placeholder:'Ex: 40',
+    // Label and hint follow the labor model (no payroll for outsourced labor)
+    get label() { return porModeloMO('Medir avanço e fechar medição', 'Medir avanço e fechar folha', 'Medir avanço e fechar medição / folha'); },
+    get hint() { return 'Levantar o avanço físico, fechar ' + porModeloMO('medição de empreiteiros', 'folha', 'medição de empreiteiros ou folha') + ' e lançar no ERP'; } },
   { key:'hQualidade',  ganho:0.90, label:'Conferir a qualidade dos serviços',
     hint:'Inspeções, FVS e conferência antes de liberar o avanço', placeholder:'Ex: 20' },
   { key:'hConsolidar', ganho:0.90, label:'Consolidar dados e montar relatórios',
@@ -1716,7 +1729,7 @@ function renderQualitativeGains() {
     cardDinamico1.desc = 'Lookahead de 4 semanas e indicador IRR identificam e removem restrições de suprimentos antes que virem atraso no canteiro.';
   } else {
     cardDinamico1.title = 'Qualidade como Trava de Pagamento (FVS)';
-    cardDinamico1.desc = 'FVS digital no fluxo diário do canteiro. A medição e a folha só são aprovadas com evidência de serviço e qualidade auditada.';
+    cardDinamico1.desc = 'FVS digital no fluxo diário do canteiro. ' + porModeloMO('A medição só é aprovada', 'A folha só é aprovada', 'A medição e a folha só são aprovadas') + ' com evidência de serviço e qualidade auditada.';
   }
 
   // 4. Dinâmico: Modelo de MO OU Escalabilidade
@@ -1746,7 +1759,7 @@ function renderQualitativeGains() {
 
 // Última Página do Diagnóstico — Plano de Ação Executivo (3 Fases de Implementação) +
 // citação de fechamento. As fases, os nomes e o "Resolve" são os mesmos do card
-// "Plano de ação executivo" do PDF (PT_FASES, ptFaseNome, ptResolve), com a numeração
+// "Plano de ação executivo" do PDF (ptFases, ptFaseNome, ptResolve), com a numeração
 // de pontos de ptModel (a mesma das folhas 02 e 05 do PDF). Preenche
 // #next-steps-container (card #next-steps-page, data-section="ultima", em index.html).
 function renderNextSteps() {
@@ -1772,21 +1785,24 @@ function renderNextSteps() {
   // (ex.: código de MO sem pilar em PT_MO_PILAR), as fases aparecem sem a linha "Resolve".
   var M = null;
   try { M = ptModel('detalhado'); } catch (e) { console.error('renderNextSteps: ptModel', e); }
-  var FASE_DIAS = { I:[0, 60], II:[0, 60], III:[60, 150] }; // mesma régua de ptRegua() (150 dias)
-  var pct = function(v) { return (v / 150 * 100).toFixed(2) + '%'; };
+  // Same phases and timeline as ptRegua(): Phase III fronts follow the labor model, the axis ends at the last one
+  var FASES = ptFases(S.modeloMO);
+  var D = Math.max.apply(null, FASES[2].frentes.map(function(fr){ return fr.fim; }));
+  var FASE_DIAS = { I:[0, 60], II:[0, 60] };
+  var pct = function(v) { return (v / D * 100).toFixed(2) + '%'; };
   var faseHtml = function(fz, i) {
     // fd = "Até 60 dias. Linha de Balanço, ..." -> prazo ("Até 60 dias") + entrega
     var m = /^((?:Até|A partir d)[^.]+)\.\s*(.*)$/.exec(fz.fd);
     var prazo = fz.prazo || (m ? m[1] : fz.dur), entrega = m ? m[2] : fz.fd;
     var d = FASE_DIAS[fz.id] || [0, 0];
     var res = M ? ptResolve(M, fz.id) : '';
-    var eixo = (i === PT_FASES.length - 1) ? '<div class="ns-axis"><span style="left:0">0</span><span style="left:' + pct(60) + '">60</span><span style="left:100%">150 dias</span></div>' : '';
+    var eixo = (i === FASES.length - 1) ? '<div class="ns-axis"><span style="left:0">0</span><span style="left:' + pct(60) + '">60</span><span style="left:100%">' + D + ' dias</span></div>' : '';
     return '<div class="ns-fase">' +
       '<span class="ns-n">0' + (i + 1) + '</span>' +
       '<div class="ns-txt"><strong>Fase de Implementação ' + fz.id + ' · ' + ptFaseNome(fz, M) + '</strong> — ' + entrega + '</div>' +
       '<div class="ns-meta"><div class="ns-prazo">' + prazo + '</div>' +
         (fz.frentes ? fz.frentes.map(function(fr) {
-          // Phase III: one bar per front, both from day 60
+          // Phase III: one bar per front of the labor model, from day 60
           return '<div class="ns-sub">' + fr.nome + ' · ' + (fr.fim - fr.ini) + ' dias</div>' +
             '<div class="ns-gantt" role="img" aria-label="' + fr.nome + ': dia ' + fr.ini + ' a ' + fr.fim + '"><i class="ns-tick" style="left:' + pct(60) + '"></i><b style="left:' + pct(fr.ini) + ';width:' + pct(fr.fim - fr.ini) + '"></b></div>';
         }).join('') :
@@ -1806,7 +1822,7 @@ function renderNextSteps() {
   if (momentoTxt[S.momento]) ouvimos.push(momentoTxt[S.momento]);
   ouvimos.push('<strong style="color:#ffffff">Operação:</strong> ' + obrasTxt + ', orçamento médio de ' + fmtNum(S.orcamentoMedio || 0) + ' e prazo médio de ' + (S.prazoMedio || 0) + ' meses, com ' + moLabel + '.');
   var f = S.ferramentas || {};
-  var ferr = [['planejamento','planejamento'],['medicao','medição'],['qualidade','qualidade'],['contratos','contratos'],['folha','folha']]
+  var ferr = [['planejamento','planejamento'],['medicao','medição'],['qualidade','qualidade'],['contratos','contratos']].concat(semMOPropria() ? [] : [['folha','folha']])
     .filter(function(p){ return f[p[0]] && String(f[p[0]]).trim(); })
     .map(function(p){ return p[1] + ' em ' + String(f[p[0]]).trim(); });
   if (ferr.length) ouvimos.push('<strong style="color:#ffffff">Ferramentas hoje:</strong> ' + ferr.join(', ') + ' — o SIIGA se integra ao ERP, sem trocá-lo.');
@@ -1821,7 +1837,7 @@ function renderNextSteps() {
       '<p style="font-size:13px;color:#cbd5e1;line-height:1.75;margin-bottom:20px">' +
         'Com base no diagnóstico da <strong>' + empresa + '</strong> (' + obrasTxt + ' no perfil <em>' + tipologiaLabel + '</em> com <em>' + moLabel + '</em>), o plano de ação se organiza em 3 Fases de Implementação:' +
       '</p>' +
-      '<div class="ns-fases">' + PT_FASES.map(faseHtml).join('') + '</div>' +
+      '<div class="ns-fases">' + FASES.map(faseHtml).join('') + '</div>' +
       '<div style="height:22px"></div>' +
       '<div style="padding:16px 18px;background:rgba(234,88,12,0.06);border-radius:6px;border-left:2.5px solid #ea580c">' +
         '<span style="font-size:13px;color:#cbd5e1;font-style:italic;line-height:1.6">"Identificamos oportunidades claras de ganho de eficiência e estancamento de perdas na sua operação. Na reunião executiva, demonstraremos a metodologia SIIGA capturando esses resultados desde o primeiro ciclo."</span>' +
@@ -1860,7 +1876,7 @@ function renderRotinaComparativa() {
   if (erpIntegradoLabel) {
     erpFerramentaLabel = erpIntegradoLabel;
     erpGargalo = 'ERP tem integração nativa disponível, mas hoje funciona isolado do canteiro. Dados só sobem no fechamento.';
-    erpPotencial = 'Integração nativa Agilean com ' + erpIntegradoLabel + ': orçamento, medição e folha sincronizados automaticamente, sem digitação duplicada.';
+    erpPotencial = 'Integração nativa Agilean com ' + erpIntegradoLabel + ': orçamento, ' + porModeloMO('medição', 'folha', 'medição e folha') + ' sincronizados automaticamente, sem digitação duplicada.';
   } else if (erpVal === 'outro') {
     erpFerramentaLabel = (f.erpOutro && f.erpOutro.trim()) ? f.erpOutro.trim() : naoInformado;
     erpGargalo = 'Sistema de gestão sem integração automática com o canteiro. Dados são lançados manualmente.';
@@ -1932,6 +1948,13 @@ function renderRotinaComparativa() {
       siiga: erpPotencial
     }
   ];
+  // Same Phase III routines as the PDF: payroll only with own labor, contractors only with outsourced labor
+  var fr3 = ptFrentesIII(S.modeloMO).map(function(fr){ return fr.nome; });
+  rows = rows.filter(function(r) {
+    if (r.rotina === 'Folha de Produção / Fechamento de MO') return fr3.indexOf('Folha de Produção') >= 0;
+    if (r.rotina === 'Controle de Contratos / Empreiteiros') return fr3.indexOf('Controle de Empreiteiros') >= 0;
+    return true;
+  });
 
   tbody.innerHTML = rows.map(function(r) {
     var ferramentaLabel = (r.ferramenta && r.ferramenta.trim()) ? r.ferramenta.trim() : naoInformado;
@@ -2223,7 +2246,7 @@ function renderSinteseAnchors(plan, roi) {
       '<td style="color:#ea580c;font-weight:700">'+(i+1)+'</td>' +
       '<td><strong style="color:'+REP_TXT_STRONG+'">'+o.gap+'</strong>'+(o.star ? REP_STAR : '') +
         '<div style="font-size:11px;color:'+REP_TXT_MUT+';font-style:italic;margin-top:2px">'+sub+'</div></td>' +
-      '<td>'+FONTE_LABEL[o.fonte]+'</td>' +
+      '<td>'+fonteLabel(o.fonte)+'</td>' +
       '<td style="text-align:right;font-weight:700;white-space:nowrap">'+(it ? fmtNum(it.baseValue*obras) : '—')+'</td>' +
     '</tr>';
   }).join('');
@@ -2280,7 +2303,8 @@ function renderAnchorGapCards(plan, roi) {
       '<div style="font-size:10.5px;color:'+REP_TXT_MUT+';margin-top:3px"><strong style="color:'+REP_TXT_STRONG+'">'+cs.nome+'</strong> · '+cs.papel+'</div>' :
       '<div style="font-size:11.5px;color:'+REP_TXT+';line-height:1.5">'+(cs.mercado || '')+'</div>';
     var baseTxt = (o.fonte === 'time' && roi.horasDoCliente === false) ?
-      'referência de mercado de horas de gestão e hora técnica de referência (R$ 115/h).' : FONTE_BASE_TXT[o.fonte];
+      'referência de mercado de horas de gestão e hora técnica de referência (R$ 115/h).' :
+      ((o.fonte === 'erros' && semMOPropria()) ? FONTE_BASE_TXT.errosTerc : FONTE_BASE_TXT[o.fonte]);
     var resposta = repEsc(answerLabelFor(o.bk, o.code, o.score));
     var voz = o.frase ?
       repLbl('Em suas palavras') + '<div style="font-style:italic;color:'+REP_TXT+';border-left:2.5px solid #ea580c;padding-left:10px;margin-bottom:6px;font-size:13px;line-height:1.5">“'+repEsc(o.frase)+'”</div>' +
@@ -2297,7 +2321,7 @@ function renderAnchorGapCards(plan, roi) {
           (o.severity !== 'critico' ? ' · Em alerta' : '') +
           (o.star ? ' · <span style="color:#eab308">★ dor declarada</span>' : '') + '</div>' +
           '<div style="font-family:Bai Jamjuree,sans-serif;font-size:17px;font-weight:700;color:'+REP_TXT_STRONG+';margin-top:2px">'+o.gap+'</div></div>' +
-        '<div style="text-align:right;font-size:10.5px;color:'+REP_TXT_MUT+';white-space:nowrap">Fonte de perda<br><strong style="color:'+REP_TXT_STRONG+'">'+FONTE_LABEL[o.fonte]+'</strong></div>' +
+        '<div style="text-align:right;font-size:10.5px;color:'+REP_TXT_MUT+';white-space:nowrap">Fonte de perda<br><strong style="color:'+REP_TXT_STRONG+'">'+fonteLabel(o.fonte)+'</strong></div>' +
       '</div>' +
       '<div style="display:grid;grid-template-columns:1fr 1fr;gap:18px">' +
         '<div>' + voz + '<div style="height:10px"></div>' + repLbl('O que isso causa') +
@@ -2334,7 +2358,7 @@ function renderGapsIdentificados(plan) {
         var g = '';
         if(!i || lista[i - 1].fonte !== r.fonte) {
           var pr = prioDa[r.fonte];
-          g = '<tr><td colspan="5" style="font-size:11px;padding-top:12px"><strong>' + (FONTE_LABEL[r.fonte] || '—') + '</strong>' +
+          g = '<tr><td colspan="5" style="font-size:11px;padding-top:12px"><strong>' + (fonteLabel(r.fonte) || '—') + '</strong>' +
             '<span style="color:var(--rep-text-mut, #999)"> · ' + nGrp[r.fonte] + (nGrp[r.fonte] === 1 ? ' ponto' : ' pontos') +
             (pr ? ' · mesma fonte da ' + (pr.length === 1 ? 'Prioridade ' : 'Prioridades ') + ptLista(pr.map(String)) : '') + '</span></td></tr>';
         }
@@ -2375,7 +2399,7 @@ function renderRoiChain(rr) {
     (es.recTotal > 0 ? ' + ' + fmtMilBR(es.recTotal, 1) + ' de retrabalho e pagamentos indevidos evitados' : '');
   var pb = fmtPayback(es.payback);
   var kp = function(l, v, s) { return '<div style="padding:14px 16px;'+REP_TILE+'">'+repLbl(l)+repBig(v, null, 20)+'<div style="font-size:10.5px;margin-top:4px;color:'+REP_TXT_MUT+'">'+s+'</div></div>'; };
-  var folha = (S.roi2 && S.roi2.folha) ? S.roi2.folha : 0;
+  var folha = folhaPropria();
   el.innerHTML =
     '<div style="display:grid;grid-template-columns:1fr 18px 1fr 18px 1fr 18px 1fr;align-items:stretch">' +
       step('1 · Dado de vocês', repBig(fmtHorasBR(op.horasInformadas)+' h'), 'por mês nas 5 rotinas de gestão de uma obra') + arr +
@@ -2384,10 +2408,11 @@ function renderRoiChain(rr) {
       step('4 · O retorno', repBig(mult.toLocaleString('pt-BR',{maximumFractionDigits:1})+'×', '#0d7c4f'), 'a mensalidade de referência de '+fmtRefBRL(rr.mensalidade)+' por obra · ROI líquido de '+Math.round(es.roi*100)+'% ao mês', 'border-color:rgba(16,185,129,0.5)') +
     '</div>' +
     repConfirm('Esses números refletem a rotina de vocês? Se estiverem certos, faz sentido desenharmos o escopo juntos?') +
-    '<div style="display:grid;grid-template-columns:repeat(3,1fr);gap:12px;margin-top:12px">' +
+    '<div style="display:grid;grid-template-columns:repeat(' + (semMOPropria() ? 2 : 3) + ',1fr);gap:12px;margin-top:12px">' +
       kp('% da jornada liberada', (op.pctJornada*100).toLocaleString('pt-BR',{maximumFractionDigits:1})+'%', 'do time técnico') +
       kp('Payback', pb.txt, pb.sub) +
-      kp('Folha considerada', folha ? fmtNum(folha) : '—', folha ? 'por mês, média da obra' : 'sem folha própria informada') +
+      // Outsourced labor: no own payroll, no payroll card
+      (semMOPropria() ? '' : kp('Folha considerada', folha ? fmtNum(folha) : '—', folha ? 'por mês, média da obra' : 'sem folha própria informada')) +
     '</div>';
 }
 
@@ -2807,15 +2832,16 @@ function buildROIReal() {
       '<div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:10px">' +
         paramItem('Mensalidade média (fixa)', fmtNum(MENSALIDADE_ROI_POR_OBRA)+'/mês por obra') +
         paramItem('Fator de captura (fixo)', Math.round(ROI_CAPTURA_FIXA*100)+'% · '+roiCapturaLabel(ROI_CAPTURA_FIXA)) +
-        paramItem('Folha de MO própria/mês por obra', fmtNum(S.roi2.folha||0)) +
+        (semMOPropria() ? '' : paramItem('Folha de MO própria/mês por obra', fmtNum(folhaPropria()))) +
         paramItem('Custo hora técnica', 'R$ '+ROI_REAL_K.CUSTO_HORA_TECNICA+'/h') +
         paramItem('Horas de gestão informadas', fmtH(r.operacional.horasInformadas)+'/mês por obra') +
       '</div>' +
       '<div style="border-top:1px dashed #ddd;padding-top:8px;margin-top:2px">' +
         '<div style="font-size:9.5px;font-weight:700;text-transform:uppercase;letter-spacing:0.06em;color:#999;margin-bottom:6px">Como é calculado — Visão Estratégica</div>' +
-        formulaItem('Pagamentos por retrabalho evitados', pC('Folha de MO própria informada')+' × '+pF('5% de retrabalho')+' × '+pS('fator de captura (50%)')) +
-        formulaItem('Pagamentos indevidos rastreados', pC('Folha de MO própria informada')+' × '+pF('5% indevidos × 80% sem sobreposição')+' × '+pS('fator de captura (50%)')) +
-        formulaItem('Recuperação financeira total', 'Soma das 2 linhas acima') +
+        (semMOPropria() ? '' :
+          formulaItem('Pagamentos por retrabalho evitados', pC('Folha de MO própria informada')+' × '+pF('5% de retrabalho')+' × '+pS('fator de captura (50%)')) +
+          formulaItem('Pagamentos indevidos rastreados', pC('Folha de MO própria informada')+' × '+pF('5% indevidos × 80% sem sobreposição')+' × '+pS('fator de captura (50%)')) +
+          formulaItem('Recuperação financeira total', 'Soma das 2 linhas acima')) +
         formulaItem('Capacidade de gestão liberada', pC('Horas recuperadas/mês')+' × '+pF('R$115/h')) +
         formulaItem('Investimento Agilean (mensalidade)', 'Mensalidade média fixa de '+fmtNum(MENSALIDADE_ROI_POR_OBRA)+'/mês, de uma obra') +
       '</div>' +
@@ -3038,6 +3064,15 @@ var PT_FONTE_LABEL = {
   erros:'Erros de medição e folha', mo:'Estouro de mão de obra'
 };
 var FONTE_LABEL = PT_FONTE_LABEL;
+// Client without own labor (outsourced): own labor and its payroll stay out of every calculation and text.
+function semMOPropria() { return S.modeloMO === 'terceirizada'; }
+function folhaPropria() { return semMOPropria() ? 0 : ((S.roi2 && S.roi2.folha) || 0); }
+// Text by labor model: outsourced, own, mixed or not informed (tool screens and texts)
+function porModeloMO(terc, propria, ambos) { return S.modeloMO === 'terceirizada' ? terc : (S.modeloMO === 'propria' ? propria : ambos); }
+// Tools screen: payroll tool only with own labor, contracts tool only with outsourced labor (saved data is kept)
+function ferrCampoVisivel(f) { return f.key === 'folha' ? !semMOPropria() : (f.key === 'contratos' ? S.modeloMO !== 'propria' : true); }
+// Loss source name for the client's labor model (tool and PDF)
+function fonteLabel(key) { return (key === 'erros' && semMOPropria()) ? 'Erros de medição' : PT_FONTE_LABEL[key]; }
 // Display-only pillar of each labor (MO) point; o.bk stays 'mo' for score and plan.
 // MO points stay outside the /57 score: they only get a pillar reference here.
 var PT_MO_PILAR = { 'MO.1':3, 'MO.2':2, 'MO.3':2, 'MO.4':3, 'MO.5':2, 'MO.6':2, 'MO.7':3 };
@@ -3053,6 +3088,7 @@ var FONTE_BASE_TXT = {
   retrabalho:'orçamento da obra informado e referência de mercado de retrabalho (10%).',
   velocidade:'orçamento da obra informado e referência de mercado de ganho de prazo (10%).',
   erros:'orçamento da obra informado, mão de obra como 45% do custo e desvio médio de medição e folha (5%).',
+  errosTerc:'orçamento da obra informado, mão de obra como 45% do custo e desvio médio de medição (5%).',
   mo:'orçamento da obra informado, mão de obra como 45% do custo e estouro médio de mercado (15%).'
 };
 // Prova social por fonte: depoimentos institucionais (os mesmos da Proposta)
@@ -3176,7 +3212,7 @@ function calculateROI() {
   var ESTOURO_MO     = 0.15;
   var CAPTURA_MO     = 0.70;
   var PCT_RETRABALHO = 0.10; // retrabalho de mercado, referência usada em retrBase
-  var PCT_DESVIO_ERROS = 0.05; // desvio médio de folha/medição (planilhas), usado em erroBase
+  var PCT_DESVIO_ERROS = 0.05; // desvio médio de folha/medição (planilhas), usado em erroBase; só medição na MO terceirizada
   // Otimização do time de gestão: horas RECUPERÁVEIS informadas pelo cliente
   // na tela "Tempo da Equipe de Gestão" (horas de cada rotina × % de economia,
   // mesmo "potencial pleno" do ROI Real), × custo da hora técnica do ROI.
@@ -3259,7 +3295,7 @@ function calculateROI() {
       baseValue: Math.round(velocBase)
     },
     {
-      key:'erros', label:'Erros de medição e folha de produção',
+      key:'erros', label:mo === 'terceirizada' ? 'Erros de medição' : 'Erros de medição e folha de produção',
       basis: 'Orçamento × 45% (custo MO) × ' + Math.round(PCT_DESVIO_ERROS*100) + '% (desvio médio)',
       fator: fatErros,
       porObra:   Math.round(erroBase * fatErros),
@@ -3355,8 +3391,10 @@ function calcROIReal(fator, mensalidadeOverride) {
   // O antigo "retrabalho administrativo liberado" (dias de fechamento × 8h)
   // saiu: o fechamento agora está dentro de hMedicao e já entra na
   // capacidade de gestão liberada — contá-lo nos dois lugares duplicava.
-  var rec2 = (r.folha||0) * K.PCT_RETRABALHO * fator;
-  var rec3 = (r.folha||0) * K.PCT_INDEVIDOS * (1 - K.DESC_SOBREPOSICAO) * fator;
+  // Own payroll only: an outsourced client has no own payroll (folhaPropria() = 0)
+  var folha = folhaPropria();
+  var rec2 = folha * K.PCT_RETRABALHO * fator;
+  var rec3 = folha * K.PCT_INDEVIDOS * (1 - K.DESC_SOBREPOSICAO) * fator;
   var recTotal = rec2 + rec3;
   var horasLib = hMes;
   var valorCapacidade = horasLib * K.CUSTO_HORA_TECNICA;
@@ -3508,11 +3546,13 @@ var ROADMAP_SPRINTS = {
     color:'#4a4558',
     title:'Primeiros passos de controle executivo',
     focus:'Com os pilares anteriores estruturados, os dados já existem para alimentar o ciclo de performance. O foco é criar a reunião de inteligência e o fechamento baseado em evidência.',
-    items: [
-      'Reunião mensal de inteligência com engenharia — análise de prazo, qualidade e custo',
-      'Relatório executivo automático para diretoria com indicadores consolidados',
-      'Pagamento por evidência — sugestão de folha e medição baseada em produção registrada'
-    ],
+    get items() {
+      return [
+        'Reunião mensal de inteligência com engenharia — análise de prazo, qualidade e custo',
+        'Relatório executivo automático para diretoria com indicadores consolidados',
+        'Pagamento por evidência — sugestão de ' + porModeloMO('medição', 'folha', 'folha e medição') + ' baseada em produção registrada'
+      ];
+    },
     prod:'Controle, performance e inteligência de gestão',
     entregavel:'Reunião executiva mensal com Performance HUB e sugestão de pagamento por evidência',
     criterio:'Relatório executivo consolidado gerado automaticamente, sem compilação manual de planilhas',
@@ -4262,7 +4302,8 @@ function buildDiagnosticoJSON() {
       pilarPriority: S.pilarPriority || [],
       portfolioTotal: (S.numObras||0) * (S.orcamentoMedio||0),
       estruturaTime: { score: S.scores.b03||0, nivel: nivel((S.scores.b03||0)/3*100) },
-      roiReal: { horasGestaoPorObra: getHorasGestao(), folhaPorObra: (S.roi2||{}).folha||0, mensalidade: MENSALIDADE_ROI_POR_OBRA, captura: ROI_CAPTURA_FIXA }
+      // Outsourced labor: no own-payroll field at all
+      roiReal: Object.assign({ horasGestaoPorObra: getHorasGestao() }, semMOPropria() ? {} : { folhaPorObra: folhaPropria() }, { mensalidade: MENSALIDADE_ROI_POR_OBRA, captura: ROI_CAPTURA_FIXA })
     },
     fases: {
       fase1: { scores: S.scores.f1||[], somatorio: (S.scores.f1||[]).reduce(function(a,b){return a+(b||0);},0), maximo: maxes.f1, percentual: f1pct, nivel: nivel(f1pct) },
@@ -4526,15 +4567,15 @@ var AHA_DETAILS = {
     icon: '⏱',
     color: '#60a5fa',
     desc: 'Com base em dados de empresas que implementaram o SIIGA, as rotinas de gestão são drasticamente otimizadas, liberando tempo e recursos para atividades estratégicas.',
-    rotinas: [
+    get rotinas() { var fm = porModeloMO('Medição de Empreiteiros', 'Folha de Pagamento', 'Folha de Pagamento e Medição de Empreiteiros'); return [
       'Medição Semanal de Avanços',
       'Atualização de Indicadores de Longo, Médio e Curto Prazo',
       'Reprogramação e Elaboração de Plano de Ação',
-      'Folha de Pagamento e Medição de Empreiteiros — Técnico',
-      'Folha de Pagamento e Medição de Empreiteiros — Gestor',
+      fm + ' — Técnico',
+      fm + ' — Gestor',
       'Distribuição dos Pacotes de Trabalho no Canteiro',
       'Rotinas de Qualidade Automáticas e Integradas com Medição'
-    ]
+    ]; }
   },
   retrabalho: {
     title: 'Redução de Retrabalhos',
@@ -4558,7 +4599,7 @@ var AHA_DETAILS = {
     formula: 'Orçamento × 45% (participação de MO) × 15% (estouro médio) × 70% (redução com SIIGA)'
   },
   erros: {
-    title: 'Erros de Medição e Folha de Produção',
+    get title() { return semMOPropria() ? 'Erros de Medição' : 'Erros de Medição e Folha de Produção'; },
     icon: '📋',
     color: '#a78bfa',
     desc: 'Erros de aferição, fórmulas inconsistentes e falta de segurança em planilhas geram desvios médios de 5% no custo de mão de obra. Com o SIIGA, o fechamento passa a ser baseado em evidência digital — eliminando esses desvios.',
@@ -5581,7 +5622,7 @@ function buildPropostaPrograma(mode) {
     ['Kick-off', 'Lean Experience', 'Workshop presencial de nivelamento Lean, até 25 pessoas.', 'CORTESIA · INCLUSA'],
     ['Pilar macro', 'Planejamento × orçamento', 'Planejamento do fluxo conectado ao orçamento e ao ERP.', ''],
     ['Pilar tático', 'Proteção do plano', 'Análise de restrições e planejamento de médio prazo.', ''],
-    ['Pilar operacional', 'Curto prazo & MO', 'Last Planner, mão de obra e folha de produção no canteiro.', '']
+    ['Pilar operacional', 'Curto prazo & MO', 'Last Planner, mão de obra e ' + porModeloMO('medição de empreiteiros', 'folha de produção', 'folha de produção') + ' no canteiro.', '']
   ];
   var cards = etapas.map(function(e){
     var badge = e[3] ? '<div style="margin-top:12px;display:inline-block;font-size:9.5px;font-weight:700;color:#34d399;border:1px solid rgba(52,211,153,0.5);border-radius:20px;padding:3px 10px">'+e[3]+'</div>' : '';
@@ -5610,7 +5651,7 @@ function buildPropostaResultados(mode) {
   var niveis = [
     ['Estratégico · Diretoria', 'Previsibilidade e visão de portfólio', ['Previsibilidade de fluxo de caixa das obras', 'Visão físico-financeira em tempo real', 'Gestão integrada do portfólio, não obra a obra']],
     ['Tático · Sala Técnica', 'Mais escala, menos redigitação', ['Fim da redigitação entre planejamento e ERP', 'Análise proativa de desvios, não reativa', 'Uma sala técnica que cobre mais obras']],
-    ['Operacional · Engenharia de Campo', 'Plano que chega ao canteiro', ['Aderência entre o plano e o que a obra executa', 'Equipes, medições e MO puxadas do planejamento', 'Folha de produção fechada no sistema']]
+    ['Operacional · Engenharia de Campo', 'Plano que chega ao canteiro', ['Aderência entre o plano e o que a obra executa', 'Equipes, medições e MO puxadas do planejamento', porModeloMO('Medição de empreiteiros fechada no sistema', 'Folha de produção fechada no sistema', 'Folha de produção fechada no sistema')]]
   ];
   var cards = niveis.map(function(n){
     var bullets = n[2].map(function(b){ return '<li style="display:flex;gap:8px;margin-bottom:6px"><span style="color:#ea580c;flex-shrink:0">•</span><span>'+b+'</span></li>'; }).join('');

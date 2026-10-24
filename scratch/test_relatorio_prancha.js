@@ -3,6 +3,7 @@
 // Usage:
 //   CASE=pcl  MODE=detalhado OUT="Piloto Relatorio v2/SIIGA_APP_v3_DETALHADO_PCL.pdf" node scratch/test_relatorio_prancha.js
 //   CASE=terc MODE=resumido  OUT="Piloto Relatorio v2/SIIGA_APP_v3_RESUMIDO_TERC.pdf"  node scratch/test_relatorio_prancha.js
+//   CASE: pcl (mixed labor), pcl2 (★ on alert point), prop (own labor), terc (outsourced). PROD_URL=https://siiga.vercel.app/ runs it in production.
 const http = require('http');
 const fs = require('fs');
 const path = require('path');
@@ -41,8 +42,13 @@ const CASES = {
 };
 // PCL with a star on an alert point (F3.4 = 1.5, becomes priority 4) and on a structured point (F2.1 = 3, tool warning)
 CASES.pcl2 = Object.assign({}, CASES.pcl, { dores: Object.assign({}, CASES.pcl.dores, { 'F3.4':'a gente paga o empreiteiro e depois descobre o retrabalho', 'F2.1':'a gente sempre corre atrás de material' }) });
+// PCL with own labor only (Phase III = Folha de Produção, 90 days)
+CASES.prop = Object.assign({}, CASES.pcl, { b0: Object.assign({}, CASES.pcl.b0, { modeloMO: 'propria' }) });
 const C = CASES[CASE];
+const MO = C.b0.modeloMO;
 const avisos = {}; // code -> warning visible after the star (score 3 only)
+let telaF44 = ''; // questionnaire card text where F4.4 is asked
+let telaFerr = null, telaHoras = ''; // tools screen (fields shown) and hours screen text
 
 const server = http.createServer((req, res) => {
   let reqPath = decodeURIComponent(req.url.split('?')[0]);
@@ -71,7 +77,7 @@ server.listen(PORT, async () => {
     page.on('console', m => { if (m.type() === 'error') console.log('CONSOLE:', m.text()); });
     page.on('dialog', d => { console.log('DIALOG:', d.message()); d.dismiss(); });
     await page.setViewport({ width: 1280, height: 1000, deviceScaleFactor: 1 });
-    await page.goto('http://localhost:' + PORT + '/index.html', { waitUntil: 'networkidle0' });
+    await page.goto(process.env.PROD_URL || ('http://localhost:' + PORT + '/index.html'), { waitUntil: 'networkidle0' });
     await page.evaluate(() => { try { localStorage.clear(); } catch (e) {} });
 
     await page.type('#c-empresa', C.empresa);
@@ -103,6 +109,7 @@ server.listen(PORT, async () => {
           var o = document.getElementById('roi-orcamento'); o.value = c.orcamento; o.dispatchEvent(new Event('input', { bubbles: true }));
         }, C);
       } else if (q.type === 'ferramentas') {
+        telaFerr = await page.evaluate(() => ({ folha: !!document.getElementById('ferr-folha'), contratos: !!document.getElementById('ferr-contratos'), txt: document.getElementById('b0-card').innerText }));
         await page.evaluate(c => {
           Object.keys(c.ferr).forEach(k => { var el = document.getElementById('ferr-' + k); if (el) el.value = c.ferr[k]; });
           var e = document.getElementById('ferr-erp'); if (e && c.erp) { e.value = c.erp; e.dispatchEvent(new Event('change', { bubbles: true })); }
@@ -125,6 +132,7 @@ server.listen(PORT, async () => {
       if (scr === 'screen-radar') break;
       if (scr === 'screen-phase-result') { await page.click('#result-next-btn'); await sleep(200); continue; }
       if (scr === 'screen-horas') {
+        telaHoras = await page.evaluate(() => document.getElementById('horas-card').innerText);
         await page.evaluate(v => document.querySelectorAll('#horas-card input').forEach((el, i) => el.value = String(v[i])), C.horas);
         horasOk = true;
         await page.click('#horas-next-btn'); await sleep(600);
@@ -140,6 +148,8 @@ server.listen(PORT, async () => {
           await page.evaluate(v => document.querySelectorAll('#phase-card input[id^="rg-"]').forEach(el => { el.value = v; el.dispatchEvent(new Event('input', { bubbles: true })); }), C.folha || '0');
         } else {
           const codes = info.subs.length ? info.subs : [info.code];
+          // F4.4 as shown on screen (combo "No fechamento / ERP"), checked against the labor model below
+          if (codes.indexOf('F4.4') >= 0) telaF44 = await page.evaluate(() => document.getElementById('phase-card').innerText);
           for (let gi = 0; gi < codes.length; gi++) {
             const code = codes[gi];
             const sc = C.resp[code] !== undefined ? C.resp[code] : 1;
@@ -253,7 +263,7 @@ server.listen(PORT, async () => {
     // Section 06 of the screen: same 3 "Resolve" lines, phase names and numbering as the PDF; no "ato" nor "Gap-âncora"
     const s06 = await page.evaluate(() => {
       const M = ptModel('detalhado'); const t = document.getElementById('next-steps-container').innerText.replace(/\s+/g, ' '); const bad = [];
-      PT_FASES.forEach(f => {
+      ptFases(S.modeloMO).forEach(f => {
         const r = ptResolve(M, f.id); if (r && t.indexOf(r) < 0) bad.push('Resolve fase ' + f.id + ': ' + r);
         if (t.indexOf('Fase de Implementação ' + f.id + ' · ' + ptFaseNome(f, M)) < 0) bad.push('nome da fase ' + f.id);
       });
@@ -265,12 +275,53 @@ server.listen(PORT, async () => {
     check('seção 06 da tela igual ao PDF (Resolve, nomes das fases, sem "ato"/"Gap-âncora")', s06.length === 0, JSON.stringify(s06));
     check('folha 05 com coluna Fase', /FASE\s+PILAR|PILAR\s+FASE/i.test(dom.pages[4] || '') || /Fase I/.test(dom.pages[4] || ''));
     check('bloco Próximo passo presente', /PRÓXIMO PASSO/i.test(all));
-    // Phase III: two fronts from day 60 (Controle de Empreiteiros 20 days, Folha de Produção 90 days); nothing says the contractors front lasts 90 days
-    check('Fase III com duas frentes no gráfico e nos textos', /Folha de Produção\s*90 dias, após I e II/.test(all) && /Controle de Empreiteiros\s*20 dias, após I e II/.test(all) &&
-      /Controle de Empreiteiros em 20 dias \(até o dia 80\)/.test(all) && /o Controle de Empreiteiros termina no dia 80/.test(all) && !/até 90 dias|Até 90 dias|até cerca do dia 150/i.test(all));
+    // Phase III by labor model, from day 60: outsourced = Controle de Empreiteiros (30 days, to day 90),
+    // own = Folha de Produção (90 days, to day 150), mixed = both
     {
+      const temE = MO !== 'propria', temF = MO !== 'terceirizada';
+      const tit = MO === 'mista' ? /o Controle de Empreiteiros termina no dia 90 e a Folha de Produção, no dia 150/ :
+        (MO === 'propria' ? /a Folha de Produção vai do dia 60 ao dia 150/ : /o Controle de Empreiteiros vai do dia 60 ao dia 90/);
+      check('Fase III só com as frentes do tipo de MO (' + MO + ')',
+        temE === /Controle de Empreiteiros\s*30 dias, após I e II/.test(all) && temF === /Folha de Produção\s*90 dias, após I e II/.test(all) &&
+        temE === /Controle de Empreiteiros em 30 dias \(até o dia 90\)/.test(all) && temF === /Folha de Produção em 90 dias \(até o dia 150\)/.test(all) &&
+        temE === /Controle de Contratos \/ Empreiteiros/.test(all) && temF === /Folha de Produção \/ Fechamento de MO/.test(all) &&
+        tit.test(all) && !/20 dias|dia 80|Até 90 dias|até cerca do dia 150/i.test(all));
       const ns = await page.evaluate(() => document.getElementById('next-steps-container').innerText);
-      check('tela: Fase III com as duas frentes (20 e 90 dias)', /Folha de Produção · 90 dias/.test(ns) && /Controle de Empreiteiros · 20 dias/.test(ns) && /A partir do dia 60/.test(ns) && !/Até 90 dias/i.test(ns), ns.slice(0, 0));
+      check('tela: Fase III só com as frentes do tipo de MO', temF === /Folha de Produção · 90 dias/.test(ns) && temE === /Controle de Empreiteiros · 30 dias/.test(ns) &&
+        /A partir do dia 60/.test(ns) && ns.indexOf((temF ? 150 : 90) + ' dias') >= 0 && !/Até 90 dias|20 dias/i.test(ns));
+    }
+    // Global value (whole term) only in the summary lead; sections 02 to 06 are monthly (Annex A keeps the formulas)
+    {
+      const corpo = dom.pages.slice(2).join('\n').split(/Anexo A · Memória de cálculo/i)[0].replace(/ /g, ' ');
+      const g = corpo.match(/.{0,40}(em \d+ meses|Perda total estimada|Perda, \d+ meses|Capturável).{0,20}/i);
+      check('valor global só no resumo do topo', !g && /Perda por mês/i.test(corpo) && /Ganho por mês/i.test(corpo), g && g[0]);
+    }
+    // Outsourced labor: no own labor / payroll anywhere (PDF text, tool screens and ROI JSON)
+    if (MO === 'terceirizada') {
+      const semCarimbo = all.replace(/Folha\s*\d+\s*\/\s*\d+/gi, '').replace(/^\s*FOLHA\s*$/gm, '').replace(/\tFOLHA\b/g, '');
+      const hit = semCarimbo.match(/.{0,40}(folha|MO própria|mão de obra própria|\bHH\b).{0,40}/i);
+      check('terceirizada: sem folha / MO própria no PDF', !hit, hit && hit[0]);
+      const extra = await page.evaluate(() => {
+        const j = JSON.stringify(buildDiagnosticoJSON().cliente.roiReal);
+        // Whole report screen and the Aha screen (rendered on the way to the report)
+        const tela = ['screen-report', 'screen-aha'].map(id => { const e = document.getElementById(id); return e ? e.textContent : ''; }).join('\n');
+        const t = tela.match(/.{0,40}(folha|MO própria).{0,40}/i);
+        return { j: j, rec: calcROIReal(0.5).estrategica.recTotal, tela: t ? t[0] : '' };
+      });
+      check('terceirizada: JSON do ROI sem folha e recuperação de folha = 0', !/folha/i.test(extra.j) && extra.rec === 0, extra.j + ' rec=' + extra.rec);
+      check('terceirizada: telas da ferramenta sem folha / MO própria', !extra.tela, extra.tela);
+    }
+    // F4.4 follows the labor model: outsourced = contractors' measurement only, own = payroll only, mixed = both
+    {
+      const f44 = await page.evaluate(() => { const q = findQ('f4', 'F4.4'); return q.text + ' ' + q.reveals; });
+      const temF = MO !== 'terceirizada', temM = MO !== 'propria';
+      check('F4.4 conforme o tipo de MO (' + MO + '), na pergunta e na tela', !!telaF44 && telaF44.indexOf('O fechamento mensal de ') >= 0 &&
+        temF === /folha/i.test(f44) && temM === /medição/i.test(f44) && temF === /fechamento mensal de folha/i.test(telaF44) && temM === /medição de empreiteiros/i.test(telaF44),
+        f44.slice(0, 80));
+      // Tools screen: payroll tool field only with own labor, contracts tool field only with outsourced labor;
+      // hours screen: "fechar medição" / "fechar folha" by labor model
+      check('tela de ferramentas conforme o tipo de MO', !!telaFerr && telaFerr.folha === temF && telaFerr.contratos === temM, JSON.stringify(telaFerr && { folha: telaFerr.folha, contratos: telaFerr.contratos }));
+      check('tela de horas conforme o tipo de MO', temF === /folha/i.test(telaHoras) && temM === /medição de empreiteiros/i.test(telaHoras), (telaHoras.match(/Medir avanço[^\n]*/) || [''])[0]);
     }
     check('seções 03 "Prioridades" e 04 "Demais pontos críticos", sem "Ponto crítico N" nem "Demais pontos avaliados"', /03\s+Prioridades/i.test(dom.pages[0] || '') && /04\s+Demais pontos críticos/i.test(dom.pages[0] || '') && !/Ponto crítico \d|Pontos críticos \d|Demais pontos avaliados/.test(all));
     check('★ em nota 3 mostra aviso na ferramenta; nas demais respostas, não', Object.keys(avisos).every(c => avisos[c] === (c === 'F2.1' && CASE === 'pcl2')), JSON.stringify(avisos));
@@ -296,12 +347,12 @@ server.listen(PORT, async () => {
       const p2 = (dom.pages[1] || '').replace(/\u00a0/g, ' '), p3 = (dom.pages[2] || '').replace(/\u00a0/g, ' ');
       const num = s => parseFloat(s.replace(/\./g, '').replace(',', '.'));
       const m2 = p2.match(/perda estimada (?:na|por) obra é de R\$ ([\d.,]+) (mil|mi) em (\d+) meses/);
-      const m3 = p3.match(/Perda total estimada\s*R\$ ([\d.,]+) (mil|mi) em (\d+) meses/i);
       const mm = p3.match(/Perda total por mês\s*R\$ ([\d.,]+) mil/i);
       const k = u => u === 'mi' ? 1000 : 1;
-      const t2 = m2 && num(m2[1]) * k(m2[2]), t3 = m3 && num(m3[1]) * k(m3[2]);
-      check('total da folha 02 = total da folha 03 (e perda/mês × prazo)', !!(m2 && m3 && mm) && Math.abs(t2 - t3) <= (m2[2] === 'mi' ? 50 : 0.5) && Math.abs(num(mm[1]) * +m3[3] - t3) <= 1 && m2[3] === m3[3],
-        JSON.stringify({ folha02: m2 && m2.slice(1), folha03: m3 && m3.slice(1), mes: mm && mm[1] }));
+      const t2 = m2 && num(m2[1]) * k(m2[2]);
+      // Sheet 02 total (rounded in the lead) = monthly loss of sheet 03 × term
+      check('total da folha 02 = perda/mês da folha 03 × prazo', !!(m2 && mm) && Math.abs(num(mm[1]) * +m2[3] - t2) <= (m2[2] === 'mi' ? 50 : 1),
+        JSON.stringify({ folha02: m2 && m2.slice(1), mes: mm && mm[1] }));
       check('folha 02: linha "Recuperável com o plano" com × mensalidade ref.', /Recuperável com o plano · [\d,]+× mensalidade ref\./.test(p2));
     }
     check('folha 02: Fase de Implementação com nome curto', /I · Planejamento e canteiro|III · Pagamento da MO/.test(dom.pages[1] || '') && /Fase de Implementação/i.test(dom.pages[1] || ''));
@@ -321,20 +372,26 @@ server.listen(PORT, async () => {
       check('PCL ★ folhas = ' + EXP_FOLHAS, dom.pages.length === EXP_FOLHAS, dom.pages.length);
     } else if (CASE === 'pcl') {
       ['21,5', 'R$ 526 mil', 'R$ 395 mil', 'R$ 11,5 mil', 'R$ 9,3 mil', 'R$ 5,5 mil', 'R$ 26,3 mil/mês', 'R$ 19,0 mil/mês', '9,5× mensalidade ref.', 'R$ 25,0 mil', '71%', '12,5×',
-       'R$ 172,5 mil', 'R$ 140,0 mil', 'R$ 82,7 mil', 'R$ 526,4 mil', 'R$ 35,1 mil', 'R$ 8,7 mil', 'R$ 6,4 mil', 'R$ 2,1 mil', 'R$ 4,0 mil', 'R$ 3,8 mil',
+       'R$ 35,1 mil', 'R$ 8,7 mil', 'R$ 6,4 mil', 'R$ 2,1 mil', 'R$ 4,0 mil', 'R$ 3,8 mil',
        'Digitalização do painel integrado de indicadores', 'Digitalização da comunicação de bloqueios de pagamento', 'Implantação da gestão de aditivos de verba',
        'Plano de Transformação Operacional para a Construtora PCL', 'Pilar 3, Gestão integrada da produção', 'Resolve: prioridade 1; pontos críticos 04, 05, 07, 10, 11, 12 e 13; 6 pontos em alerta.',
        'Resolve: pontos críticos 06 e 09; 1 ponto em alerta.', 'Resolve: prioridades 2 e 3; ponto crítico 08; 4 pontos em alerta.', 'Por fonte de perda · 10 pontos críticos',
        'Outros 11 pontos estão em alerta', '3 de 13 pontos críticos', 'Total das 3 prioridades', 'mesma fonte da Prioridade 1'].forEach(s => check('PCL contém "' + s + '"', allLow.indexOf(s.toLowerCase()) >= 0));
       // Hours+payroll model only in the Detalhado annex (A.4); 15-month source values only in the annex
-      ['R$ 20,5 mil', 'R$ 10,25 mil', '5,1×', '3,1×', 'R$ 6,15 mil', 'R$ 52,5 mil', 'R$ 78,8 mil', 'R$ 375,3 mil'].forEach(s => check('PCL ' + (MODE === 'resumido' ? 'sem' : 'com (Anexo)') + ' "' + s + '"', (allLow.indexOf(s.toLowerCase()) >= 0) === (MODE !== 'resumido')));
+      ['R$ 172,5 mil', 'R$ 140,0 mil', 'R$ 82,7 mil', 'R$ 526,4 mil', 'R$ 20,5 mil', 'R$ 10,25 mil', '5,1×', '3,1×', 'R$ 6,15 mil', 'R$ 52,5 mil', 'R$ 78,8 mil', 'R$ 375,3 mil'].forEach(s => check('PCL ' + (MODE === 'resumido' ? 'sem' : 'com (Anexo)') + ' "' + s + '"', (allLow.indexOf(s.toLowerCase()) >= 0) === (MODE !== 'resumido')));
       check('PCL sem "custa R$ 26 mil" e sem bloco horas+folha no resumo', !/custa R\$ 26 mil/.test(all) && !/Perda em horas de gestão e folha/i.test(all));
       check('PCL folhas = ' + EXP_FOLHAS, dom.pages.length === EXP_FOLHAS, dom.pages.length);
+    } else if (CASE === 'prop') {
+      // Own labor: payroll lines stay (Annex A.4 in the Detalhado), no contractors front
+      check('própria: "MO própria" no escopo', /MO própria/.test(all));
+      check('própria folhas = ' + EXP_FOLHAS, dom.pages.length === EXP_FOLHAS, dom.pages.length);
+      if (MODE !== 'resumido') check('própria: Anexo com retrabalho pago na folha', /Retrabalho pago na folha/.test(all));
     } else {
       check('título sem artigo: "para Horizonte Engenharia"', allLow.indexOf('plano de transformação operacional para horizonte engenharia') >= 0);
       check('sem linhas de folha própria (terceirizada)', !/Retrabalho pago na folha/.test(all));
       check('ERP "Não utiliza ERP"', /Não utiliza ERP/.test(all));
       check('prazo 24 meses', /24 meses/.test(all));
+      check('terceirizada folhas = ' + EXP_FOLHAS, dom.pages.length === EXP_FOLHAS, dom.pages.length);
       ['Resolve: prioridade 2; pontos críticos 04, 05, 06, 07, 09, 10, 11 e 12; 5 pontos em alerta.', 'Resolve: pontos críticos 08 e 13; 1 ponto em alerta.', 'Resolve: prioridades 1 e 3; 1 ponto em alerta.', 'Por fonte de perda · 10 pontos críticos', 'Outros 7 pontos estão em alerta', 'R$ 52,9 mil', 'R$ 39,1 mil', '19,5×', 'R$ 33,5 mil/mês', '16,8× mensalidade ref.', 'Total no portfólio (3 obras)'].forEach(s => check('terceirizada contém "' + s + '"', allLow.indexOf(s.toLowerCase()) >= 0));
     }
 
