@@ -38,7 +38,7 @@ server.listen(PORT, async () => {
     page.on('pageerror', err => { console.log('PAGE ERROR:', err.message); fails.push('pageerror: ' + err.message); });
     page.on('dialog', d => { console.log('DIALOG:', d.message()); d.dismiss(); });
     await page.setViewport({ width: 1920, height: 1080, deviceScaleFactor: 1 });
-    await page.goto('http://localhost:' + PORT + '/index.html', { waitUntil: 'networkidle0' });
+    await page.goto(process.env.PROD_URL || ('http://localhost:' + PORT + '/index.html'), { waitUntil: 'networkidle0' });
     await page.evaluate(() => { try { localStorage.clear(); } catch (e) {} });
 
     await page.type('#c-empresa', 'Construtora PCL');
