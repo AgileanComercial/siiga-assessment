@@ -812,7 +812,7 @@ function showHorasScreen(origem) {
   var navStep = document.getElementById('nav-step');
   if(navStep) navStep.textContent = 'Etapa final · Tempo da equipe';
   var nextBtn = document.getElementById('horas-next-btn');
-  if(nextBtn) nextBtn.textContent = horasOrigem === 'focused' ? 'Ver Resultado →' : 'Ver Radar Completo →';
+  if(nextBtn) nextBtn.textContent = horasOrigem === 'focused' ? 'Ver Resultado →' : 'Continuar →';
   showScreen('screen-horas');
   saveDraft();
 }
@@ -830,7 +830,7 @@ function nextHoras() {
   readHorasScreen();
   saveDraft();
   if(horasOrigem === 'focused') showFocusedResult();
-  else buildAndShowRadar();
+  else showConfirmacao(); // Conferência antes dos resultados (Radar)
 }
 
 function prevHoras() {
@@ -1700,14 +1700,14 @@ function showReport() {
 }
 
 // ═══════════════════════════════════════════
-//  CONFERÊNCIA ANTES DO RELATÓRIO (uso interno)
-//  Prioridades, comentário do cliente e perda por mês antes de gerar o relatório.
+//  CONFERÊNCIA ANTES DOS RESULTADOS (uso interno)
+//  Prioridades, comentário do cliente e perda por mês antes de mostrar o Radar e o relatório.
 //  Cada ação regrava S.prioAjustes, salva o rascunho e redesenha a partir de
 //  getGapPlan() (fonte única). Só o comentário é editável (S.dores[code].frase).
 // ═══════════════════════════════════════════
 function showConfirmacao() {
   renderConfirmacao();
-  document.getElementById('nav-step').textContent = 'Conferência antes do relatório';
+  document.getElementById('nav-step').textContent = 'Conferência antes dos resultados';
   showScreen('screen-confirmacao');
 }
 function confEsc(t) {
@@ -2278,11 +2278,12 @@ function renderPerdasFonteGanho(roi) {
   var presGanhoEl = document.getElementById('pres-formulas-ganho');
   if (presGanhoEl && roi) {
     presGanhoEl.innerHTML =
-      '<div style="font-size:11px;color:#666;line-height:1.5;margin-bottom:8px">• <strong style="color:#333">Fator:</strong> % da perda bruta de cada fonte que é realista capturar, dado o nível de maturidade do cliente nos pilares do diagnóstico mais ligados àquele ganho — quanto menor a maturidade hoje, maior o fator (mais espaço para captura); quanto maior a maturidade, menor o fator. Varia de 20% a 100% por fonte, calculado individualmente para cada uma.</div>' +
+      '<div style="font-size:11px;color:#666;line-height:1.5;margin-bottom:8px">• <strong style="color:#333">Fator:</strong> % da perda bruta de cada fonte que é realista capturar, dado o nível de maturidade do cliente nos pilares do diagnóstico mais ligados àquele ganho — quanto menor a maturidade hoje, maior o fator (mais espaço para captura); quanto maior a maturidade, menor o fator. Varia de 20% a 70% por fonte, calculado individualmente para cada uma. No retrabalho e no estouro de MO, o ganho é a perda bruta × a redução com o SIIGA (40% e 70%) × o fator.</div>' +
       '<div style="font-size:9.5px;font-weight:700;text-transform:uppercase;letter-spacing:0.06em;color:#999;margin-bottom:6px">Como o fator é aplicado por fonte</div>' +
       roi.items.map(function(item) {
         var fp = Math.round((item.fator||1)*100);
-        return '<div style="font-size:10px;color:#666;line-height:1.5">• <strong style="color:#333">'+item.label+':</strong> '+fmtNum(item.baseValue)+' (perda bruta/obra) × '+fp+'% = '+fmtNum(item.porObra)+' (ganho capturável/obra)</div>';
+        var red = (item.reducao != null && item.reducao < 1) ? Math.round(item.reducao*100)+'% (redução com o SIIGA) × ' : '';
+        return '<div style="font-size:10px;color:#666;line-height:1.5">• <strong style="color:#333">'+item.label+':</strong> '+fmtNum(item.baseValue)+' (perda bruta/obra) × '+red+fp+'% (fator) = '+fmtNum(item.porObra)+' (ganho capturável/obra)</div>';
       }).join('') +
       '<div style="margin-top:10px;font-size:11px;color:#888;font-style:italic">Valores baseados nas planilhas de ROI Agilean e em benchmarks de Lean Construction. Estimativa conservadora — não representa garantia contratual.</div>';
   }
@@ -2736,14 +2737,14 @@ function buildReport() {
   var roiHtml = '<thead><tr>' +
     '<th>Fonte</th>' +
     '<th style="text-align:right">Perda bruta (portfólio)</th>' +
-    '<th style="text-align:center">Fator de captura</th>' +
+    '<th style="text-align:center">Captura (ganho ÷ perda)</th>' +
     '<th style="text-align:right">Ganho capturável (portfólio)</th>' +
     '<th>Prioridade</th>' +
     '</tr></thead><tbody>';
   var anchorPorFonte = {};
   gapPlan.anchors.forEach(function(o){ if(!anchorPorFonte[o.fonte]) anchorPorFonte[o.fonte] = o.gap; });
   roi.items.forEach(function(item) {
-    var fp = Math.round((item.fator||1)*100);
+    var fp = item.baseValue ? Math.round(item.porObra / item.baseValue * 100) : 0; // captura efetiva = ganho ÷ perda
     roiHtml += '<tr>' +
       '<td>'+item.label+'</td>' +
       '<td style="text-align:right" class="roi-val">'+fmtNum(item.baseValue*obrasAtual)+'</td>' +
@@ -3388,7 +3389,8 @@ function calculateROI() {
   // ── PRESSUPOSTOS BASE ─────────────────────────────────────────────
   var PCT_MO         = 0.45;
   var ESTOURO_MO     = 0.15;
-  var CAPTURA_MO     = 0.70;
+  var CAPTURA_MO     = 0.70; // redução do estouro de MO com o SIIGA (aplicada ao ganho)
+  var RED_RETRABALHO = 0.40; // redução do retrabalho com o SIIGA (aplicada ao ganho)
   var PCT_RETRABALHO = 0.10; // retrabalho de mercado, referência usada em retrBase
   var PCT_DESVIO_ERROS = 0.05; // desvio médio de folha/medição (planilhas), usado em erroBase; só medição na MO terceirizada
   // Otimização do time de gestão: horas RECUPERÁVEIS informadas pelo cliente
@@ -3410,10 +3412,10 @@ function calculateROI() {
   var f4p = getAvgPct('f4');
 
   // ── WEIGHTED CAPTURE FACTOR per component ─────────────────────────
-  // fator = 0.20 + (1 - score_ponderado_do_componente) × 0.80
-  // Min 20% (empresa 100% madura), Max 100% (empresa 0% madura)
+  // fator = 0.20 + (1 - score_ponderado_do_componente) × 0.50
+  // Min 20% (empresa 100% madura), Max 70% (empresa 0% madura)
   function capFactor(scoreComposto) {
-    return Math.max(0.20, Math.min(1.0, 0.20 + (1 - scoreComposto) * 0.80));
+    return Math.max(0.20, Math.min(0.70, 0.20 + (1 - scoreComposto) * 0.50));
   }
 
   var fatTime    = capFactor(f3p * 0.50 + f4p * 0.50);   // time: F3+F4
@@ -3424,20 +3426,22 @@ function calculateROI() {
 
   // ── GANHOS BASE (potencial teórico por obra) ──────────────────────
   var engBase    = horasRecup * custoHora * prazo;
-  var retrBase   = orcamento * PCT_RETRABALHO * 0.40;
+  // Perda bruta (baseValue) sem a redução do SIIGA; a redução (RED_RETRABALHO, CAPTURA_MO) entra só no ganho:
+  // ganho = perda × redução × fator de captura. Fontes sem redução própria usam redução 1.
+  var retrBase   = orcamento * PCT_RETRABALHO;
   var velocBase  = orcamento * 0.10 * 0.15;
   var erroBase   = orcamento * PCT_MO * PCT_DESVIO_ERROS;
 
   var moBase = 0;
   var moLabel = '', moBasis = '';
   if(mo === 'propria') {
-    moBase  = orcamento * PCT_MO * ESTOURO_MO * CAPTURA_MO;
+    moBase  = orcamento * PCT_MO * ESTOURO_MO;
     moLabel = 'Redução de estouro no custo de mão de obra';
-    moBasis = 'Orçamento × 45% MO × 15% estouro × 70% de redução com SIIGA';
+    moBasis = 'Orçamento × 45% MO × 15% estouro';
   } else if(mo === 'mista') {
-    moBase  = orcamento * PCT_MO * 0.50 * ESTOURO_MO * CAPTURA_MO;
+    moBase  = orcamento * PCT_MO * 0.50 * ESTOURO_MO;
     moLabel = 'Redução de estouro de MO (50% própria)';
-    moBasis = 'Orçamento × 45% × 50% própria × 15% estouro × 70% de redução';
+    moBasis = 'Orçamento × 45% × 50% própria × 15% estouro';
   } else if(mo === 'terceirizada') {
     moBase  = 0;
     moLabel = '';
@@ -3448,6 +3452,7 @@ function calculateROI() {
   var items = [
     {
       key:'time', label:'Otimização do time de gestão',
+      reducao: 1,
       basis: fmtHorasBR(horasRecup) + ' h/mês recuperáveis ' +
         (horasDoCliente ? '(horas informadas pelo cliente × % de economia de cada rotina)' : '(referência de mercado: 12,25 dias × 8h — horas não informadas)') +
         ' × R$' + custoHora + '/h × ' + prazo + ' meses',
@@ -3458,14 +3463,16 @@ function calculateROI() {
     },
     {
       key:'retrabalho', label:'Redução de retrabalhos',
-      basis: 'Orçamento × 10% (retrabalho mercado) × 40% (redução com SIIGA)',
+      basis: 'Orçamento × 10% (retrabalho de mercado)',
       fator: fatRetr,
-      porObra:   Math.round(retrBase * fatRetr),
-      portfolio: Math.round(retrBase * fatRetr * obras),
+      reducao: RED_RETRABALHO,
+      porObra:   Math.round(retrBase * RED_RETRABALHO * fatRetr),
+      portfolio: Math.round(retrBase * RED_RETRABALHO * fatRetr * obras),
       baseValue: Math.round(retrBase)
     },
     {
       key:'velocidade', label:'Ganho em velocidade de produção',
+      reducao: 1,
       basis: 'Orçamento × 10% (redução prazo) × 15% (custos proporcionais)',
       fator: fatVeloc,
       porObra:   Math.round(velocBase * fatVeloc),
@@ -3474,6 +3481,7 @@ function calculateROI() {
     },
     {
       key:'erros', label:mo === 'terceirizada' ? 'Erros de medição' : 'Erros de medição e folha de produção',
+      reducao: 1,
       basis: 'Orçamento × 45% (custo MO) × ' + Math.round(PCT_DESVIO_ERROS*100) + '% (desvio médio)',
       fator: fatErros,
       porObra:   Math.round(erroBase * fatErros),
@@ -3486,8 +3494,9 @@ function calculateROI() {
     items.push({
       key:'mo', label: moLabel, basis: moBasis,
       fator: fatMO,
-      porObra:   Math.round(moBase * fatMO),
-      portfolio: Math.round(moBase * fatMO * obras),
+      reducao: CAPTURA_MO,
+      porObra:   Math.round(moBase * CAPTURA_MO * fatMO),
+      portfolio: Math.round(moBase * CAPTURA_MO * fatMO * obras),
       baseValue: Math.round(moBase)
     });
   }
@@ -4760,7 +4769,7 @@ var AHA_DETAILS = {
     icon: '🔧',
     color: '#f87171',
     desc: 'Dados de mercado indicam que de 10% a 15% do custo de uma obra é desperdiçado com retrabalhos. O SIIGA tem potencial de reduzir pelo menos 40% desse custo — número conservador, com relatos de até 80% em casos documentados.',
-    formula: 'Orçamento × 10% (retrabalho médio de mercado) × 40% (redução conservadora com SIIGA)'
+    formula: 'Orçamento × 10% (retrabalho médio de mercado)'
   },
   velocidade: {
     title: 'Ganho em Velocidade de Produção',
@@ -4774,7 +4783,7 @@ var AHA_DETAILS = {
     icon: '👷',
     color: '#fb923c',
     desc: 'Dados de mercado e histórico de obras mostram que o custo de mão de obra estoura em média 15% acima do orçado, principalmente por improdutividade não identificada a tempo. O SIIGA permite identificar e corrigir esse desvio ao longo da obra — não apenas no fechamento.',
-    formula: 'Orçamento × 45% (participação de MO) × 15% (estouro médio) × 70% (redução com SIIGA)'
+    formula: 'Orçamento × 45% (participação de MO) × 15% (estouro médio)'
   },
   erros: {
     get title() { return semMOPropria() ? 'Erros de Medição' : 'Erros de Medição e Folha de Produção'; },
@@ -4793,9 +4802,13 @@ function showAhaScreen() {
 
 function revealAha(guess) {
   var roi = calculateROI();
-  var perObra = roi.totalPorObra;
-  var total   = roi.totalPortfolio;
   var obras   = S.numObras || 5;
+  // Tudo o que a tela chama de PERDA usa a perda bruta (roi.totalBase), igual ao relatório;
+  // o ganho recuperável (roi.totalPorObra / totalPortfolio) aparece rotulado como recuperável.
+  var perObra = roi.totalBase;
+  var total   = roi.totalBase * obras;
+  var recObra = roi.totalPorObra;
+  var recTotal = roi.totalPortfolio;
 
   // Anchor contrast message
   var contrastMsg = '';
@@ -4827,7 +4840,7 @@ function revealAha(guess) {
       : '';
 
     var fatorPct = Math.round((item.fator || 1) * 100);
-    var fatorColor = fatorPct >= 80 ? '#f87171' : fatorPct >= 50 ? '#fb923c' : '#34d399';
+    var fatorColor = fatorPct >= 56 ? '#f87171' : fatorPct >= 35 ? '#fb923c' : '#34d399'; // limiares de 80/50 reescalados para o teto de 70%
     compsHtml += '<div class="aha-comp" style="animation-delay:' + delay + 'ms">' +
       '<div style="display:flex;align-items:center;justify-content:space-between;gap:12px">' +
         '<div style="display:flex;align-items:center;gap:10px;flex:1">' +
@@ -4839,8 +4852,8 @@ function revealAha(guess) {
         '</div>' +
         '<div style="display:flex;align-items:center;gap:10px;flex-shrink:0">' +
           '<div style="text-align:right">' +
-            '<div class="aha-num">' + fmtNum(item.porObra) + '</div>' +
-            '<div style="font-size:10px;color:' + fatorColor + ';margin-top:2px">' + fatorPct + '% de captura</div>' +
+            '<div class="aha-num">' + fmtNum(item.baseValue) + '</div>' +
+            '<div style="font-size:10px;color:' + fatorColor + ';margin-top:2px">recuperável: ' + fmtNum(item.porObra) + '</div>' +
           '</div>' +
           '<button class="aha-expand-btn" onclick="toggleAhaDetail(this)">▼ ver mais</button>' +
         '</div>' +
@@ -4849,8 +4862,9 @@ function revealAha(guess) {
         (detail.desc || '') +
         (detail.rotinas ? '<ul style="margin-top:8px;padding-left:16px">' + detail.rotinas.map(function(r){return '<li style="margin-bottom:3px">'+r+'</li>';}).join('') + '</ul>' : '') +
         '<div style="margin-top:8px;padding:6px 10px;background:rgba(0,0,0,0.2);border-radius:4px;font-size:10px;color:rgba(255,255,255,0.4)">' +
+          'Perda por obra: ' + fmtNum(item.baseValue) + ' · ' + ((item.reducao != null && item.reducao < 1) ? 'Redução com o SIIGA: ' + Math.round(item.reducao * 100) + '% · ' : '') +
           'Fator de captura: <strong style="color:' + fatorColor + '">' + fatorPct + '%</strong> — ' +
-          'Potencial teórico: ' + fmtNum(item.baseValue||item.porObra) + ' · Com maturidade atual: ' + fmtNum(item.porObra) +
+          'Recuperável com a maturidade atual: ' + fmtNum(item.porObra) +
         '</div>' +
       '</div>' +
     '</div>';
@@ -4862,6 +4876,8 @@ function revealAha(guess) {
   document.getElementById('aha-per-obra-sm').textContent = fmtNum(perObra);
   document.getElementById('aha-nobs').textContent = obras + (obras === 1 ? ' obra' : ' obras');
   document.getElementById('aha-total').textContent = fmtNum(total);
+  var recEl = document.getElementById('aha-recuperavel');
+  if(recEl) recEl.textContent = 'Recuperável com o plano: ' + fmtNum(recObra) + ' por obra (' + Math.round(recObra / (roi.totalBase || 1) * 100) + '% da perda)' + (obras > 1 ? ' · ' + fmtNum(recTotal) + ' no portfólio' : '');
   document.getElementById('aha-multiplier-text').textContent = 'Sua operação tem ' + obras + (obras===1?' obra':' obras') + '. A perda total estimada no portfólio é:';
 
   // Qualitative gains — 6 items in 3-col grid

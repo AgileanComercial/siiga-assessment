@@ -491,7 +491,7 @@ function calculateLeadROI(row) {
   var diasLib = 13.75;
 
   function capFactor(scoreComposto) {
-    return Math.max(0.20, Math.min(1.0, 0.20 + (1 - scoreComposto) * 0.80));
+    return Math.max(0.20, Math.min(0.70, 0.20 + (1 - scoreComposto) * 0.50));
   }
 
   var fatTime = capFactor(f3p * 0.50 + f4p * 0.50);

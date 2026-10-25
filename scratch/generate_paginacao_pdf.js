@@ -111,6 +111,7 @@ server.listen(8098, async () => {
         var el = document.querySelector('.screen.active');
         return el ? el.id : null;
       });
+      if (activeScreen === 'screen-confirmacao') { await page.click('#btn-conf-resultados'); await sleep(900); continue; }
       if (activeScreen === 'screen-radar') break;
 
       if (activeScreen === 'screen-phase-result') {
@@ -171,7 +172,7 @@ server.listen(8098, async () => {
     await sleep(400);
     await page.evaluate(() => document.querySelector('button[onclick="revealAha(\'mid\')"]').click());
     await sleep(400);
-    await page.evaluate(() => (showConfirmacao(), document.getElementById('btn-conf-relatorio').click()));
+    await page.evaluate(() => document.querySelector('button[onclick="showReport()"]').click());
     await sleep(800);
 
     const onReport = await page.evaluate(() => {

@@ -84,6 +84,7 @@ server.listen(PORT, async () => {
     // Pilares + horas
     for (let i = 0; i < 80; i++) {
       const scr = await active(page);
+      if (scr === 'screen-confirmacao') { await page.click('#btn-conf-resultados'); await sleep(900); continue; }
       if (scr === 'screen-radar') break;
       if (scr === 'screen-phase-result') { await page.click('#result-next-btn'); await sleep(200); continue; }
       if (scr === 'screen-horas') {
@@ -107,7 +108,7 @@ server.listen(PORT, async () => {
     await page.evaluate(() => { var m = document.getElementById('save-modal'); if (m) m.style.display = 'none'; });
     await page.evaluate(() => document.querySelector('button[onclick="showAhaScreen()"]').click()); await sleep(400);
     await page.evaluate(() => document.querySelector('button[onclick="revealAha(\'mid\')"]').click()); await sleep(400);
-    await page.evaluate(() => (showConfirmacao(), document.getElementById('btn-conf-relatorio').click())); await sleep(1000);
+    await page.evaluate(() => document.querySelector('button[onclick="showReport()"]').click()); await sleep(1000);
 
     // ── Gera as duas propostas e salva os PDFs ──
     async function gerar(mode) {

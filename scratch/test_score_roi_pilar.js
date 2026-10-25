@@ -92,6 +92,7 @@ server.listen(PORT, async () => {
     for (let i = 0; i < 80; i++) {
       const scr = await active(page);
       if (screensSeen[screensSeen.length - 1] !== scr) screensSeen.push(scr);
+      if (scr === 'screen-confirmacao') { await page.click('#btn-conf-resultados'); await sleep(900); continue; }
       if (scr === 'screen-radar') break;
       if (scr === 'screen-phase-result') {
         const lastBk = await page.evaluate(() => phaseOrder[currentPhaseIdx]);
@@ -143,7 +144,7 @@ server.listen(PORT, async () => {
 
     await page.evaluate(() => document.querySelector('button[onclick="showAhaScreen()"]').click()); await sleep(400);
     await page.evaluate(() => document.querySelector('button[onclick="revealAha(\'mid\')"]').click()); await sleep(400);
-    await page.evaluate(() => (showConfirmacao(), document.getElementById('btn-conf-relatorio').click())); await sleep(1000);
+    await page.evaluate(() => document.querySelector('button[onclick="showReport()"]').click()); await sleep(1000);
 
     const rep = await page.evaluate(() => {
       var snap = document.getElementById('exec-snapshot').innerText;

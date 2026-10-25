@@ -45,9 +45,38 @@ CASES.pcl2 = Object.assign({}, CASES.pcl, { dores: Object.assign({}, CASES.pcl.d
 // PCL with own labor only (Phase III = Folha de Produção, 90 days)
 CASES.prop = Object.assign({}, CASES.pcl, { b0: Object.assign({}, CASES.pcl.b0, { modeloMO: 'propria' }) });
 // PCL with the vendedor's adjustment from the Conferência screen: priority 3 (Estouro de MO, MO.3) taken out of the priorities
-CASES.ajuste = Object.assign({}, CASES.pcl, { ajustes: { travados: [], excluidos: ['MO.3'] } });
+CASES.ajuste = Object.assign({}, CASES.pcl, { ajustes: { travados: [], excluidos: ['MO.3'] }, prioFontes: ['retrabalho', 'time', 'erros'] });
 const C = CASES[CASE];
 const MO = C.b0.modeloMO;
+
+// ── Valores esperados calculados da REGRA, a partir das respostas do caso (não do que o app imprime) ──
+// fator = 0,20 + (1 − maturidade) × 0,50 (20% a 70%); perda bruta sem a redução do SIIGA;
+// ganho = perda × redução (40% retrabalho, 70% estouro de MO, 1 nas demais) × fator.
+const nf = (v, d) => v.toLocaleString('pt-BR', { minimumFractionDigits: d, maximumFractionDigits: d });
+const fMil = v => 'R$ ' + nf(v / 1000, 1) + ' mil';                       // ptMil(v, 1)
+const fMilInt = v => v >= 1e6 ? 'R$ ' + nf(v / 1e6, 0).replace(/,0$/, '') + ' mi' : 'R$ ' + nf(v / 1000, 0) + ' mil'; // ptMilInt
+const fPct = v => Math.round(v * 100) + '%';
+const fMilPt = v => v >= 1e6 ? 'R$ ' + v.toLocaleString('pt-BR', { maximumFractionDigits: 0 }).slice(0, 0) + (Math.round(v / 1e4) / 100).toLocaleString('pt-BR', { minimumFractionDigits: 1, maximumFractionDigits: 2 }) + ' mi' : fMil(v); // ptMil(v, 1)
+const fTela = v => v >= 1e6 ? 'R$ ' + (v / 1e6).toFixed(1).replace('.', ',') + 'M' : v >= 1000 ? 'R$ ' + Math.round(v / 1000) + 'K' : 'R$ ' + Math.round(v); // fmtNum da ferramenta
+const semNb = t => String(t).replace(/\u00a0/g, ' ');
+function esperado(Cc) {
+  const soma = pre => Object.keys(Cc.resp).filter(k => k.indexOf(pre) === 0).reduce((a, k) => a + Cc.resp[k], 0);
+  const pm = { f1: soma('F1.') / 21, f2: soma('F2.') / 9, f3: soma('F3.') / 15, f4: soma('F4.') / 12 };
+  const cap = m => Math.max(0.20, Math.min(0.70, 0.20 + (1 - m) * 0.50));
+  const orc = parseInt(String(Cc.orcamento).replace(/\./g, ''), 10), prazo = +Cc.prazo, obras = +Cc.obras, mo = Cc.b0.modeloMO;
+  const fator = { time: cap(pm.f3 * 0.5 + pm.f4 * 0.5), retrabalho: cap(pm.f2 * 0.3 + pm.f3 * 0.7), velocidade: cap(pm.f1 * 0.5 + pm.f2 * 0.5), erros: cap(pm.f3 * 0.4 + pm.f4 * 0.6), mo: cap(pm.f3 * 0.7 + pm.f2 * 0.3) };
+  const horasRec = Cc.horas.reduce((a, h, i) => a + h * [0.4, 0.9, 0.9, 0.9, 0.9][i], 0);
+  const perda = { time: horasRec * 115 * prazo, retrabalho: orc * 0.10, velocidade: orc * 0.10 * 0.15, erros: orc * 0.45 * 0.05 };
+  const red = { time: 1, retrabalho: 0.40, velocidade: 1, erros: 1, mo: 0.70 };
+  if (mo === 'propria') perda.mo = orc * 0.45 * 0.15; else if (mo === 'mista') perda.mo = orc * 0.45 * 0.50 * 0.15;
+  const fontes = Object.keys(perda), P = {}, G = {};
+  fontes.forEach(k => { P[k] = Math.round(perda[k]); G[k] = Math.round(perda[k] * red[k] * fator[k]); });
+  const somaP = fontes.reduce((a, k) => a + P[k], 0), somaG = fontes.reduce((a, k) => a + G[k], 0);
+  const top3 = Cc.prioFontes || fontes.slice().sort((a, b) => P[b] - P[a]).slice(0, 3);   // 1 prioridade por fonte, das 3 mais caras (ou as fontes após a retirada)
+  return { prazo, obras, fator, P, G, somaP, somaG, perdaMes: somaP / prazo, ganhoMes: somaG / prazo, capEf: somaG / somaP,
+    critPerda: top3.reduce((a, k) => a + P[k], 0), critMes: top3.reduce((a, k) => a + P[k], 0) / prazo, critCapMes: top3.reduce((a, k) => a + G[k], 0) / prazo, top3 };
+}
+const EXP = esperado(C);
 const avisos = {}; // code -> warning visible after the star (score 3 only)
 let telaF44 = ''; // questionnaire card text where F4.4 is asked
 let telaFerr = null, telaHoras = ''; // tools screen (fields shown) and hours screen text
@@ -131,7 +160,7 @@ server.listen(PORT, async () => {
     let horasOk = false;
     for (let i = 0; i < 90; i++) {
       const scr = await active(page);
-      if (scr === 'screen-radar') break;
+      if (scr === 'screen-radar' || scr === 'screen-confirmacao') break;
       if (scr === 'screen-phase-result') { await page.click('#result-next-btn'); await sleep(200); continue; }
       if (scr === 'screen-horas') {
         telaHoras = await page.evaluate(() => document.getElementById('horas-card').innerText);
@@ -175,6 +204,9 @@ server.listen(PORT, async () => {
       await sleep(200);
     }
     check('tela de horas preenchida', horasOk);
+    check('após as horas vem a Conferência, antes do Radar', await active(page) === 'screen-confirmacao', await active(page));
+    await page.click('#btn-conf-resultados'); await sleep(900);
+    check('Ver resultados -> Radar', await active(page) === 'screen-radar', await active(page));
     let roiAntes = null, roiDepois = null;
     if (C.ajustes) {
       const r = await page.evaluate(aj => { var a = calculateROI().totalBase; S.prioAjustes = aj; return { a: a, b: calculateROI().totalBase }; }, C.ajustes);
@@ -184,7 +216,16 @@ server.listen(PORT, async () => {
     await page.evaluate(() => { var m = document.getElementById('save-modal'); if (m) m.style.display = 'none'; });
     await page.evaluate(() => document.querySelector('button[onclick="showAhaScreen()"]').click()); await sleep(400);
     await page.evaluate(() => document.querySelector('button[onclick="revealAha(\'mid\')"]').click()); await sleep(400);
-    await page.evaluate(() => (showConfirmacao(), document.getElementById('btn-conf-relatorio').click())); await sleep(1200);
+    // AHA: tudo o que se chama de perda usa a perda bruta; o recuperável aparece rotulado
+    const aha = await page.evaluate(() => ({ perObra: document.getElementById('aha-per-obra').textContent, total: document.getElementById('aha-total').textContent, rec: document.getElementById('aha-recuperavel').textContent, comps: Array.prototype.map.call(document.querySelectorAll('#aha-components .aha-num'), e => e.textContent), sub: document.getElementById('aha-subtotal').textContent, hasConf: !!document.querySelector('#screen-aha [onclick*="showConfirmacao"]') }));
+    const ordem = ['time', 'retrabalho', 'velocidade', 'erros', 'mo'].filter(k => EXP.P[k] != null);
+    check('AHA: perda por obra = perda bruta (' + fTela(EXP.somaP) + ', soma das fontes sem redução)', aha.perObra === fTela(EXP.somaP), aha.perObra + ' x ' + fTela(EXP.somaP));
+    check('AHA: portfólio = perda bruta × obras (' + fTela(EXP.somaP * EXP.obras) + ')', aha.total === fTela(EXP.somaP * EXP.obras), aha.total + ' x ' + fTela(EXP.somaP * EXP.obras));
+    check('AHA: composição por fonte em perda bruta e subtotal = perda bruta', JSON.stringify(aha.comps) === JSON.stringify(ordem.map(k => fTela(EXP.P[k]))) && aha.sub === fTela(EXP.somaP), aha.comps.join(' | ') + ' / ' + ordem.map(k => fTela(EXP.P[k])).join(' | '));
+    check('AHA: ganho rotulado como recuperável (' + fTela(EXP.somaG) + ' por obra, ' + fPct(EXP.capEf) + ' da perda)', aha.rec === 'Recuperável com o plano: ' + fTela(EXP.somaG) + ' por obra (' + fPct(EXP.capEf) + ' da perda)' + (EXP.obras > 1 ? ' · ' + fTela(EXP.somaG * EXP.obras) + ' no portfólio' : ''), aha.rec);
+    check('AHA sem atalho para a Conferência', !aha.hasConf);
+    await page.evaluate(() => document.querySelector('#screen-aha button[onclick="showReport()"]').click()); await sleep(1200);
+    check('relatório sem o botão "← Conferência" (sem atalho visível ao cliente)', await page.evaluate(() => !/Conferência/.test(document.getElementById('screen-report').innerText) && !document.querySelector('#screen-report [onclick*="showConfirmacao"]')));
 
     // Uses the on-screen dark toggle first: the PDF must come out in the light Direction A anyway.
     await page.evaluate(() => changeReportTheme('dark'));
@@ -207,7 +248,12 @@ server.listen(PORT, async () => {
         return { folha: i + 2, folga_mm: ((st - b) / (96 / 25.4)).toFixed(1) };
       }) : [];
       var fontsOk = PT_FONT_FACES.map(function(f){ return document.fonts.check(f, 'Ação'); });
-      return { pages: pages, over: over, fontsOk: fontsOk };
+      var f03 = root ? Array.prototype.map.call(root.querySelectorAll(':scope > .page')[2].querySelectorAll('table tbody tr'), function(tr){ return Array.prototype.map.call(tr.children, function(td){ return td.innerText.trim(); }); }) : [];
+      var grp = root ? Array.prototype.filter.call(root.querySelectorAll('tr.grp'), function(g){ return /fase de implementação iii/i.test(g.innerText); })[0] : null;
+      var gI = root ? Array.prototype.filter.call(root.querySelectorAll('tr.grp'), function(g){ return /fase de implementação i(?!i)/i.test(g.innerText); })[0] : null;
+      var reg = root ? root.querySelector('.tl') : null, plano = root ? root.querySelector('.plano') : null, F = Node.DOCUMENT_POSITION_FOLLOWING;
+      var ordem = { ok: !!(grp && gI && reg && plano), I_antes_III: !!(gI && grp && (gI.compareDocumentPosition(grp) & F)), III_antes_regua: !!(grp && reg && (grp.compareDocumentPosition(reg) & F)), regua_antes_plano: !!(reg && plano && (reg.compareDocumentPosition(plano) & F)) };
+      return { pages: pages, over: over, fontsOk: fontsOk, f03: f03, ordem: ordem };
     });
     if (process.env.DUMP_PONTOS) {
       // Points model (critical + others): n, code, phase, priority, for before/after comparison
@@ -216,7 +262,7 @@ server.listen(PORT, async () => {
     }
     if (C.ajustes) {
       const aj = await page.evaluate(() => { const M = ptModel('detalhado'); return { crit: M.criticos.map(c => c.code).join(','), tit: M.criticos.map(c => c.titulo), demais: M.demais.map(d => d.code + ':' + d.n).join(','), pdf: document.getElementById('ptr-root').innerText }; });
-      check('caso com ajuste: prioridades do relat\u00f3rio = F4.3, MO.6, F4.4 (a vaga da n\u00ba 3 foi para a pr\u00f3xima fonte)', aj.crit === 'F4.3,MO.6,F4.4', aj.crit);
+      check('caso com ajuste: prioridades do relat\u00f3rio = MO.6, F4.3, F4.4 (a vaga da n\u00ba 3 foi para a pr\u00f3xima fonte)', aj.crit === 'MO.6,F4.3,F4.4', aj.crit);
       check('caso com ajuste: o PDF traz o t\u00edtulo da nova n\u00ba 3 e MO.3 volta para a tabela de pontos cr\u00edticos', aj.pdf.replace(/\u00a0/g, ' ').indexOf(aj.tit[2]) >= 0 && /MO\.3:\d+/.test(aj.demais), aj.tit[2] + ' | ' + aj.demais);
       check('caso com ajuste: a perda total do ROI n\u00e3o muda (' + roiAntes + ' = ' + roiDepois + ')', roiAntes === roiDepois && roiAntes > 0);
     }
@@ -347,7 +393,18 @@ server.listen(PORT, async () => {
       check('sem agendamento: "A definir" e sem tabela', /A definir/.test(all) && !/Participante confirmado/i.test(all));
     }
     // v5: folha 03 on the loss-map base (total loss, captured share, monthly gain, x reference fee), no explanatory notes
-    check('folha 03: perda total, perda capturada, ganho mensal e × mensalidade, sem notas', /Perda total por mês/i.test(dom.pages[2] || '') && /Perda capturada/i.test(dom.pages[2] || '') && /Ganho mensal/i.test(dom.pages[2] || '') && /× mensalidade ref\./i.test(dom.pages[2] || '') && !/Contexto:|não se somam|Unidade:|Fonte:/.test(dom.pages[2] || ''));
+    check('folha 03: perda total, perda capturada e ganho mensal (3 cards), sem notas e sem múltiplo', /Perda total por mês/i.test(dom.pages[2] || '') && /Perda capturada/i.test(dom.pages[2] || '') && /Ganho mensal/i.test(dom.pages[2] || '') && !/mensalidade|×/i.test((dom.pages[2] || '').split(/FONTE DE PERDA/i)[0]) && !/Contexto:|não se somam|Unidade:|Fonte:/.test(dom.pages[2] || ''));
+    check('PDF sem nenhuma menção a "mensalidade" (toda a versão ' + MODE + ')', !/mensalidade/i.test(all), (all.match(/.{0,30}mensalidade.{0,30}/i) || [''])[0]);
+    {
+      const num = t => parseFloat(String(t).replace(/[^\d,]/g, '').replace(',', '.'));
+      const linhas = (dom.f03 || []).map(r => r.map(semNb)).filter(r => r.length >= 4 && /^R\$/.test(r[1]) && /%$/.test(r[2]) && /^R\$/.test(r[3]) && !/^Total/.test(r[0]));
+      const ruins = linhas.filter(r => { const pm = num(r[1]), c = num(r[2]) / 100, g = num(r[3]); return Math.abs(pm * c - g) > 0.05 + pm * 0.005 + 0.05 * c; }).map(r => r.slice(0, 4).join(' | '));
+      check('folha 03: perda × captura = ganho em cada linha (' + linhas.length + ' fontes)', linhas.length >= 4 && ruins.length === 0, JSON.stringify(ruins));
+      const tot = (dom.f03 || []).filter(r => /^Total( por obra|, 1 obra)$/.test(semNb(r[0]).trim())).map(r => r.map(semNb))[0];
+      check('folha 03: total por obra também fecha (perda × captura = ganho)', !!tot && Math.abs(num(tot[1]) * num(tot[2]) / 100 - num(tot[3])) <= 0.05 + num(tot[1]) * 0.005 + 0.05 * num(tot[2]) / 100, JSON.stringify(tot));
+      check('folha 03: valores batem com a regra (perda/mês ' + fMil(EXP.perdaMes) + ', ganho/mês ' + fMil(EXP.ganhoMes) + ', captura ' + fPct(EXP.capEf) + ')', !!tot && tot[1] === fMil(EXP.perdaMes) && tot[3] === fMil(EXP.ganhoMes) && tot[2] === fPct(EXP.capEf), JSON.stringify(tot));
+    }
+    check('plano: Fases I e II, depois a Fase III, depois a régua, depois o card do plano de ação', dom.ordem.ok && dom.ordem.I_antes_III && dom.ordem.III_antes_regua && dom.ordem.regua_antes_plano, JSON.stringify(dom.ordem));
     check('folhas 02 e 05 sem IMEDIATA, PROGRAMADA, Dia 0, Após o dia 60 nem Início', !/IMEDIATA|PROGRAMADA|Dia 0|Após o dia 60|início em até|Implantar em até/i.test((dom.pages[1] || '') + (dom.pages[4] || '').split(/PLANO DE TRANSFORMAÇÃO/i)[0]) && !/IMEDIATA|PROGRAMADA/.test(all));
     check('folha 05: coluna Fase com nome curto, sem coluna de perda e sem nota de rodapé', /I · Planejamento e canteiro/.test(dom.pages[4] || '') && /III · Pagamento da MO/.test(dom.pages[4] || '') && !/Perda por mês sem tratamento/i.test(dom.pages[4] || '') && !/A Fase III vem após|o valor aparece só nos pontos críticos/.test(all));
     // v5: wording rules and the same total on folhas 02 and 03
@@ -366,7 +423,7 @@ server.listen(PORT, async () => {
       // Sheet 02 total (rounded in the lead) = monthly loss of sheet 03 × term
       check('total da folha 02 = perda/mês da folha 03 × prazo', !!(m2 && mm) && Math.abs(num(mm[1]) * +m2[3] - t2) <= (m2[2] === 'mi' ? 50 : 1),
         JSON.stringify({ folha02: m2 && m2.slice(1), mes: mm && mm[1] }));
-      check('folha 02: linha "Recuperável com o plano" com × mensalidade ref.', /Recuperável com o plano · [\d,]+× mensalidade ref\./.test(p2));
+      check('folha 02: linha "Recuperável com o plano" só com o valor R$/mês (' + fMil(EXP.critCapMes) + '), sem múltiplo', semNb(p2).replace(/\s+/g, ' ').indexOf('Recuperável com o plano ' + fMil(EXP.critCapMes) + '/mês') >= 0 && !/Recuperável com o plano ·/.test(p2), (semNb(p2).match(/Recuperável com o plano.{0,30}/) || [''])[0]);
     }
     check('folha 02: Fase de Implementação com nome curto', /I · Planejamento e canteiro|III · Pagamento da MO/.test(dom.pages[1] || '') && /Fase de Implementação/i.test(dom.pages[1] || ''));
     if (MODE === 'resumido') {
@@ -378,25 +435,27 @@ server.listen(PORT, async () => {
     const EXP_FOLHAS = MODE === 'resumido' ? 8 : 10;
     if (CASE === 'pcl2') {
       ['Total das 4 prioridades', '3 de 13 pontos críticos; 1 ponto em alerta com dor declarada', 'Em alerta · dor declarada pelo cliente', 'Digitalização da FVS vinculada ao avanço físico',
-       '“A gente paga o empreiteiro e depois descobre o retrabalho.”', 'Outros 10 pontos estão em alerta', 'Resolve: prioridade 4; pontos críticos 07 e 10.'].forEach(s => check('PCL ★ contém "' + s + '"', all.indexOf(s) >= 0));
+       '“A gente paga o empreiteiro e depois descobre o retrabalho.”', 'Outros 10 pontos estão em alerta', 'Resolve: prioridade 4; pontos críticos 08 e 10.'].forEach(s => check('PCL ★ contém "' + s + '"', all.indexOf(s) >= 0));
       check('★ em nota 3 (F2.1) fora do relatório', !/corre atrás de material/i.test(all));
       // Option B: section 04 starts on the sheet of the 4th priority, so the sheet count stays the same
       check('seção 04 na mesma folha da Prioridade 4', /PRIORIDADE 4/.test(dom.pages[4] || '') && /DEMAIS PONTOS CRÍTICOS/.test(dom.pages[4] || ''));
       check('PCL ★ folhas = ' + EXP_FOLHAS, dom.pages.length === EXP_FOLHAS, dom.pages.length);
     } else if (CASE === 'pcl') {
-      ['21,5', 'R$ 526 mil', 'R$ 395 mil', 'R$ 11,5 mil', 'R$ 9,3 mil', 'R$ 5,5 mil', 'R$ 26,3 mil/mês', 'R$ 19,0 mil/mês', '9,5× mensalidade ref.', 'R$ 25,0 mil', '71%', '12,5×',
-       'R$ 35,1 mil', 'R$ 8,7 mil', 'R$ 6,4 mil', 'R$ 2,1 mil', 'R$ 4,0 mil', 'R$ 3,8 mil',
+      ['21,5', fMilInt(EXP.somaP), fMilInt(EXP.critPerda), fMil(EXP.P.retrabalho / EXP.prazo), fMil(EXP.P.time / EXP.prazo), fMil(EXP.P.mo / EXP.prazo),
+       fMil(EXP.critMes) + '/mês', fMil(EXP.critCapMes) + '/mês', fMil(EXP.ganhoMes), fPct(EXP.capEf), fMil(EXP.perdaMes),
+       fMil(EXP.G.time / EXP.prazo), fMil(EXP.G.retrabalho / EXP.prazo), fMil(EXP.G.velocidade / EXP.prazo), fMil(EXP.G.erros / EXP.prazo), fMil(EXP.G.mo / EXP.prazo),
        'Digitalização do painel integrado de indicadores', 'Digitalização da comunicação de bloqueios de pagamento', 'Implantação da gestão de aditivos de verba',
-       'Plano de Transformação Operacional para a Construtora PCL', 'Pilar 3, Gestão integrada da produção', 'Resolve: prioridade 1; pontos críticos 04, 05, 07, 10, 11, 12 e 13; 6 pontos em alerta.',
-       'Resolve: pontos críticos 06 e 09; 1 ponto em alerta.', 'Resolve: prioridades 2 e 3; ponto crítico 08; 4 pontos em alerta.', 'Por fonte de perda · 10 pontos críticos',
+       'Plano de Transformação Operacional para a Construtora PCL', 'Pilar 3, Gestão integrada da produção', 'Resolve: prioridade 2; pontos críticos 04, 05, 06, 10, 11, 12 e 13; 6 pontos em alerta.',
+       'Resolve: pontos críticos 07 e 09; 1 ponto em alerta.', 'Resolve: prioridades 1 e 3; ponto crítico 08; 4 pontos em alerta.', 'Por fonte de perda · 10 pontos críticos',
        'Outros 11 pontos estão em alerta', '3 de 13 pontos críticos', 'Total das 3 prioridades', 'mesma fonte da Prioridade 1'].forEach(s => check('PCL contém "' + s + '"', allLow.indexOf(s.toLowerCase()) >= 0));
       // Hours+payroll model only in the Detalhado annex (A.4); 15-month source values only in the annex
-      ['R$ 172,5 mil', 'R$ 140,0 mil', 'R$ 82,7 mil', 'R$ 526,4 mil', 'R$ 20,5 mil', 'R$ 10,25 mil', '5,1×', '3,1×', 'R$ 6,15 mil', 'R$ 52,5 mil', 'R$ 78,8 mil', 'R$ 375,3 mil'].forEach(s => check('PCL ' + (MODE === 'resumido' ? 'sem' : 'com (Anexo)') + ' "' + s + '"', (allLow.indexOf(s.toLowerCase()) >= 0) === (MODE !== 'resumido')));
+      [fMil(EXP.P.time), fMil(EXP.P.retrabalho), fMil(EXP.P.mo), fMil(EXP.somaP), 'R$ 20,5 mil', 'R$ 10,25 mil', 'R$ 6,15 mil', fMil(EXP.P.velocidade), fMil(EXP.P.erros), fMil(EXP.somaG)].forEach(s => check('PCL ' + (MODE === 'resumido' ? 'sem' : 'com (Anexo)') + ' "' + s + '"', (allLow.indexOf(s.toLowerCase()) >= 0) === (MODE !== 'resumido')));
+      check('PCL sem múltiplo da mensalidade (5,1×, 3,1×, 9,5×, 12,5×)', !/5,1×|3,1×|9,5×|12,5×/.test(all));
       check('PCL sem "custa R$ 26 mil" e sem bloco horas+folha no resumo', !/custa R\$ 26 mil/.test(all) && !/Perda em horas de gestão e folha/i.test(all));
       check('PCL folhas = ' + EXP_FOLHAS, dom.pages.length === EXP_FOLHAS, dom.pages.length);
     } else if (CASE === 'ajuste') {
       // PCL with MO.3 taken out of the priorities: the 3rd priority is the best critical of the next source (F4.4); MO.3 goes back to section 04
-      ['Total das 3 prioridades', 'Digitalização do controle financeiro do fechamento (ERP)', 'Por fonte de perda · 10 pontos críticos', 'Outros 11 pontos estão em alerta', 'R$ 526 mil', 'R$ 5,3 mil'].forEach(s => check('ajuste contém "' + s + '"', allLow.indexOf(s.toLowerCase()) >= 0));
+      ['Total das 3 prioridades', 'Digitalização do controle financeiro do fechamento (ERP)', 'Por fonte de perda · 10 pontos críticos', 'Outros 11 pontos estão em alerta', fMilInt(EXP.somaP), fMil(EXP.P.erros / EXP.prazo)].forEach(s => check('ajuste contém "' + s + '"', allLow.indexOf(s.toLowerCase()) >= 0));
       check('ajuste: MO.3 (aditivos de verba) segue no relatório, só como ponto crítico', /Implantação da gestão de aditivos de verba/.test(all) && !/PRIORIDADE 3[\s\S]{0,80}aditivos/i.test(dom.pages[3] || ''));
       check('ajuste folhas = ' + EXP_FOLHAS, dom.pages.length === EXP_FOLHAS, dom.pages.length);
     } else if (CASE === 'prop') {
@@ -410,7 +469,7 @@ server.listen(PORT, async () => {
       check('ERP "Não utiliza ERP"', /Não utiliza ERP/.test(all));
       check('prazo 24 meses', /24 meses/.test(all));
       check('terceirizada folhas = ' + EXP_FOLHAS, dom.pages.length === EXP_FOLHAS, dom.pages.length);
-      ['Resolve: prioridade 2; pontos críticos 04, 05, 06, 07, 09, 10, 11 e 12; 5 pontos em alerta.', 'Resolve: pontos críticos 08 e 13; 1 ponto em alerta.', 'Resolve: prioridades 1 e 3; 1 ponto em alerta.', 'Por fonte de perda · 10 pontos críticos', 'Outros 7 pontos estão em alerta', 'R$ 52,9 mil', 'R$ 39,1 mil', '19,5×', 'R$ 33,5 mil/mês', '16,8× mensalidade ref.', 'Total no portfólio (3 obras)'].forEach(s => check('terceirizada contém "' + s + '"', allLow.indexOf(s.toLowerCase()) >= 0));
+      ['Resolve: prioridade 2; pontos críticos 04, 05, 06, 07, 09, 10, 11 e 12; 5 pontos em alerta.', 'Resolve: pontos críticos 08 e 13; 1 ponto em alerta.', 'Resolve: prioridades 1 e 3; 1 ponto em alerta.', 'Por fonte de perda · 10 pontos críticos', 'Outros 7 pontos estão em alerta', fMil(EXP.perdaMes), fMil(EXP.ganhoMes), fMil(EXP.critCapMes) + '/mês', 'Total no portfólio (3 obras)', fMil(EXP.perdaMes * EXP.obras), fMil(EXP.ganhoMes * EXP.obras)].forEach(s => check('terceirizada contém "' + s + '"', allLow.indexOf(s.toLowerCase()) >= 0));
     }
 
     if (uri && uri.startsWith('data:application/pdf')) {

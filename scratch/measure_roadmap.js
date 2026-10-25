@@ -79,6 +79,7 @@ server.listen(8098, async () => {
 
     for (let i = 0; i < 60; i++) {
       const activeScreen = await page.evaluate(() => { var el = document.querySelector('.screen.active'); return el ? el.id : null; });
+      if (activeScreen === 'screen-confirmacao') { await page.click('#btn-conf-resultados'); await sleep(900); continue; }
       if (activeScreen === 'screen-radar') break;
       if (activeScreen === 'screen-phase-result') { await page.click('#result-next-btn'); await sleep(100); continue; }
       if (activeScreen === 'screen-phase') {
@@ -118,7 +119,7 @@ server.listen(8098, async () => {
     await sleep(300);
     await page.evaluate(() => document.querySelector('button[onclick="revealAha(\'mid\')"]').click());
     await sleep(300);
-    await page.evaluate(() => (showConfirmacao(), document.getElementById('btn-conf-relatorio').click()));
+    await page.evaluate(() => document.querySelector('button[onclick="showReport()"]').click());
     await sleep(600);
 
     const info = await page.evaluate(() => {

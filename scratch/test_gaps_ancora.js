@@ -99,6 +99,7 @@ server.listen(PORT, async () => {
     let dorMarcadas = 0, dorBoxes = 0;
     for (let i = 0; i < 90; i++) {
       const scr = await active(page);
+      if (scr === 'screen-confirmacao') { await page.click('#btn-conf-resultados'); await sleep(900); continue; }
       if (scr === 'screen-radar') break;
       if (scr === 'screen-phase-result') { await page.click('#result-next-btn'); await sleep(200); continue; }
       if (scr === 'screen-horas') {
@@ -156,7 +157,7 @@ server.listen(PORT, async () => {
 
     await page.evaluate(() => document.querySelector('button[onclick="showAhaScreen()"]').click()); await sleep(400);
     await page.evaluate(() => document.querySelector('button[onclick="revealAha(\'mid\')"]').click()); await sleep(400);
-    await page.evaluate(() => (showConfirmacao(), document.getElementById('btn-conf-relatorio').click())); await sleep(1200);
+    await page.evaluate(() => document.querySelector('button[onclick="showReport()"]').click()); await sleep(1200);
 
     const rep = await page.evaluate(() => {
       var plan = getGapPlan();
@@ -192,7 +193,7 @@ server.listen(PORT, async () => {
     console.log('Plano:\n' + rep.plano);
     check('24 gaps (sem limite de 14)', rep.total === 24, rep.total);
     check('quadro mostra 13 pontos críticos', /13\s*\n?\s*Pontos críticos/i.test(rep.gapsTile), rep.gapsTile.replace(/\n/g,' | '));
-    check('3 gaps-âncora: HUB★, Bloqueios★, Aditivos', rep.anchors.join(',') === 'F4.3:Performance HUB — visão integrada:time★,MO.6:Comunicação de bloqueios de pagamento:retrabalho★,MO.3:Gestão de aditivos de verba:mo', rep.anchors.join(','));
+    check('3 gaps-âncora: HUB★, Bloqueios★, Aditivos', rep.anchors.join(',') === 'MO.6:Comunicação de bloqueios de pagamento:retrabalho★,F4.3:Performance HUB — visão integrada:time★,MO.3:Gestão de aditivos de verba:mo', rep.anchors.join(','));
     check('cards dos âncoras são filhos diretos do relatório (paginação do PDF)', rep.anchorCards === 3 && rep.anchorCardsDirect === 3, rep.anchorCards + '/' + rep.anchorCardsDirect);
     check('tabela Gaps Identificados só com os 10 demais críticos, e os 11 em alerta só contados', rep.oppRows === 10 && /Outros 11 pontos estão em alerta/.test(rep.oppCard), rep.oppRows);
     check('Pontos de atenção = 11, dentro da tabela única (card antigo oculto)', rep.attention === 11 && rep.attnTxt === '', rep.attention);
@@ -203,7 +204,7 @@ server.listen(PORT, async () => {
     check('Síntese sem caixa de próximo passo', !/Próximo passo/i.test(rep.execAnchors + rep.execRet + rep.execSnap));
     check('Perda ao Ganho com coluna Prioridade', /Prioridade/i.test(rep.roiTable) && !/Gap-âncora/i.test(rep.roiTable) && /● Performance HUB/.test(rep.roiTable));
     check('ROI em 4 passos com confirmação', /Dado de vocês/i.test(rep.chain) && /O retorno/i.test(rep.chain) && /faz sentido desenharmos o escopo/.test(rep.chain));
-    check('Plano com Resolve, O que ouvimos e Próximo passo', /Resolve: prioridade 1; pontos críticos 04, 05/.test(rep.plano) && !/Gap-âncora|ato/i.test(rep.plano) && /O que ouvimos/i.test(rep.plano) && /Próximo passo/i.test(rep.plano));
+    check('Plano com Resolve, O que ouvimos e Próximo passo', /Resolve: prioridade 2; pontos críticos 04, 05, 06, 10, 11, 12 e 13; 6 pontos em alerta\./.test(rep.plano) && /Resolve: prioridades 1 e 3; ponto crítico 08; 4 pontos em alerta\./.test(rep.plano) && !/Gap-âncora|ato/i.test(rep.plano) && /O que ouvimos/i.test(rep.plano) && /Próximo passo/i.test(rep.plano));
     check('Fluxo Metodológico removido do corpo', !rep.hasFluxo);
     check('sem placeholder de case', !rep.hasPlaceholder);
     check('case Tack (Leonardo Aidar) no gap de retrabalho', rep.tack);
@@ -221,18 +222,18 @@ server.listen(PORT, async () => {
       return r;
     }, aj, dores);
     const base0 = await AJ({}, {});
-    check('sem ajustes: prioridades iguais às de antes (F4.3, MO.6, MO.3)', base0.anchors.join(',') === 'F4.3:fin,MO.6:fin,MO.3:fin', base0.anchors.join(','));
+    check('sem ajustes: prioridades iguais às de antes (MO.6, F4.3, MO.3)', base0.anchors.join(',') === 'MO.6:fin,F4.3:fin,MO.3:fin', base0.anchors.join(','));
     const nulo = await AJ({ travados: [], excluidos: [] }, {});
     check('ajustes vazios = sem ajustes', JSON.stringify(nulo) === JSON.stringify(base0));
     const ret3 = await AJ({ travados: [], excluidos: ['MO.3'] }, {});
-    check('retirar a nº 3 (Estouro de MO): a vaga vai para a PRÓXIMA FONTE (Erros de medição e folha: F4.4), não para MO.2', ret3.anchors.join(',') === 'F4.3:fin,MO.6:fin,F4.4:fin', ret3.anchors.join(','));
+    check('retirar a nº 3 (Estouro de MO): a vaga vai para a PRÓXIMA FONTE (Erros de medição e folha: F4.4), não para MO.2', ret3.anchors.join(',') === 'MO.6:fin,F4.3:fin,F4.4:fin', ret3.anchors.join(','));
     check('retirado volta para o rest com a marca', ret3.rest.indexOf('MO.3*') >= 0, ret3.rest.join(','));
     const retAlerta = await AJ({ travados: [], excluidos: ['F3.4'] }, { 'F3.4': 'qualidade só no fechamento' });
     check('★ em alerta retirada volta para attention (1,5), com a marca', retAlerta.att.indexOf('F3.4*') >= 0 && retAlerta.anchors.indexOf('F3.4:extra') < 0, retAlerta.anchors.join(',') + ' | ' + retAlerta.att.join(','));
     const comAlerta = await AJ({}, { 'F3.4': 'qualidade só no fechamento' });
-    check('★ em alerta entra como extra (nº 4) sem ajustes', comAlerta.anchors.join(',') === 'F4.3:fin,MO.6:fin,MO.3:fin,F3.4:extra', comAlerta.anchors.join(','));
+    check('★ em alerta entra como extra (nº 4) sem ajustes', comAlerta.anchors.join(',') === 'MO.6:fin,F4.3:fin,MO.3:fin,F3.4:extra', comAlerta.anchors.join(','));
     const prom = await AJ({ travados: [{ code: 'F4.1', tipo: 'extra' }], excluidos: [] }, {});
-    check('promovido ocupa vaga extra (4) e não conta como financeiro', prom.anchors.join(',') === 'F4.3:fin,MO.6:fin,MO.3:fin,F4.1:extra!', prom.anchors.join(','));
+    check('promovido ocupa vaga extra (4) e não conta como financeiro', prom.anchors.join(',') === 'MO.6:fin,F4.3:fin,MO.3:fin,F4.1:extra!', prom.anchors.join(','));
     const prom2 = await AJ({ travados: [{ code: 'F4.1', tipo: 'extra' }, { code: 'F1.7', tipo: 'extra' }, { code: 'F3.2', tipo: 'extra' }], excluidos: [] }, {});
     check('teto 5: o 3º promovido não entra', prom2.anchors.length === 5 && prom2.anchors.indexOf('F3.2:extra!') < 0, prom2.anchors.join(','));
     const seis = await AJ({ travados: [], excluidos: [] }, { 'F3.2': 'a', 'F4.1': 'b', 'F4.2': 'c' });
@@ -240,7 +241,7 @@ server.listen(PORT, async () => {
     const trav6 = await AJ({ travados: [{ code: 'MO.3', tipo: 'fin' }], excluidos: [] }, { 'F3.2': 'a', 'F4.1': 'b', 'F4.2': 'c' });
     check('travado sobrevive a 6 ★ e o teto continua 5', trav6.anchors.length === 5 && trav6.anchors.indexOf('MO.3:fin!') >= 0, trav6.anchors.join(','));
     const tr3 = await AJ({ travados: [{ code: 'F4.1', tipo: 'fin' }], excluidos: [] }, {});
-    check('travado fin cobre a sua fonte (F4.1 = fonte time): F4.3 não duplica a vaga', tr3.anchors.join(',') === 'F4.1:fin!,MO.6:fin,MO.3:fin,F4.3:extra', tr3.anchors.join(','));
+    check('travado fin cobre a sua fonte (F4.1 = fonte time): F4.3 não duplica a vaga', tr3.anchors.join(',') === 'MO.6:fin,F4.1:fin!,MO.3:fin,F4.3:extra', tr3.anchors.join(','));
     check('perda total do ROI não muda com nenhum ajuste', [ret3, prom, prom2, seis, trav6, tr3].every(r => r.total === base0.total));
 
     // Tela de Conferência (cliques reais)
@@ -248,17 +249,17 @@ server.listen(PORT, async () => {
     check('Conferência ativa, com aviso de uso interno', await active(page) === 'screen-confirmacao' && /Uso interno: não é mostrada ao cliente/.test(await page.$eval('#screen-confirmacao', e => e.innerText)));
     check('3 prioridades na Conferência e botões Travar / Tirar', await page.evaluate(() => document.querySelectorAll('#conf-body .conf-card').length === 3 && document.querySelectorAll('#conf-body [data-acao="travar"]').length === 3 && document.querySelectorAll('#conf-body [data-acao="tirar"]').length === 3));
     const perdas = await page.$$eval('#conf-body .conf-meta', els => els.map(e => e.innerText.replace(/\s+/g, ' ')));
-    check('perda por mês por fonte (mesma conta do relatório): R$ 11,5 / 9,3 / 5,5 mil', /11,5 mil/.test(perdas[0]) && /9,3 mil/.test(perdas[1]) && /5,5 mil/.test(perdas[2]), JSON.stringify(perdas));
+    check('perda por mês por fonte (mesma conta do relatório): R$ 23,3 / 11,5 / 7,9 mil', /23,3 mil/.test(perdas[0]) && /11,5 mil/.test(perdas[1]) && /7,9 mil/.test(perdas[2]), JSON.stringify(perdas));
     await page.setViewport({ width: 1366, height: 768, deviceScaleFactor: 1 }); await sleep(300);
     await page.screenshot({ path: path.join(G2DIR, 'conferencia_pcl_normal_1366x768.png'), fullPage: true });
     // comentário sem ligar a ★
     await page.evaluate(() => { var i = document.querySelectorAll('#conf-body .conf-card')[2].querySelector('input'); i.value = 'aditivo fica no e-mail'; i.dispatchEvent(new Event('input', { bubbles: true })); });
     const dorMO3 = await page.evaluate(() => JSON.stringify(S.dores['MO.3']));
     check('comentário grava S.dores[code].frase com star:false (não vira dor declarada)', dorMO3 === JSON.stringify({ star: false, frase: 'aditivo fica no e-mail' }), dorMO3);
-    check('o comentário não muda as prioridades', await page.evaluate(() => getGapPlan().anchors.map(o => o.code).join(',') === 'F4.3,MO.6,MO.3'));
+    check('o comentário não muda as prioridades', await page.evaluate(() => getGapPlan().anchors.map(o => o.code).join(',') === 'MO.6,F4.3,MO.3'));
     // travar e destravar
     await page.evaluate(() => document.querySelectorAll('#conf-body .conf-card')[0].querySelector('[data-acao="travar"]').click());
-    check('Travar grava travado fin', await page.evaluate(() => JSON.stringify(S.prioAjustes.travados) === JSON.stringify([{ code: 'F4.3', tipo: 'fin' }]) && !!document.querySelector('#conf-body .conf-card.trav .conf-lock')));
+    check('Travar grava travado fin', await page.evaluate(() => JSON.stringify(S.prioAjustes.travados) === JSON.stringify([{ code: 'MO.6', tipo: 'fin' }]) && !!document.querySelector('#conf-body .conf-card.trav .conf-lock')));
     await page.evaluate(() => document.querySelector('#conf-body [data-acao="destravar"]').click());
     check('Destravar limpa', await page.evaluate(() => S.prioAjustes.travados.length === 0));
     // tirar a nº 3
@@ -266,30 +267,32 @@ server.listen(PORT, async () => {
     const tirou = await page.evaluate(() => ({ aj: JSON.stringify(S.prioAjustes), cards: Array.prototype.map.call(document.querySelectorAll('#conf-body .conf-card'), c => c.getAttribute('data-code')).join(','),
       ret: Array.prototype.map.call(document.querySelectorAll('#conf-body .conf-li'), l => l.getAttribute('data-code') + ':' + /Retirado das prioridades/.test(l.innerText)).filter(x => x.indexOf('true') >= 0).join(','),
       draft: JSON.parse(localStorage.getItem(DRAFT_KEY)).state.prioAjustes }));
-    check('Tirar das prioridades: MO.3 sai, entra F4.4 (próxima fonte), MO.3 volta em Demais com "Retirado das prioridades"', tirou.cards === 'F4.3,MO.6,F4.4' && tirou.ret === 'MO.3:true', JSON.stringify(tirou));
+    check('Tirar das prioridades: MO.3 sai, entra F4.4 (próxima fonte), MO.3 volta em Demais com "Retirado das prioridades"', tirou.cards === 'MO.6,F4.3,F4.4' && tirou.ret === 'MO.3:true', JSON.stringify(tirou));
     check('S.prioAjustes gravado no rascunho (saveDraft)', JSON.stringify(tirou.draft) === JSON.stringify({ travados: [], excluidos: ['MO.3'] }), JSON.stringify(tirou.draft));
     await page.screenshot({ path: path.join(G2DIR, 'conferencia_pcl_nr3_retirada_1366x768.png'), fullPage: true });
-    // Ver relatório reflete o ajuste
-    await page.evaluate(() => document.getElementById('btn-conf-relatorio').click()); await sleep(1200);
+    // Ver resultados -> Radar; o relatório (depois da AHA) reflete o ajuste
+    await page.evaluate(() => document.getElementById('btn-conf-resultados').click()); await sleep(1200);
+    check('Ver resultados -> Radar (Conferência vem antes do Radar)', await active(page) === 'screen-radar', await active(page));
+    await page.evaluate(() => document.querySelector('button[onclick="showAhaScreen()"]').click()); await sleep(300);
+    await page.evaluate(() => document.querySelector('#screen-aha button[onclick="showReport()"]').click()); await sleep(1200);
     const repAj = await page.evaluate(() => ({ scr: document.querySelector('.screen.active').id, cards: document.querySelectorAll('#screen-report .anchor-gap-card').length, txt: document.getElementById('screen-report').innerText, plan: ptModel('detalhado').criticos.map(c => c.code).join(','), g3: getGapPlan().anchors[2].gap }));
-    check('relatório mostra as prioridades ajustadas (F4.3, MO.6, F4.4)', repAj.scr === 'screen-report' && repAj.cards === 3 && repAj.plan === 'F4.3,MO.6,F4.4' && repAj.txt.indexOf(repAj.g3) >= 0 && repAj.txt.indexOf('Estouro') >= 0, repAj.scr + ' ' + repAj.cards + ' ' + repAj.plan);
-    // botão ← Conferência no relatório
-    await page.evaluate(() => document.querySelector('#screen-report button[onclick="showConfirmacao()"]').click()); await sleep(300);
-    check('botão "← Conferência" no relatório volta à Conferência', await active(page) === 'screen-confirmacao');
+    check('relatório mostra as prioridades ajustadas (MO.6, F4.3, F4.4)', repAj.scr === 'screen-report' && repAj.cards === 3 && repAj.plan === 'MO.6,F4.3,F4.4' && repAj.txt.indexOf(repAj.g3) >= 0 && repAj.txt.indexOf('Estouro') >= 0, repAj.scr + ' ' + repAj.cards + ' ' + repAj.plan);
+    check('relatório sem o botão "← Conferência"', await page.evaluate(() => !/Conferência/.test(document.getElementById('screen-report').innerText) && !document.querySelector('#screen-report [onclick*="showConfirmacao"]')));
+    await page.evaluate(() => showConfirmacao()); await sleep(300); // a Conferência só é aberta pelo fluxo das horas; aqui reabrimos para seguir testando
     // Tornar prioridade em ponto retirado só desfaz a retirada: retirar MO.3 e restaurar devolve as prioridades originais (MO.3 travada como fin)
     await page.evaluate(() => document.querySelector('#conf-body .conf-li[data-code="MO.3"] [data-acao="promover"]').click());
     const p1 = await page.evaluate(() => ({ aj: JSON.stringify(S.prioAjustes), cards: Array.prototype.map.call(document.querySelectorAll('#conf-body .conf-card'), c => c.getAttribute('data-code')).join(',') }));
-    check('Tornar prioridade em ponto retirado: sai de excluídos e volta travado fin (3 prioridades, sem fonte duplicada)', p1.aj === JSON.stringify({ travados: [{ code: 'MO.3', tipo: 'fin' }], excluidos: [] }) && p1.cards === 'F4.3,MO.6,MO.3', p1.aj + ' | ' + p1.cards);
-    check('restaurar devolve as prioridades originais (F4.3, MO.6, MO.3)', p1.cards === base0.anchors.map(a => a.split(':')[0]).join(','), p1.cards);
+    check('Tornar prioridade em ponto retirado: sai de excluídos e volta travado fin (3 prioridades, sem fonte duplicada)', p1.aj === JSON.stringify({ travados: [{ code: 'MO.3', tipo: 'fin' }], excluidos: [] }) && p1.cards === 'MO.6,F4.3,MO.3', p1.aj + ' | ' + p1.cards);
+    check('restaurar devolve as prioridades originais (MO.6, F4.3, MO.3)', p1.cards === base0.anchors.map(a => a.split(':')[0]).join(','), p1.cards);
     // promove mais dois pontos até o teto de 5
     await page.evaluate(() => document.querySelector('#conf-body .conf-li [data-acao="promover"]').click());
     await page.evaluate(() => document.querySelector('#conf-body .conf-li [data-acao="promover"]').click());
     const p2 = await page.evaluate(() => ({ n: document.querySelectorAll('#conf-body .conf-card').length, dis: Array.prototype.every.call(document.querySelectorAll('#conf-body [data-acao="promover"]'), b => b.disabled), teto: /Teto de 5 prioridades atingido/.test(document.getElementById('conf-body').innerText) }));
     check('com 5 prioridades "Tornar prioridade" fica desabilitado, com a explicação do teto', p2.n === 5 && p2.dis && p2.teto, JSON.stringify(p2));
     await page.screenshot({ path: path.join(G2DIR, 'conferencia_pcl_teto_1366x768.png'), fullPage: true });
-    // Voltar da Conferência -> AHA
+    // Voltar da Conferência -> tela de horas (com os valores salvos)
     await page.evaluate(() => document.getElementById('btn-conf-voltar').click()); await sleep(300);
-    check('← Voltar da Conferência -> tela AHA', await active(page) === 'screen-aha');
+    check('← Voltar da Conferência -> tela de horas', await active(page) === 'screen-horas' && await page.evaluate(() => Array.prototype.map.call(document.querySelectorAll('#horas-card input'), i => i.value).join(',') === '16,24,32,16,32'));
     // Retomada/admin: showReport direto, com os ajustes salvos aplicados
     await page.evaluate(() => { showReport(); }); await sleep(800);
     check('retomada vai direto ao relatório, com os ajustes salvos', await page.evaluate(() => document.querySelector('.screen.active').id === 'screen-report' && document.querySelectorAll('#screen-report .anchor-gap-card').length === 5));

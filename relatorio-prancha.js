@@ -150,7 +150,6 @@ function ptMilVar(v) {
 }
 function ptPct(p) { return Math.round(p * 100) + '%'; }
 function ptHoras(h) { return ptNum(h, 0, 1) + ' h'; }
-function ptMult(x) { return ptNum(x, 1, 1) + '×'; }
 function ptPad(n) { return (n < 10 ? '0' : '') + n; }
 function ptCap(t) { t = String(t || '').trim(); return t ? t.charAt(0).toUpperCase() + t.slice(1) : t; }
 function ptLow(t) { t = String(t || '').trim(); return t ? t.charAt(0).toLowerCase() + t.slice(1) : t; }
@@ -223,7 +222,8 @@ function ptModel(mode) {
   roi.items.forEach(function(it) {
     var label = fonteLabel(it.key) || it.label;
     var labelTab = (it.key === 'mo' && mo === 'mista') ? label + ' (50% própria)' : label;
-    fontes[it.key] = { key:it.key, label:label, labelTab:labelTab, perda:it.baseValue, cap:it.porObra, fator:it.fator,
+    fontes[it.key] = { key:it.key, label:label, labelTab:labelTab, perda:it.baseValue, cap:it.porObra, fator:it.fator, reducao:(it.reducao == null ? 1 : it.reducao),
+      capEf:(it.baseValue ? it.porObra / it.baseValue : 0),
       mes:it.baseValue / prazo, basis:it.basis };
   });
 
@@ -362,16 +362,15 @@ function ptSecResumo(M) {
     blocks.push({ sec:'01', html:'<div class="row sec"><div><div class="lbl rule">Prioridades</div><div class="note" style="margin-top:1.5mm">' + (nC - M.nPrioAlerta) + ' de ' + M.nCritTot + ' pontos críticos' + (M.nPrioAlerta ? '; ' + M.nPrioAlerta + (M.nPrioAlerta === 1 ? ' ponto em alerta com dor declarada' : ' pontos em alerta com dor declarada') : '') + '</div></div><div>' +
       '<table><thead><tr><th style="width:5mm">#</th><th>Prioridade</th><th style="width:15mm">Pilar</th><th style="width:38mm">Fase de Implementação</th><th class="n wrap" style="width:24mm">Perda por mês sem tratamento</th></tr></thead>' +
       '<tbody>' + crit + '<tr class="tot"><td></td><td>Total ' + (nC === 1 ? 'da prioridade' : 'das ' + nC + ' prioridades') + '</td><td></td><td></td><td class="n">' + ptMil(M.critMes, 1) + '/mês</td></tr>' +
-      '<tr class="rec"><td></td><td colspan="3">Recuperável com o plano · ' + ptMult(M.critCapMes / M.cons.mensalidade) + ' mensalidade ref.</td><td class="n">' + ptMil(M.critCapMes, 1) + '/mês</td></tr></tbody></table></div></div>' });
+      '<tr class="rec"><td></td><td colspan="3">Recuperável com o plano</td><td class="n">' + ptMil(M.critCapMes, 1) + '/mês</td></tr></tbody></table></div></div>' });
   }
   return blocks;
 }
-function ptRefBRL(v) { return 'R$ ' + Math.round(v).toLocaleString('pt-BR'); }
 
 // Section 02: total loss and monthly gain on the loss-map base (same R$ total as section 01).
 // Values per project; the hours+payroll model stays only in Annex A.4.
 function ptSecPerdaGanho(M) {
-  var P = M.prazo, mens = M.cons.mensalidade, porObra = M.obras > 1;
+  var P = M.prazo, porObra = M.obras > 1;
   var perdaMes = M.roi.totalBase / P, ganhoMes = M.roi.totalPorObra / P;
   var capPct = M.roi.totalBase ? M.roi.totalPorObra / M.roi.totalBase : 0;
   var linked = {};
@@ -394,14 +393,13 @@ function ptSecPerdaGanho(M) {
     '<div><span class="lbl">' + (porObra ? 'Obras' : 'Obra') + '</span>' + M.obras + (M.moTxt ? ' · ' + M.moTxt : '') + '</div></div>';
   var b1 = ptSec('02', 'Perda e ganho mensal', true) +
     '<div class="row" style="margin-top:5mm">' + baseInf + '<div>' +
-      '<div class="strip four"><div><div class="lbl">Perda total por mês</div><div class="big p">' + ptMil(perdaMes, 1) + '</div></div>' +
+      '<div class="strip"><div><div class="lbl">Perda total por mês</div><div class="big p">' + ptMil(perdaMes, 1) + '</div></div>' +
       '<div><div class="lbl">Perda capturada</div><div class="big">' + ptPct(capPct) + '</div></div>' +
-      '<div><div class="lbl">Ganho mensal</div><div class="big g">' + ptMil(ganhoMes, 1) + '</div></div>' +
-      '<div><div class="lbl">× mensalidade ref.</div><div class="big">' + ptMult(ganhoMes / mens) + '</div></div></div>' +
+      '<div><div class="lbl">Ganho mensal</div><div class="big g">' + ptMil(ganhoMes, 1) + '</div></div></div>' +
       chart + '</div></div>';
   var rows = itens.map(function(f) {
     var l = linked[f.key];
-    return '<tr><td>' + f.labelTab + '</td><td class="n">' + ptMil(f.mes, 1) + '</td><td class="n">' + ptPct(f.fator) + '</td><td class="n">' + ptMil(f.cap / P, 1) + '</td><td style="padding-left:5mm">' +
+    return '<tr><td>' + f.labelTab + '</td><td class="n">' + ptMil(f.mes, 1) + '</td><td class="n">' + ptPct(f.capEf) + '</td><td class="n">' + ptMil(f.cap / P, 1) + '</td><td style="padding-left:5mm">' +
       (l ? ptPrioLista(l) : '—') + '</td></tr>';
   }).join('');
   var portf = porObra ? '<tr class="tot"><td>Total no portfólio (' + M.obras + ' obras)</td><td class="n">' + ptMil(M.roi.totalBase * M.obras / P, 1) + '</td><td class="n"></td><td class="n">' + ptMil(M.roi.totalPortfolio / P, 1) + '</td><td></td></tr>' : '';
@@ -561,12 +559,12 @@ function ptResolve(M, faseId) {
 function ptSecPlano(M) {
   var R = ptRotinas(M), FZ = ptFases(M.mo);
   var blocks = [];
-  // Phases I+II, timeline, Phase III, action card, signatures (pilot order)
+  // Phases I+II, Phase III, timeline, action card, signatures (round 3 order)
   blocks.push({ sec:'05', head:ptSec('05', ptPlano06(M)), rows:[0, 1], render:function(rows) {
     return '<div style="margin-top:5mm"><table>' + PT_PLANO_THEAD + '<tbody>' + rows.map(function(i){ return ptFaseGroup(FZ[i], R[FZ[i].id], M); }).join('') + '</tbody></table></div>';
   }});
-  blocks.push({ sec:'05', html:'<div style="margin-top:7mm">' + ptRegua(M) + '</div>' });
   blocks.push({ sec:'05', html:'<div style="margin-top:7mm"><table>' + PT_PLANO_THEAD + '<tbody>' + ptFaseGroup(FZ[2], R.III, M) + '</tbody></table></div>' });
+  blocks.push({ sec:'05', html:'<div style="margin-top:7mm">' + ptRegua(M) + '</div>' });
   var frentes = FZ.map(function(fz, i) {
     var res = ptResolve(M, fz.id);
     return '<div class="fr"><div class="nn">0' + (i + 1) + '</div><div><div class="ft">Fase de Implementação ' + fz.id + ' · ' + ptFaseNome(fz, M) + '</div><div class="fd">' + fz.fd + '</div>' + (res ? '<div class="fz">' + res + '</div>' : '') + '</div></div>';
@@ -622,8 +620,7 @@ function ptSecBases(M) {
   var glos = [['P1 a P4', 'Pilares: P1 ' + PT_PILAR_NOME.f1 + '; P2 ' + PT_PILAR_NOME.f2 + '; P3 ' + PT_PILAR_NOME.f3 + '; P4 ' + PT_PILAR_NOME.f4 + '.'],
     ['EAP','Estrutura analítica do projeto.'],['FVS','Ficha de verificação de serviço.']].concat(semMOPropria() ? [] : [['HH','Homem-hora.']], [['IRR','Índice de remoção de restrições.'],
     ['Lookahead','Planejamento de médio prazo, com janela de semanas à frente da execução.'],['MO','Mão de obra.'],['PPC','Percentual de planos concluídos.'],
-    ['Fator de captura','Fração da perda de cada fonte que se estima recuperar, conforme a maturidade dos pilares ligados à fonte.'],
-    ['Mensalidade de referência', ptRefBRL(MENSALIDADE_ROI_POR_OBRA) + ' por obra; base de cálculo, não é proposta comercial.']]);
+    ['Fator de captura','Fração da perda de cada fonte que se estima recuperar, conforme a maturidade dos pilares ligados à fonte.']]);
   var t2 = function(rows) { return rows.map(function(r){ return '<tr><td>' + r[0] + '</td><td class="n">' + r[1] + '</td></tr>'; }).join(''); };
   return [
     { sec:'06', breakBefore:true, html:ptSec('06', 'Bases do diagnóstico', true) + '<div class="row" style="margin-top:5mm"><div><div class="lbl rule">Referências de mercado</div></div><div><table><thead><tr><th>Parâmetro</th><th class="n">Valor</th></tr></thead><tbody>' + t2(refs) + '</tbody></table></div></div>' },
@@ -646,10 +643,10 @@ function ptSecAnexo(M) {
   var hR = ptNum(M.roi.horasRecup, 0, 1);
   var form = {
     time: hR + ' h/mês × R$ ' + custoH + '/h × ' + P + ' meses; ' + (M.roi.horasDoCliente ? hR + ' h = horas informadas × % de economia de cada rotina (40% planejar, 90% demais)' : 'referência de mercado de 12,25 dias × 8 h (horas não informadas)'),
-    retrabalho: 'Orçamento ' + orcT + ' × 10% × 40%',
+    retrabalho: 'Orçamento ' + orcT + ' × 10%',
     velocidade: 'Orçamento ' + orcT + ' × 10% × 15%',
     erros: 'Orçamento ' + orcT + ' × 45% × 5%',
-    mo: M.mo === 'mista' ? 'Orçamento ' + orcT + ' × 45% × 50% × 15% × 70%' : 'Orçamento ' + orcT + ' × 45% × 15% × 70%'
+    mo: M.mo === 'mista' ? 'Orçamento ' + orcT + ' × 45% × 50% × 15%' : 'Orçamento ' + orcT + ' × 45% × 15%'
   };
   var a2rows = M.roi.items.map(function(it){ var f = F[it.key]; return '<tr><td>' + f.labelTab + '</td><td class="f">' + form[it.key] + '</td><td class="n">' + ptMil(f.perda, 1) + '</td></tr>'; }).join('');
   var mesRows = M.criticos.filter(function(c){ return c.mes != null; }).map(function(c, i) {
@@ -661,24 +658,22 @@ function ptSecAnexo(M) {
     (nC ? '<table class="ax" style="margin-top:6mm"><thead><tr><th style="width:44mm">Perda por mês sem tratamento</th><th>Fórmula</th><th class="n" style="width:24mm">Valor</th></tr></thead><tbody>' + mesRows +
       '<tr class="tot"><td>Total ' + (nC === 1 ? 'da prioridade' : 'das ' + nC + ' prioridades') + '</td><td class="f">' + ptMil(M.critPerda, 1) + ' ÷ ' + P + '</td><td class="n">' + ptMil(M.critMes, 1) + '</td></tr>' +
       '<tr><td>Perda total do Mapa (contexto)</td><td class="f">' + ptMil(M.roi.totalBase, 1) + ' ÷ ' + P + '</td><td class="n">' + ptMil(M.mapaMes, 1) + '</td></tr></tbody></table>' : '') + '</div></div>';
-  var a3rows = M.roi.items.map(function(it){ var f = F[it.key]; return '<tr><td>' + f.labelTab + '</td><td class="f">' + ptMil(f.perda, 1) + ' × ' + ptPct(f.fator) + '</td><td class="n">' + ptMil(f.cap, 1) + '</td></tr>'; }).join('');
+  var a3rows = M.roi.items.map(function(it){ var f = F[it.key]; return '<tr><td>' + f.labelTab + '</td><td class="f">' + ptMil(f.perda, 1) + (f.reducao < 1 ? ' × ' + ptPct(f.reducao) + ' (redução com o SIIGA)' : '') + ' × ' + ptPct(f.fator) + ' (fator)</td><td class="n">' + ptMil(f.cap, 1) + '</td></tr>'; }).join('');
   var a3 = '<div class="row sec"><div><div class="lbl rule">A.3 Fator de captura</div></div><div><table class="ax"><thead><tr><th style="width:44mm">Fonte de perda</th><th>Fórmula</th><th class="n" style="width:20mm">Ganho</th></tr></thead><tbody>' + a3rows +
     '<tr class="tot"><td>Total</td><td></td><td class="n">' + ptMil(M.roi.totalPorObra, 1) + '</td></tr></tbody></table>' +
-    '<div class="src">Fator: % da perda de cada fonte que se estima capturar, conforme a maturidade dos pilares ligados ao ganho; quanto menor a maturidade, maior o fator. Varia de 20% a 100% por fonte e é calculado individualmente. Fatores exibidos arredondados; valores calculados com o fator exato.</div></div></div>';
+    '<div class="src">Fator: % da perda de cada fonte que se estima capturar, conforme a maturidade dos pilares ligados ao ganho; quanto menor a maturidade, maior o fator. Varia de 20% a 70% por fonte e é calculado individualmente. Em retrabalho e estouro de MO, o ganho é a perda × a redução com o SIIGA (40% e 70%) × o fator; a captura efetiva (ganho ÷ perda) é a exibida na tabela de perda e ganho por fonte. Fatores exibidos arredondados; valores calculados com o fator exato.</div></div></div>';
   var Pm = M.perdaMes, G = M.ganhoMes, temFolha = (Pm.retr + Pm.indev) > 0;
   var hPot = M.horasPot, hMes = M.cons.operacional.hMes;
   var compR = '<tr><td>Horas do time técnico</td><td class="f">' + ptHoras(hPot) + ' × R$ ' + custoH + '/h; ganho: horas recuperadas (' + ptHoras(hMes) + ') × R$ ' + custoH + '/h</td><td class="n">' + ptMil(Pm.horas, 2) + '</td><td class="n">' + ptMil(G.horas, 2) + '</td></tr>' +
     (temFolha ? '<tr><td>Retrabalho pago na folha</td><td class="f">Folha de MO própria × 5% de retrabalho; ganho: × captura do cenário (' + cap + ')</td><td class="n">' + ptMil(Pm.retr, 2) + '</td><td class="n">' + ptMil(G.retr, 2) + '</td></tr>' +
       '<tr><td>Pagamentos indevidos na folha</td><td class="f">Folha de MO própria × 5% indevidos × 80% sem sobreposição; ganho: × ' + cap + '</td><td class="n">' + ptMil(Pm.indev, 2) + '</td><td class="n">' + ptMil(G.indev, 2) + '</td></tr>' : '');
-  var mens = M.cons.mensalidade;
   var gp = M.ganhoPess.total;
   var ind = [['Potencial pleno de horas', 'Horas informadas em cada rotina × % de economia da rotina (40% planejar, 90% demais)', ptNum(hPot, 0, 1) + ' h/mês'],
     ['Horas recuperadas por mês', 'Potencial pleno × captura do cenário (' + cap + ')', ptNum(hMes, 0, 1) + ' h/mês'],
     ['Horas recuperadas por obra', 'Horas recuperadas por mês × prazo da obra (' + P + ' meses)', ptHoras(M.cons.operacional.hObra)],
-    ['Múltiplo da mensalidade de referência', ptMil(G.total, 2) + ' ÷ ' + ptRefBRL(mens), ptMult(G.total / mens)],
     ['Horas recuperadas no mês de 1 profissional', ptHoras(hMes) + ' ÷ ' + ROI_REAL_K.JORNADA + ' h úteis por mês', ptNum(M.cons.operacional.pctJornada * 100, 1, 1) + '%'],
-    ['Cenário Pessimista (30%)', ptHoras(M.pess.operacional.hMes) + '; ganho ' + ptMil(gp, 2) + ' ÷ ' + ptRefBRL(mens), ptMult(gp / mens)]];
-  var a4 = '<div class="row sec"><div><div class="lbl rule">A.4 Retorno mensal</div></div><div><p class="note" style="margin-top:4mm">Premissas: mensalidade de referência ' + ptRefBRL(mens) + ' por obra; captura do cenário ' + cap + ' (Conservador)' +
+    ['Cenário Pessimista (30%)', 'Horas recuperadas por mês: ' + ptHoras(M.pess.operacional.hMes), ptMil(gp, 2) + '/mês']];
+  var a4 = '<div class="row sec"><div><div class="lbl rule">A.4 Retorno mensal</div></div><div><p class="note" style="margin-top:4mm">Premissas: captura do cenário ' + cap + ' (Conservador)' +
       (M.folha > 0 ? '; folha de MO própria ' + ptMilVar(M.folha) + '/mês' : '') + '; hora técnica R$ ' + custoH + '/h; horas de gestão informadas ' + ptNum(M.horasInf, 0, 1) + ' h/mês.</p>' +
     '<div style="margin-top:4mm"><table class="ax"><thead><tr><th style="width:44mm">Componente</th><th>Fórmula</th><th class="n wrap" style="width:22mm">Perda/mês (' + (temFolha ? 'horas e folha' : 'horas') + ')</th><th class="n" style="width:20mm">Ganho/mês</th></tr></thead><tbody>' + compR +
       '<tr class="tot"><td>Total</td><td></td><td class="n">' + ptMil(Pm.total, 2) + '</td><td class="n">' + ptMil(G.total, 2) + '</td></tr></tbody></table></div>' +
