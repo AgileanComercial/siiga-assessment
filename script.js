@@ -2435,7 +2435,7 @@ function renderAnchorGapCards(plan, roi) {
       '<div style="font-size:10.5px;color:'+REP_TXT_MUT+';margin-top:3px"><strong style="color:'+REP_TXT_STRONG+'">'+cs.nome+'</strong> · '+cs.papel+'</div>' :
       '<div style="font-size:11.5px;color:'+REP_TXT+';line-height:1.5">'+(cs.mercado || '')+'</div>';
     var baseTxt = (o.fonte === 'time' && roi.horasDoCliente === false) ?
-      'referência de mercado de horas de gestão e hora técnica de referência (R$ 115/h).' :
+      'referência de mercado de 98 h/mês nas rotinas de gestão × 80% de economia média e hora técnica de referência (R$ 115/h).' :
       ((o.fonte === 'erros' && semMOPropria()) ? FONTE_BASE_TXT.errosTerc : FONTE_BASE_TXT[o.fonte]);
     var resposta = repEsc(answerLabelFor(o.bk, o.code, o.score));
     var voz = o.frase ?
@@ -2791,7 +2791,7 @@ function buildReport() {
   var presRetrab = document.getElementById('pres-retrab');
   if(presRetrab) presRetrab.textContent = Math.round((roi.pctRetrabalho||0.10)*100) + '% do portfólio';
   var presDiasLib = document.getElementById('pres-diaslib');
-  if(presDiasLib) presDiasLib.textContent = fmtHorasBR(roi.horasRecup) + ' h' + (roi.horasDoCliente ? '' : ' (referência de mercado)');
+  if(presDiasLib) presDiasLib.textContent = fmtHorasBR(roi.horasRecup) + ' h' + (roi.horasDoCliente ? '' : ' (' + fmtHorasBR(roi.horasRefMercado) + ' h nas rotinas × ' + Math.round(roi.economiaMedia * 100) + '% de economia média)');
   // Fórmulas de como o valor BRUTO de cada fonte de perda (item.baseValue) é
   // calculado — mesma memória de cálculo da tabela "Fonte da Perda" acima.
   // A explicação do Fator vive em renderPerdasFonteGanho() (#pres-formulas-ganho),
@@ -3397,12 +3397,15 @@ function calculateROI() {
   // na tela "Tempo da Equipe de Gestão" (horas de cada rotina × % de economia,
   // mesmo "potencial pleno" do ROI Real), × custo da hora técnica do ROI.
   // Sem horas informadas (tela em branco ou diagnóstico antigo), usa a
-  // referência de mercado de 12,25 dias/mês × 8h — sinalizada no pressuposto.
+  // referência de mercado de 12,25 dias/mês × 8h = 98 h/mês GASTAS nas rotinas;
+  // as recuperáveis são essas horas × a economia média das rotinas
+  // (média simples dos `ganho` de HORAS_GESTAO_CAMPOS = 80%) — sinalizado no pressuposto.
   var HORAS_REF_MERCADO = 12.25 * 8;
+  var ECONOMIA_MEDIA = HORAS_GESTAO_CAMPOS.reduce(function(a,c){ return a + c.ganho; }, 0) / HORAS_GESTAO_CAMPOS.length;
   var horasGestao = getHorasGestao();
   var horasRecup = HORAS_GESTAO_CAMPOS.reduce(function(a,c){ return a + (horasGestao[c.key]||0) * c.ganho; }, 0);
   var horasDoCliente = horasRecup > 0;
-  if(!horasDoCliente) horasRecup = HORAS_REF_MERCADO;
+  if(!horasDoCliente) horasRecup = HORAS_REF_MERCADO * ECONOMIA_MEDIA;
   var custoHora = ROI_REAL_K.CUSTO_HORA_TECNICA;
 
   // ── PHASE PERCENTAGES ─────────────────────────────────────────────
@@ -3454,7 +3457,7 @@ function calculateROI() {
       key:'time', label:'Otimização do time de gestão',
       reducao: 1,
       basis: fmtHorasBR(horasRecup) + ' h/mês recuperáveis ' +
-        (horasDoCliente ? '(horas informadas pelo cliente × % de economia de cada rotina)' : '(referência de mercado: 12,25 dias × 8h — horas não informadas)') +
+        (horasDoCliente ? '(horas informadas pelo cliente × % de economia de cada rotina)' : '(referência de mercado: ' + fmtHorasBR(HORAS_REF_MERCADO) + ' h/mês nas rotinas × ' + Math.round(ECONOMIA_MEDIA * 100) + '% de economia média — horas não informadas)') +
         ' × R$' + custoHora + '/h × ' + prazo + ' meses',
       fator: fatTime,
       porObra:   Math.round(engBase  * fatTime),
@@ -3518,6 +3521,8 @@ function calculateROI() {
     fatores: {time:fatTime, retrabalho:fatRetr, velocidade:fatVeloc, mo:fatMO, erros:fatErros},
     pctRetrabalho: PCT_RETRABALHO,
     horasRecup: horasRecup,
+    horasRefMercado: HORAS_REF_MERCADO,
+    economiaMedia: ECONOMIA_MEDIA,
     horasDoCliente: horasDoCliente
   };
 }

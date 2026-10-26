@@ -82,7 +82,7 @@ var PT_CONSEQ = {
 // Basis of each loss source, without formula (allowed in RESUMIDO: data + rates).
 var PT_FONTE_BASE = {
   time:'Horas de gestão informadas e hora técnica de referência (R$ 115/h).',
-  timeRef:'Referência de mercado de horas de gestão (horas não informadas) e hora técnica de referência (R$ 115/h).',
+  timeRef:'Referência de mercado: 98 h/mês nas rotinas de gestão × 80% de economia média (horas não informadas) e hora técnica de referência (R$ 115/h).',
   retrabalho:'Orçamento da obra informado e referência de mercado de retrabalho (10%).',
   velocidade:'Orçamento da obra informado e referência de mercado de ganho de prazo (10%).',
   erros:'Orçamento da obra informado, mão de obra como 45% do custo e desvio médio de medição e folha (5%).',
@@ -642,7 +642,7 @@ function ptSecAnexo(M) {
     pres.map(function(r){ return '<tr><td>' + r[0] + '</td><td class="n">' + r[1] + '</td></tr>'; }).join('') + '</tbody></table></div></div>';
   var hR = ptNum(M.roi.horasRecup, 0, 1);
   var form = {
-    time: hR + ' h/mês × R$ ' + custoH + '/h × ' + P + ' meses; ' + (M.roi.horasDoCliente ? hR + ' h = horas informadas × % de economia de cada rotina (40% planejar, 90% demais)' : 'referência de mercado de 12,25 dias × 8 h (horas não informadas)'),
+    time: hR + ' h/mês × R$ ' + custoH + '/h × ' + P + ' meses; ' + (M.roi.horasDoCliente ? hR + ' h = horas informadas × % de economia de cada rotina (40% planejar, 90% demais)' : 'referência de mercado: ' + ptNum(M.roi.horasRefMercado, 0, 1) + ' h/mês nas rotinas × ' + Math.round(M.roi.economiaMedia * 100) + '% de economia média = ' + hR + ' h/mês recuperáveis (horas não informadas)'),
     retrabalho: 'Orçamento ' + orcT + ' × 10%',
     velocidade: 'Orçamento ' + orcT + ' × 10% × 15%',
     erros: 'Orçamento ' + orcT + ' × 45% × 5%',

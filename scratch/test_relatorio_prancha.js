@@ -46,6 +46,8 @@ CASES.pcl2 = Object.assign({}, CASES.pcl, { dores: Object.assign({}, CASES.pcl.d
 CASES.prop = Object.assign({}, CASES.pcl, { b0: Object.assign({}, CASES.pcl.b0, { modeloMO: 'propria' }) });
 // PCL with the vendedor's adjustment from the Conferência screen: priority 3 (Estouro de MO, MO.3) taken out of the priorities
 CASES.ajuste = Object.assign({}, CASES.pcl, { ajustes: { travados: [], excluidos: ['MO.3'] }, prioFontes: ['retrabalho', 'time', 'erros'] });
+// PCL without hours informed on the horas screen (Israel's pilot case): time source falls back to the market reference
+CASES.semhoras = Object.assign({}, CASES.pcl, { consultor: 'Israel Chacon', horas: null });
 const C = CASES[CASE];
 const MO = C.b0.modeloMO;
 
@@ -65,7 +67,8 @@ function esperado(Cc) {
   const cap = m => Math.max(0.20, Math.min(0.70, 0.20 + (1 - m) * 0.50));
   const orc = parseInt(String(Cc.orcamento).replace(/\./g, ''), 10), prazo = +Cc.prazo, obras = +Cc.obras, mo = Cc.b0.modeloMO;
   const fator = { time: cap(pm.f3 * 0.5 + pm.f4 * 0.5), retrabalho: cap(pm.f2 * 0.3 + pm.f3 * 0.7), velocidade: cap(pm.f1 * 0.5 + pm.f2 * 0.5), erros: cap(pm.f3 * 0.4 + pm.f4 * 0.6), mo: cap(pm.f3 * 0.7 + pm.f2 * 0.3) };
-  const horasRec = Cc.horas.reduce((a, h, i) => a + h * [0.4, 0.9, 0.9, 0.9, 0.9][i], 0);
+  // sem horas informadas: 98 h/mês (12,25 dias × 8 h) GASTAS × 80% de economia média ((40% + 4 × 90%) ÷ 5) = 78,4 h/mês recuperáveis
+  const horasRec = Cc.horas ? Cc.horas.reduce((a, h, i) => a + h * [0.4, 0.9, 0.9, 0.9, 0.9][i], 0) : 12.25 * 8 * ((0.4 + 4 * 0.9) / 5);
   const perda = { time: horasRec * 115 * prazo, retrabalho: orc * 0.10, velocidade: orc * 0.10 * 0.15, erros: orc * 0.45 * 0.05 };
   const red = { time: 1, retrabalho: 0.40, velocidade: 1, erros: 1, mo: 0.70 };
   if (mo === 'propria') perda.mo = orc * 0.45 * 0.15; else if (mo === 'mista') perda.mo = orc * 0.45 * 0.50 * 0.15;
@@ -164,7 +167,7 @@ server.listen(PORT, async () => {
       if (scr === 'screen-phase-result') { await page.click('#result-next-btn'); await sleep(200); continue; }
       if (scr === 'screen-horas') {
         telaHoras = await page.evaluate(() => document.getElementById('horas-card').innerText);
-        await page.evaluate(v => document.querySelectorAll('#horas-card input').forEach((el, i) => el.value = String(v[i])), C.horas);
+        await page.evaluate(v => document.querySelectorAll('#horas-card input').forEach((el, i) => el.value = v ? String(v[i]) : ''), C.horas);
         horasOk = true;
         await page.click('#horas-next-btn'); await sleep(600);
         continue;
@@ -463,6 +466,17 @@ server.listen(PORT, async () => {
       check('própria: "MO própria" no escopo', /MO própria/.test(all));
       check('própria folhas = ' + EXP_FOLHAS, dom.pages.length === EXP_FOLHAS, dom.pages.length);
       if (MODE !== 'resumido') check('própria: Anexo com retrabalho pago na folha', /Retrabalho pago na folha/.test(all));
+    } else if (CASE === 'semhoras') {
+      // No hours informed: 98 h/mês spent × 80% average saving = 78,4 h/mês recoverable; expected values come from the rule (78,4 h × R$ 115 × prazo × fator)
+      const horasRec = 12.25 * 8 * 0.8, perdaTime = horasRec * 115 * EXP.prazo;
+      check('sem horas: perda do time = 78,4 h × R$ 115 × prazo', Math.abs(EXP.P.time - Math.round(perdaTime)) <= 1, EXP.P.time + ' x ' + perdaTime);
+      check('sem horas: ganho do time = perda × fator', Math.abs(EXP.G.time - Math.round(perdaTime * EXP.fator.time)) <= 1, EXP.G.time);
+      [fMil(EXP.P.time / EXP.prazo), fMil(EXP.G.time / EXP.prazo), fMil(EXP.perdaMes), fMil(EXP.ganhoMes), fPct(EXP.capEf)].forEach(s => check('sem horas contém "' + s + '"', all.indexOf(s) >= 0));
+      if (MODE !== 'resumido') {
+        check('sem horas: Anexo A com 98 h/mês × 80% = 78,4 h/mês', /98\s*h/.test(all) && /80%/.test(all) && /78,4\s*h/.test(all));
+        check('sem horas: sem a referência antiga "12,25 dias × 8 h"', !/12,25 dias × 8 ?h/.test(all));
+      }
+      check('sem horas folhas = ' + EXP_FOLHAS, dom.pages.length === EXP_FOLHAS, dom.pages.length);
     } else {
       check('título sem artigo: "para Horizonte Engenharia"', allLow.indexOf('plano de transformação operacional para horizonte engenharia') >= 0);
       check('sem linhas de folha própria (terceirizada)', !/Retrabalho pago na folha/.test(all));

@@ -189,7 +189,7 @@ server.listen(PORT, async () => {
     console.log('Fallback sem horas:', JSON.stringify(rep.fallback));
     check('Mapa de Perdas usa horas do cliente: 86 h × R$115 × 22', rep.perdaTime.base === Math.round(86 * 115 * 22), rep.perdaTime.base);
     check('pressuposto mostra 86 h', /^86 h$/.test(rep.presDias || ''), rep.presDias);
-    check('sem horas: referência de mercado 98 h × R$115 × 22', rep.fallback.base === Math.round(98 * 115 * 22) && /referência de mercado/.test(rep.fallback.basis), rep.fallback.base);
+    check('sem horas: referência de mercado 98 h × 80% (78,4 h) × R$115 × 22', rep.fallback.base === Math.round(98 * 0.8 * 115 * 22) && /referência de mercado/.test(rep.fallback.basis), rep.fallback.base);
     check('tabela de cenários mantida (4 linhas)', (rep.cenText.match(/Pessimista|Conservador|Realista|Pleno/g) || []).length >= 4);
 
     if (WANT_PDF) {
