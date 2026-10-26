@@ -249,7 +249,8 @@ server.listen(PORT, async () => {
     check('Conferência ativa, com aviso de uso interno', await active(page) === 'screen-confirmacao' && /Uso interno: não é mostrada ao cliente/.test(await page.$eval('#screen-confirmacao', e => e.innerText)));
     check('3 prioridades na Conferência e botões Travar / Tirar', await page.evaluate(() => document.querySelectorAll('#conf-body .conf-card').length === 3 && document.querySelectorAll('#conf-body [data-acao="travar"]').length === 3 && document.querySelectorAll('#conf-body [data-acao="tirar"]').length === 3));
     const perdas = await page.$$eval('#conf-body .conf-meta', els => els.map(e => e.innerText.replace(/\s+/g, ' ')));
-    check('perda por mês por fonte (mesma conta do relatório): R$ 23,3 / 11,5 / 7,9 mil', /23,3 mil/.test(perdas[0]) && /11,5 mil/.test(perdas[1]) && /7,9 mil/.test(perdas[2]), JSON.stringify(perdas));
+    // perda estimada por fonte (referência × ajuste pela maturidade) ÷ 15 meses: retrabalho 350,0 × 50,7% = 177,3; horas 172,5 × 55% = 94,9; estouro de MO 118,1 × 50,7% = 59,9
+    check('perda por mês por fonte (mesma conta do relatório): R$ 11,8 / 6,3 / 4,0 mil', /11,8 mil/.test(perdas[0]) && /6,3 mil/.test(perdas[1]) && /4,0 mil/.test(perdas[2]), JSON.stringify(perdas));
     await page.setViewport({ width: 1366, height: 768, deviceScaleFactor: 1 }); await sleep(300);
     await page.screenshot({ path: path.join(G2DIR, 'conferencia_pcl_normal_1366x768.png'), fullPage: true });
     // comentário sem ligar a ★

@@ -152,7 +152,7 @@ server.listen(PORT, async () => {
     check('#11 investimento personalizado', has('Investimento Personalizado para a CONSTRUTORA MERIDIANO'));
     check('#11 sem chips de módulos', !has('MO3') && !has('MOP') && !has('CPO'));
     check('#12 retorno projetado personalizado', has('Retorno Projetado para a CONSTRUTORA MERIDIANO'));
-    check('#12 exposição bruta × ganho no período + payback sobre o investimento total (sem ROI Mensal, horas nem % da jornada)', has('Exposição em Risco') && has('Ganho capturável com o programa') && has('Captura efetiva (redução com o SIIGA × fator de maturidade, 20% a 70%)') && has('Payback') && has('a partir do 3º mês') && !/ROI Mensal|Horas recuperadas|% da jornada liberada/i.test(t));
+    check('#12 exposição bruta × ganho no período + payback sobre o investimento total (sem ROI Mensal, horas nem % da jornada)', has('Exposição em Risco') && has('Ganho capturável com o programa') && has('Redução com o SIIGA por fonte (referência SIIGA)') && has('Payback') && has('a partir do 3º mês') && !/ROI Mensal|Horas recuperadas|% da jornada liberada/i.test(t));
     const mesesEsp = MO === 'terceirizada' ? 3 : 5;
     check('#6 programa pelas Fases de Implementação I, II e III, sem Pilar macro/tático/operacional e sem "Fase 1"', has('Fase de Implementação I') && has('Fase de Implementação II') && has('Fase de Implementação III') && !/Pilar (macro|tático|operacional)/.test(t) && !has('Fase 1'));
     check('programa com a duração do tipo de MO (' + MO + ': ' + mesesEsp + ' meses, R$ ' + (15 * mesesEsp) + '.000)', has('Mês ' + mesesEsp + ' — Análise e resultados') && has('R$ 15.000/mês × ' + mesesEsp + ' meses') && has('R$ ' + (15 * mesesEsp) + '.000'));

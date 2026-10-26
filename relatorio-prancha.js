@@ -81,13 +81,13 @@ var PT_CONSEQ = {
 // PT_FONTE_LABEL (loss source names) and PT_MO_PILAR live in script.js, the single source shared with the tool.
 // Basis of each loss source, without formula (allowed in RESUMIDO: data + rates).
 var PT_FONTE_BASE = {
-  time:'Horas de gestão informadas e hora técnica de referência (R$ 115/h).',
-  timeRef:'Referência de mercado: 98 h/mês nas rotinas de gestão × 80% de economia média (horas não informadas) e hora técnica de referência (R$ 115/h).',
-  retrabalho:'Orçamento da obra informado e referência de mercado de retrabalho (10%).',
-  velocidade:'Orçamento da obra informado e referência de mercado de ganho de prazo (10%).',
-  erros:'Orçamento da obra informado, mão de obra como 45% do custo e desvio médio de medição e folha (5%).',
-  errosTerc:'Orçamento da obra informado, mão de obra como 45% do custo e desvio médio de medição (5%).',
-  mo:'Orçamento da obra informado, mão de obra como 45% do custo e estouro médio de mercado (15%).'
+  time:'Horas de gestão informadas e hora técnica de referência (R$ 115/h). Ajustado pela maturidade.',
+  timeRef:'Referência de mercado: 98 h/mês nas rotinas de gestão × 80% de economia média (horas não informadas) e hora técnica de referência (R$ 115/h). Ajustado pela maturidade.',
+  retrabalho:'Orçamento da obra informado e referência de mercado de retrabalho (10%). Ajustado pela maturidade.',
+  velocidade:'Orçamento da obra informado, custos indiretos de 15% do orçamento e redução de prazo de 10% com o SIIGA (referência SIIGA). Ajustado pela maturidade.',
+  erros:'Orçamento da obra informado, mão de obra como 45% do custo e desvio médio de medição e folha (5%). Ajustado pela maturidade.',
+  errosTerc:'Orçamento da obra informado, mão de obra como 45% do custo e desvio médio de medição (5%). Ajustado pela maturidade.',
+  mo:'Orçamento da obra informado, mão de obra como 45% do custo e estouro médio de mercado (15%). Ajustado pela maturidade.'
 };
 // Same names as the Pilares screen of the tool (sales slide)
 var PT_PILAR_NOME = { f1:'Planejamento estratégico do fluxo de produção', f2:'Proteção e garantia da execução do plano', f3:'Gestão integrada da produção', f4:'Controle real e performance da produção' };
@@ -380,7 +380,7 @@ function ptSecPerdaGanho(M) {
   var mx = porPerda.length ? porPerda[0].perda / P : 0;
   var w = function(v) { return mx ? (v / (mx * 1.22) * 100).toFixed(1) + '%' : '0%'; };
   var lab = function(v) { return ptNum(v / 1000, 1, 1); };
-  var chart = '<div style="margin-top:6mm"><div class="chart-t">' + ptPct(capPct) + ' da perda total é recuperável com o plano: ' + ptMil(ganhoMes, 1) + ' de ' + ptMil(perdaMes, 1) + ' por mês' + (porObra ? ' por obra' : '') + '</div>' +
+  var chart = '<div style="margin-top:6mm"><div class="chart-t">' + ptMil(ganhoMes, 1) + ' dos ' + ptMil(perdaMes, 1) + ' de perda estimada por mês' + (porObra ? ', por obra,' : '') + ' são recuperáveis com o plano</div>' +
     porPerda.map(function(f) {
       return '<div class="pf"><div class="nm">' + f.labelTab + '</div><div class="bb">' +
         '<div class="ln p"><i style="width:' + w(f.mes) + '"></i><span>' + lab(f.mes) + '</span></div>' +
@@ -393,8 +393,7 @@ function ptSecPerdaGanho(M) {
     '<div><span class="lbl">' + (porObra ? 'Obras' : 'Obra') + '</span>' + M.obras + (M.moTxt ? ' · ' + M.moTxt : '') + '</div></div>';
   var b1 = ptSec('02', 'Perda e ganho mensal', true) +
     '<div class="row" style="margin-top:5mm">' + baseInf + '<div>' +
-      '<div class="strip"><div><div class="lbl">Perda total por mês</div><div class="big p">' + ptMil(perdaMes, 1) + '</div></div>' +
-      '<div><div class="lbl">Perda capturada</div><div class="big">' + ptPct(capPct) + '</div></div>' +
+      '<div class="strip two"><div><div class="lbl">Perda estimada por mês</div><div class="big p">' + ptMil(perdaMes, 1) + '</div></div>' +
       '<div><div class="lbl">Ganho mensal</div><div class="big g">' + ptMil(ganhoMes, 1) + '</div></div></div>' +
       chart + '</div></div>';
   var rows = itens.map(function(f) {
@@ -404,7 +403,7 @@ function ptSecPerdaGanho(M) {
   }).join('');
   var portf = porObra ? '<tr class="tot"><td>Total no portfólio (' + M.obras + ' obras)</td><td class="n">' + ptMil(M.roi.totalBase * M.obras / P, 1) + '</td><td class="n"></td><td class="n">' + ptMil(M.roi.totalPortfolio / P, 1) + '</td><td></td></tr>' : '';
   var b2 = '<div class="row sec"><div><div class="lbl rule">Composição</div></div><div><table><thead><tr><th>Fonte de perda</th><th class="n" style="width:22mm">Perda/mês</th><th class="n" style="width:16mm">Captura</th><th class="n" style="width:24mm">Ganho/mês</th><th class="wrap" style="width:31mm;padding-left:5mm">Prioridade ligada</th></tr></thead><tbody>' + rows +
-    '<tr class="tot"><td>' + (porObra ? 'Total por obra' : 'Total, 1 obra') + '</td><td class="n perda">' + ptMil(perdaMes, 1) + '</td><td class="n">' + ptPct(capPct) + '</td><td class="n ganho">' + ptMil(ganhoMes, 1) + '</td><td></td></tr>' + portf + '</tbody></table></div></div>';
+    '<tr class="tot"><td>' + (porObra ? 'Total por obra' : 'Total, 1 obra') + '</td><td class="n perda">' + ptMil(perdaMes, 1) + '</td><td class="n"></td><td class="n ganho">' + ptMil(ganhoMes, 1) + '</td><td></td></tr>' + portf + '</tbody></table><div class="src">Nas fontes Horas do time de gestão e Custo indireto do prazo a captura é 100%: a perda já é a parte que o SIIGA elimina (a parte manual das rotinas e o tempo a mais de obra).</div></div></div>';
   return [{ sec:'02', html:b1 }, { sec:'02', html:b2 }];
 }
 
@@ -425,7 +424,8 @@ function ptSecCriticos(M) {
       '</div><div>' +
         '<div class="kv"><span class="lbl">Fonte de perda</span><div class="txt b6">' + f.label + '</div>' +
           '<div class="vals"><div>' + ptMil(f.mes, 1) + '<small>Perda por mês</small></div><div class="ganho">' + ptMil(f.cap / M.prazo, 1) + '<small>Ganho por mês</small></div></div>' +
-          '<div class="note">' + c.base + '</div></div>' +
+          '<div class="note">' + c.base + '</div>' +
+          ((f.key === 'time' || f.key === 'velocidade') ? '<div class="note" style="margin-top:1mm">Nesta fonte a perda já é a parte que o SIIGA elimina (' + (f.key === 'time' ? 'a parte manual das rotinas' : 'o tempo a mais de obra') + '); a captura é 100%.</div>' : '') + '</div>' +
         (c.dep ? '<div class="kv"><span class="lbl">Depoimento de Cliente Agilean</span><div class="dep">“' + ptEsc(c.dep) + '”</div><div class="dep-a">' + ptEsc(c.depA) + '</div></div>' : '') +
       '</div></div></div></div>';
     blocks.push({ sec:'03', html:(i === 0 ? head : '') + html });
@@ -610,7 +610,7 @@ function ptBlocoReuniao2(M) {
 function ptSecBases(M) {
   var refs = [['Mão de obra como % do custo da obra', '45%']];
   if (M.mo !== 'terceirizada') refs.push(['Estouro médio de mão de obra', '15%']);
-  refs.push(['Retrabalhos (referência de mercado)', ptPct(M.roi.pctRetrabalho || 0.10) + ' do portfólio'], ['Ganho de velocidade de produção', '10% do prazo'],
+  refs.push(['Retrabalhos (referência de mercado)', ptPct(M.roi.pctRetrabalho || 0.10) + ' do portfólio'], ['Custos indiretos × redução de prazo com o SIIGA', '15% do orçamento × 10%'],
     ['Custo de referência da hora técnica', 'R$ ' + ROI_REAL_K.CUSTO_HORA_TECNICA + '/h'],
     ['Média de mercado por pilar (P1 a P4)', ['f1','f2','f3','f4'].map(function(k){ return ptPct(PT_MERCADO[k]); }).join(' · ')]);
   var oper = [['Obras em andamento', String(M.obras)], [M.obras === 1 ? 'Orçamento da obra' : 'Orçamento médio por obra', ptMilVar(M.orc)], ['Prazo da obra', M.prazo + ' meses'],
@@ -620,7 +620,7 @@ function ptSecBases(M) {
   var glos = [['P1 a P4', 'Pilares: P1 ' + PT_PILAR_NOME.f1 + '; P2 ' + PT_PILAR_NOME.f2 + '; P3 ' + PT_PILAR_NOME.f3 + '; P4 ' + PT_PILAR_NOME.f4 + '.'],
     ['EAP','Estrutura analítica do projeto.'],['FVS','Ficha de verificação de serviço.']].concat(semMOPropria() ? [] : [['HH','Homem-hora.']], [['IRR','Índice de remoção de restrições.'],
     ['Lookahead','Planejamento de médio prazo, com janela de semanas à frente da execução.'],['MO','Mão de obra.'],['PPC','Percentual de planos concluídos.'],
-    ['Fator de captura','Fração da perda de cada fonte que se estima recuperar, conforme a maturidade dos pilares ligados à fonte.']]);
+    ['Ajuste pela maturidade','Parte da perda estimada de cada fonte (20% a 70%), conforme a maturidade dos pilares ligados à fonte.']]);
   var t2 = function(rows) { return rows.map(function(r){ return '<tr><td>' + r[0] + '</td><td class="n">' + r[1] + '</td></tr>'; }).join(''); };
   return [
     { sec:'06', breakBefore:true, html:ptSec('06', 'Bases do diagnóstico', true) + '<div class="row" style="margin-top:5mm"><div><div class="lbl rule">Referências de mercado</div></div><div><table><thead><tr><th>Parâmetro</th><th class="n">Valor</th></tr></thead><tbody>' + t2(refs) + '</tbody></table></div></div>' },
@@ -635,33 +635,36 @@ function ptSecAnexo(M) {
   var orcT = ptMilVar(M.orc), P = M.prazo, F = M.fontes, cap = ptPct(ROI_CAPTURA_FIXA), custoH = ROI_REAL_K.CUSTO_HORA_TECNICA;
   var hasMo = !!F.mo;
   var pres = [['Mão de obra como % do custo da obra', '45%']];
-  if (hasMo) pres.push(['Estouro médio de mão de obra', '15%'], ['Redução do estouro com o SIIGA', '70%']);
-  pres.push(['Retrabalho de referência de mercado', '10% do portfólio'], ['Redução do retrabalho com o SIIGA', '40%'], ['Ganho de velocidade', '10% do prazo × 15% dos custos proporcionais'],
-    [semMOPropria() ? 'Desvio médio de medição' : 'Desvio médio de medição e folha', '5%'], ['Horas de gestão recuperáveis', ptNum(M.roi.horasRecup, 0, 1) + ' h/mês' + (M.roi.horasDoCliente ? '' : ' (referência de mercado)')], ['Prazo da obra', P + ' meses'], ['Hora técnica', 'R$ ' + custoH + '/h']);
+  if (hasMo) pres.push(['Estouro médio de mão de obra', '15%'], ['Redução do estouro de MO com o SIIGA', '70% (referência SIIGA)']);
+  pres.push(['Retrabalho de referência de mercado', '10% do portfólio'], ['Redução do retrabalho com o SIIGA', '40% (referência SIIGA)'], ['Redução dos erros de medição' + (semMOPropria() ? '' : ' e folha') + ' com o SIIGA', '70% (referência SIIGA)'],
+    [semMOPropria() ? 'Desvio médio de medição' : 'Desvio médio de medição e folha', '5%'],
+    ['Custos indiretos do prazo (equipe, equipamentos, canteiro)', '15% do orçamento'], ['Redução de prazo com o SIIGA', '10% (referência SIIGA)'],
+    ['Ajuste pela maturidade', '20% a 70%, por fonte'], ['Horas de gestão recuperáveis', ptNum(M.roi.horasRecup, 0, 1) + ' h/mês' + (M.roi.horasDoCliente ? '' : ' (referência de mercado)')], ['Prazo da obra', P + ' meses']);
   var a1 = ptSec('A', 'Anexo A · Memória de cálculo', true) + '<div class="row" style="margin-top:5mm"><div><div class="lbl rule">A.1 Pressupostos</div></div><div><table class="ax"><thead><tr><th>Parâmetro</th><th class="n">Valor</th></tr></thead><tbody>' +
     pres.map(function(r){ return '<tr><td>' + r[0] + '</td><td class="n">' + r[1] + '</td></tr>'; }).join('') + '</tbody></table></div></div>';
   var hR = ptNum(M.roi.horasRecup, 0, 1);
+  var adj = function(k){ return F[k] ? ' × ' + ptPct(F[k].fator) + ' (ajuste)' : ''; };
   var form = {
-    time: hR + ' h/mês × R$ ' + custoH + '/h × ' + P + ' meses; ' + (M.roi.horasDoCliente ? hR + ' h = horas informadas × % de economia de cada rotina (40% planejar, 90% demais)' : 'referência de mercado: ' + ptNum(M.roi.horasRefMercado, 0, 1) + ' h/mês nas rotinas × ' + Math.round(M.roi.economiaMedia * 100) + '% de economia média = ' + hR + ' h/mês recuperáveis (horas não informadas)'),
-    retrabalho: 'Orçamento ' + orcT + ' × 10%',
-    velocidade: 'Orçamento ' + orcT + ' × 10% × 15%',
-    erros: 'Orçamento ' + orcT + ' × 45% × 5%',
-    mo: M.mo === 'mista' ? 'Orçamento ' + orcT + ' × 45% × 50% × 15%' : 'Orçamento ' + orcT + ' × 45% × 15%'
+    time: hR + ' h/mês × R$ ' + custoH + '/h × ' + P + ' meses' + adj('time') + '; ' + (M.roi.horasDoCliente ? hR + ' h = horas informadas × economia de cada rotina (40% planejar, 90% demais)' : 'referência de mercado: ' + ptNum(M.roi.horasRefMercado, 0, 1) + ' h/mês nas rotinas × ' + Math.round(M.roi.economiaMedia * 100) + '% de economia média = ' + hR + ' h/mês recuperáveis (horas não informadas)'),
+    retrabalho: 'Orçamento ' + orcT + ' × 10%' + adj('retrabalho'),
+    velocidade: 'Orçamento ' + orcT + ' × 15% (custos indiretos) × 10% (redução de prazo com o SIIGA)' + adj('velocidade'),
+    erros: 'Orçamento ' + orcT + ' × 45% × 5%' + adj('erros'),
+    mo: (M.mo === 'mista' ? 'Orçamento ' + orcT + ' × 45% × 50% × 15%' : 'Orçamento ' + orcT + ' × 45% × 15%') + adj('mo')
   };
   var a2rows = M.roi.items.map(function(it){ var f = F[it.key]; return '<tr><td>' + f.labelTab + '</td><td class="f">' + form[it.key] + '</td><td class="n">' + ptMil(f.perda, 1) + '</td></tr>'; }).join('');
   var mesRows = M.criticos.filter(function(c){ return c.mes != null; }).map(function(c, i) {
     return '<tr><td>Prioridade ' + c.n + ' (' + c.fonte.label + ')</td><td class="f">' + (i === 0 ? 'Perda da fonte ÷ meses de obra: ' : '') + ptMil(c.fonte.perda, 1) + ' ÷ ' + P + '</td><td class="n">' + ptMil(c.mes, 1) + '</td></tr>';
   }).join('');
   var nC = M.criticos.length;
-  var a2 = '<div class="row sec"><div><div class="lbl rule">A.2 Perda por fonte</div></div><div><table class="ax"><thead><tr><th style="width:44mm">Fonte de perda</th><th>Fórmula (' + P + ' meses)</th><th class="n" style="width:20mm">Valor</th></tr></thead><tbody>' + a2rows +
+  var a2 = '<div class="row sec"><div><div class="lbl rule">A.2 Perda estimada por fonte</div></div><div><table class="ax"><thead><tr><th style="width:44mm">Fonte de perda</th><th>Fórmula (' + P + ' meses)</th><th class="n" style="width:20mm">Valor</th></tr></thead><tbody>' + a2rows +
     '<tr class="tot"><td>Total</td><td></td><td class="n">' + ptMil(M.roi.totalBase, 1) + '</td></tr></tbody></table>' +
     (nC ? '<table class="ax" style="margin-top:6mm"><thead><tr><th style="width:44mm">Perda por mês sem tratamento</th><th>Fórmula</th><th class="n" style="width:24mm">Valor</th></tr></thead><tbody>' + mesRows +
       '<tr class="tot"><td>Total ' + (nC === 1 ? 'da prioridade' : 'das ' + nC + ' prioridades') + '</td><td class="f">' + ptMil(M.critPerda, 1) + ' ÷ ' + P + '</td><td class="n">' + ptMil(M.critMes, 1) + '</td></tr>' +
       '<tr><td>Perda total do Mapa (contexto)</td><td class="f">' + ptMil(M.roi.totalBase, 1) + ' ÷ ' + P + '</td><td class="n">' + ptMil(M.mapaMes, 1) + '</td></tr></tbody></table>' : '') + '</div></div>';
-  var a3rows = M.roi.items.map(function(it){ var f = F[it.key]; return '<tr><td>' + f.labelTab + '</td><td class="f">' + ptMil(f.perda, 1) + (f.reducao < 1 ? ' × ' + ptPct(f.reducao) + ' (redução com o SIIGA)' : '') + ' × ' + ptPct(f.fator) + ' (fator)</td><td class="n">' + ptMil(f.cap, 1) + '</td></tr>'; }).join('');
-  var a3 = '<div class="row sec"><div><div class="lbl rule">A.3 Fator de captura</div></div><div><table class="ax"><thead><tr><th style="width:44mm">Fonte de perda</th><th>Fórmula</th><th class="n" style="width:20mm">Ganho</th></tr></thead><tbody>' + a3rows +
-    '<tr class="tot"><td>Total</td><td></td><td class="n">' + ptMil(M.roi.totalPorObra, 1) + '</td></tr></tbody></table>' +
-    '<div class="src">Fator: % da perda de cada fonte que se estima capturar, conforme a maturidade dos pilares ligados ao ganho; quanto menor a maturidade, maior o fator. Varia de 20% a 70% por fonte e é calculado individualmente. Em retrabalho e estouro de MO, o ganho é a perda × a redução com o SIIGA (40% e 70%) × o fator; a captura efetiva (ganho ÷ perda) é a exibida na tabela de perda e ganho por fonte. Fatores exibidos arredondados; valores calculados com o fator exato.</div></div></div>';
+  var a3rows = M.roi.items.map(function(it){ var f = F[it.key]; return '<tr><td>' + f.labelTab + '</td><td class="f">' + ptMil(f.perda, 1) + ' × ' + ptPct(f.reducao) + (f.reducao < 1 ? '' : '') + '</td><td class="n">' + ptPct(f.capEf) + '</td><td class="n">' + ptMil(f.cap, 1) + '</td></tr>'; }).join('');
+  var a3 = '<div class="row sec"><div><div class="lbl rule">A.3 Redução e ganho</div></div><div><table class="ax"><thead><tr><th style="width:44mm">Fonte de perda</th><th>Fórmula (perda × redução)</th><th class="n" style="width:16mm">Captura</th><th class="n" style="width:20mm">Ganho</th></tr></thead><tbody>' + a3rows +
+    '<tr class="tot"><td>Total</td><td></td><td class="n">' + ptPct(M.roi.totalBase ? M.roi.totalPorObra / M.roi.totalBase : 0) + '</td><td class="n">' + ptMil(M.roi.totalPorObra, 1) + '</td></tr></tbody></table>' +
+    '<div class="src">Ganho = perda estimada × redução com o SIIGA (referência SIIGA); captura = ganho ÷ perda = a redução de cada fonte. O ajuste pela maturidade (20% a 70% por fonte; quanto menor a maturidade, maior o ajuste) já está na perda estimada (A.2). Em Horas do time de gestão e Custo indireto do prazo a captura é 100%: a perda já é a parte que o SIIGA elimina (a parte manual das rotinas e o tempo a mais de obra). Ajustes arredondados na exibição; cálculo com o valor exato.</div></div></div>';
   var Pm = M.perdaMes, G = M.ganhoMes, temFolha = (Pm.retr + Pm.indev) > 0;
   var hPot = M.horasPot, hMes = M.cons.operacional.hMes;
   var compR = '<tr><td>Horas do time técnico</td><td class="f">' + ptHoras(hPot) + ' × R$ ' + custoH + '/h; ganho: horas recuperadas (' + ptHoras(hMes) + ') × R$ ' + custoH + '/h</td><td class="n">' + ptMil(Pm.horas, 2) + '</td><td class="n">' + ptMil(G.horas, 2) + '</td></tr>' +

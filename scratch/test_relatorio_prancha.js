@@ -52,8 +52,8 @@ const C = CASES[CASE];
 const MO = C.b0.modeloMO;
 
 // ── Valores esperados calculados da REGRA, a partir das respostas do caso (não do que o app imprime) ──
-// fator = 0,20 + (1 − maturidade) × 0,50 (20% a 70%); perda bruta sem a redução do SIIGA;
-// ganho = perda × redução (40% retrabalho, 70% estouro de MO, 1 nas demais) × fator.
+// ajuste pela maturidade = 0,20 + (1 − maturidade) × 0,50 (20% a 70%); perda estimada da empresa = referência × ajuste;
+// ganho = perda estimada × redução com o SIIGA (horas 100%, retrabalho 40%, custo indireto do prazo 100%, erros de medição 70%, estouro de MO 70%).
 const nf = (v, d) => v.toLocaleString('pt-BR', { minimumFractionDigits: d, maximumFractionDigits: d });
 const fMil = v => 'R$ ' + nf(v / 1000, 1) + ' mil';                       // ptMil(v, 1)
 const fMilInt = v => v >= 1e6 ? 'R$ ' + nf(v / 1e6, 0).replace(/,0$/, '') + ' mi' : 'R$ ' + nf(v / 1000, 0) + ' mil'; // ptMilInt
@@ -69,14 +69,14 @@ function esperado(Cc) {
   const fator = { time: cap(pm.f3 * 0.5 + pm.f4 * 0.5), retrabalho: cap(pm.f2 * 0.3 + pm.f3 * 0.7), velocidade: cap(pm.f1 * 0.5 + pm.f2 * 0.5), erros: cap(pm.f3 * 0.4 + pm.f4 * 0.6), mo: cap(pm.f3 * 0.7 + pm.f2 * 0.3) };
   // sem horas informadas: 98 h/mês (12,25 dias × 8 h) GASTAS × 80% de economia média ((40% + 4 × 90%) ÷ 5) = 78,4 h/mês recuperáveis
   const horasRec = Cc.horas ? Cc.horas.reduce((a, h, i) => a + h * [0.4, 0.9, 0.9, 0.9, 0.9][i], 0) : 12.25 * 8 * ((0.4 + 4 * 0.9) / 5);
-  const perda = { time: horasRec * 115 * prazo, retrabalho: orc * 0.10, velocidade: orc * 0.10 * 0.15, erros: orc * 0.45 * 0.05 };
-  const red = { time: 1, retrabalho: 0.40, velocidade: 1, erros: 1, mo: 0.70 };
+  const perda = { time: horasRec * 115 * prazo, retrabalho: orc * 0.10, velocidade: orc * 0.15 * 0.10, erros: orc * 0.45 * 0.05 };   // referências, antes do ajuste
+  const red = { time: 1, retrabalho: 0.40, velocidade: 1, erros: 0.70, mo: 0.70 };
   if (mo === 'propria') perda.mo = orc * 0.45 * 0.15; else if (mo === 'mista') perda.mo = orc * 0.45 * 0.50 * 0.15;
   const fontes = Object.keys(perda), P = {}, G = {};
-  fontes.forEach(k => { P[k] = Math.round(perda[k]); G[k] = Math.round(perda[k] * red[k] * fator[k]); });
+  fontes.forEach(k => { P[k] = Math.round(perda[k] * fator[k]); G[k] = Math.round(perda[k] * fator[k] * red[k]); });
   const somaP = fontes.reduce((a, k) => a + P[k], 0), somaG = fontes.reduce((a, k) => a + G[k], 0);
   const top3 = Cc.prioFontes || fontes.slice().sort((a, b) => P[b] - P[a]).slice(0, 3);   // 1 prioridade por fonte, das 3 mais caras (ou as fontes após a retirada)
-  return { prazo, obras, fator, P, G, somaP, somaG, perdaMes: somaP / prazo, ganhoMes: somaG / prazo, capEf: somaG / somaP,
+  return { prazo, obras, fator, red, ref: perda, P, G, somaP, somaG, perdaMes: somaP / prazo, ganhoMes: somaG / prazo, capEf: somaG / somaP,
     critPerda: top3.reduce((a, k) => a + P[k], 0), critMes: top3.reduce((a, k) => a + P[k], 0) / prazo, critCapMes: top3.reduce((a, k) => a + G[k], 0) / prazo, top3 };
 }
 const EXP = esperado(C);
@@ -221,13 +221,13 @@ server.listen(PORT, async () => {
     await page.evaluate(() => { var m = document.getElementById('save-modal'); if (m) m.style.display = 'none'; });
     await page.evaluate(() => document.querySelector('button[onclick="showAhaScreen()"]').click()); await sleep(400);
     await page.evaluate(() => document.querySelector('button[onclick="revealAha(\'mid\')"]').click()); await sleep(400);
-    // AHA: tudo o que se chama de perda usa a perda bruta; o recuperável aparece rotulado
+    // AHA: tudo o que se chama de perda usa a perda estimada (referência × ajuste); o recuperável aparece rotulado, sem o percentual total
     const aha = await page.evaluate(() => ({ perObra: document.getElementById('aha-per-obra').textContent, total: document.getElementById('aha-total').textContent, rec: document.getElementById('aha-recuperavel').textContent, comps: Array.prototype.map.call(document.querySelectorAll('#aha-components .aha-num'), e => e.textContent), sub: document.getElementById('aha-subtotal').textContent, hasConf: !!document.querySelector('#screen-aha [onclick*="showConfirmacao"]') }));
     const ordem = ['time', 'retrabalho', 'velocidade', 'erros', 'mo'].filter(k => EXP.P[k] != null);
-    check('AHA: perda por obra = perda bruta (' + fTela(EXP.somaP) + ', soma das fontes sem redução)', aha.perObra === fTela(EXP.somaP), aha.perObra + ' x ' + fTela(EXP.somaP));
-    check('AHA: portfólio = perda bruta × obras (' + fTela(EXP.somaP * EXP.obras) + ')', aha.total === fTela(EXP.somaP * EXP.obras), aha.total + ' x ' + fTela(EXP.somaP * EXP.obras));
-    check('AHA: composição por fonte em perda bruta e subtotal = perda bruta', JSON.stringify(aha.comps) === JSON.stringify(ordem.map(k => fTela(EXP.P[k]))) && aha.sub === fTela(EXP.somaP), aha.comps.join(' | ') + ' / ' + ordem.map(k => fTela(EXP.P[k])).join(' | '));
-    check('AHA: ganho rotulado como recuperável (' + fTela(EXP.somaG) + ' por obra, ' + fPct(EXP.capEf) + ' da perda)', aha.rec === 'Recuperável com o plano: ' + fTela(EXP.somaG) + ' por obra (' + fPct(EXP.capEf) + ' da perda)' + (EXP.obras > 1 ? ' · ' + fTela(EXP.somaG * EXP.obras) + ' no portfólio' : ''), aha.rec);
+    check('AHA: perda por obra = perda estimada (' + fTela(EXP.somaP) + ', soma das fontes, referência × ajuste)', aha.perObra === fTela(EXP.somaP), aha.perObra + ' x ' + fTela(EXP.somaP));
+    check('AHA: portfólio = perda estimada × obras (' + fTela(EXP.somaP * EXP.obras) + ')', aha.total === fTela(EXP.somaP * EXP.obras), aha.total + ' x ' + fTela(EXP.somaP * EXP.obras));
+    check('AHA: composição por fonte em perda estimada e subtotal = perda estimada', JSON.stringify(aha.comps) === JSON.stringify(ordem.map(k => fTela(EXP.P[k]))) && aha.sub === fTela(EXP.somaP), aha.comps.join(' | ') + ' / ' + ordem.map(k => fTela(EXP.P[k])).join(' | '));
+    check('AHA: ganho rotulado como recuperável (' + fTela(EXP.somaG) + ' por obra), sem o percentual total', aha.rec === 'Recuperável com o plano: ' + fTela(EXP.somaG) + ' por obra' + (EXP.obras > 1 ? ' · ' + fTela(EXP.somaG * EXP.obras) + ' no portfólio' : ''), aha.rec);
     check('AHA sem atalho para a Conferência', !aha.hasConf);
     check('AHA: texto visível sem a palavra "gap"', !GAP.test(await page.evaluate(() => document.getElementById('screen-aha').innerText)));
     await page.evaluate(() => document.querySelector('#screen-aha button[onclick="showReport()"]').click()); await sleep(1200);
@@ -412,7 +412,7 @@ server.listen(PORT, async () => {
       check('sem agendamento: "A definir" e sem tabela', /A definir/.test(all) && !/Participante confirmado/i.test(all));
     }
     // v5: folha 03 on the loss-map base (total loss, captured share, monthly gain, x reference fee), no explanatory notes
-    check('folha 03: perda total, perda capturada e ganho mensal (3 cards), sem notas e sem múltiplo', /Perda total por mês/i.test(dom.pages[2] || '') && /Perda capturada/i.test(dom.pages[2] || '') && /Ganho mensal/i.test(dom.pages[2] || '') && !/mensalidade|×/i.test((dom.pages[2] || '').split(/FONTE DE PERDA/i)[0]) && !/Contexto:|não se somam|Unidade:|Fonte:/.test(dom.pages[2] || ''));
+    check('folha 03: perda estimada por mês e ganho mensal (2 cards, sem o card de captura), sem notas e sem múltiplo', /Perda estimada por mês/i.test(dom.pages[2] || '') && !/Captura\s*\n?\s*\d+%/i.test((dom.pages[2] || '').split(/FONTE DE PERDA/i)[0]) && /Ganho mensal/i.test(dom.pages[2] || '') && !/mensalidade|×/i.test((dom.pages[2] || '').split(/FONTE DE PERDA/i)[0]) && !/Contexto:|não se somam|Unidade:|Fonte:/.test(dom.pages[2] || ''));
     check('PDF sem nenhuma menção a "mensalidade" (toda a versão ' + MODE + ')', !/mensalidade/i.test(all), (all.match(/.{0,30}mensalidade.{0,30}/i) || [''])[0]);
     {
       const num = t => parseFloat(String(t).replace(/[^\d,]/g, '').replace(',', '.'));
@@ -420,8 +420,11 @@ server.listen(PORT, async () => {
       const ruins = linhas.filter(r => { const pm = num(r[1]), c = num(r[2]) / 100, g = num(r[3]); return Math.abs(pm * c - g) > 0.05 + pm * 0.005 + 0.05 * c; }).map(r => r.slice(0, 4).join(' | '));
       check('folha 03: perda × captura = ganho em cada linha (' + linhas.length + ' fontes)', linhas.length >= 4 && ruins.length === 0, JSON.stringify(ruins));
       const tot = (dom.f03 || []).filter(r => /^Total( por obra|, 1 obra)$/.test(semNb(r[0]).trim())).map(r => r.map(semNb))[0];
-      check('folha 03: total por obra também fecha (perda × captura = ganho)', !!tot && Math.abs(num(tot[1]) * num(tot[2]) / 100 - num(tot[3])) <= 0.05 + num(tot[1]) * 0.005 + 0.05 * num(tot[2]) / 100, JSON.stringify(tot));
-      check('folha 03: valores batem com a regra (perda/mês ' + fMil(EXP.perdaMes) + ', ganho/mês ' + fMil(EXP.ganhoMes) + ', captura ' + fPct(EXP.capEf) + ')', !!tot && tot[1] === fMil(EXP.perdaMes) && tot[3] === fMil(EXP.ganhoMes) && tot[2] === fPct(EXP.capEf), JSON.stringify(tot));
+      check('folha 03: a linha Total não mostra o percentual de captura (só por fonte)', !!tot && tot[2] === '', JSON.stringify(tot));
+      check('folha 03: valores batem com a regra (perda estimada/mês ' + fMil(EXP.perdaMes) + ', ganho/mês ' + fMil(EXP.ganhoMes) + ')', !!tot && tot[1] === fMil(EXP.perdaMes) && tot[3] === fMil(EXP.ganhoMes), JSON.stringify(tot));
+      check('folha 03: captura por fonte = redução com o SIIGA (' + linhas.map(r => r[2]).join(', ') + ')', linhas.length >= 4 && linhas.every(r => { const f = Object.keys(EXP.P).filter(k => fMil(EXP.P[k] / EXP.prazo) === r[1] && fMil(EXP.G[k] / EXP.prazo) === r[3])[0]; return f && r[2] === fPct(EXP.red[f]); }), JSON.stringify(linhas));
+      check('folha 03: título em reais ("' + fMil(EXP.ganhoMes) + ' dos ' + fMil(EXP.perdaMes) + ' de perda estimada por mês' + (EXP.obras > 1 ? ', por obra,' : '') + ' são recuperáveis com o plano")', semNb(dom.pages[2] || '').replace(/\s+/g, ' ').indexOf(fMil(EXP.ganhoMes) + ' dos ' + fMil(EXP.perdaMes) + ' de perda estimada por mês' + (EXP.obras > 1 ? ', por obra,' : '') + ' são recuperáveis com o plano') >= 0);
+      check('folha 03: nota das fontes com captura 100% (horas e custo indireto do prazo)', /captura é 100%: a perda já é a parte que o SIIGA elimina/.test(semNb(dom.pages[2] || '').replace(/\s+/g, ' ')));
     }
     check('plano: Fases I e II, depois a Fase III, depois a régua, depois o card do plano de ação', dom.ordem.ok && dom.ordem.I_antes_III && dom.ordem.III_antes_regua && dom.ordem.regua_antes_plano, JSON.stringify(dom.ordem));
     check('folhas 02 e 05 sem IMEDIATA, PROGRAMADA, Dia 0, Após o dia 60 nem Início', !/IMEDIATA|PROGRAMADA|Dia 0|Após o dia 60|início em até|Implantar em até/i.test((dom.pages[1] || '') + (dom.pages[4] || '').split(/PLANO DE TRANSFORMAÇÃO/i)[0]) && !/IMEDIATA|PROGRAMADA/.test(all));
@@ -436,7 +439,7 @@ server.listen(PORT, async () => {
       const p2 = (dom.pages[1] || '').replace(/\u00a0/g, ' '), p3 = (dom.pages[2] || '').replace(/\u00a0/g, ' ');
       const num = s => parseFloat(s.replace(/\./g, '').replace(',', '.'));
       const m2 = p2.match(/perda estimada (?:na|por) obra é de R\$ ([\d.,]+) (mil|mi) em (\d+) meses/);
-      const mm = p3.match(/Perda total por mês\s*R\$ ([\d.,]+) mil/i);
+      const mm = p3.match(/Perda estimada por mês\s*R\$ ([\d.,]+) mil/i);
       const k = u => u === 'mi' ? 1000 : 1;
       const t2 = m2 && num(m2[1]) * k(m2[2]);
       // Sheet 02 total (rounded in the lead) = monthly loss of sheet 03 × term
@@ -461,7 +464,7 @@ server.listen(PORT, async () => {
       check('PCL ★ folhas = ' + EXP_FOLHAS, dom.pages.length === EXP_FOLHAS, dom.pages.length);
     } else if (CASE === 'pcl') {
       ['21,5', fMilInt(EXP.somaP), fMilInt(EXP.critPerda), fMil(EXP.P.retrabalho / EXP.prazo), fMil(EXP.P.time / EXP.prazo), fMil(EXP.P.mo / EXP.prazo),
-       fMil(EXP.critMes) + '/mês', fMil(EXP.critCapMes) + '/mês', fMil(EXP.ganhoMes), fPct(EXP.capEf), fMil(EXP.perdaMes),
+       fMil(EXP.critMes) + '/mês', fMil(EXP.critCapMes) + '/mês', fMil(EXP.ganhoMes), fMil(EXP.perdaMes),
        fMil(EXP.G.time / EXP.prazo), fMil(EXP.G.retrabalho / EXP.prazo), fMil(EXP.G.velocidade / EXP.prazo), fMil(EXP.G.erros / EXP.prazo), fMil(EXP.G.mo / EXP.prazo),
        'Digitalização do painel integrado de indicadores', 'Digitalização da comunicação de bloqueios de pagamento', 'Implantação da gestão de aditivos de verba',
        'Plano de Transformação Operacional para a Construtora PCL', 'Pilar 3, Gestão integrada da produção', 'Resolve: prioridade 2; pontos críticos 04, 05, 06, 10, 11, 12 e 13; 6 pontos em alerta.',
@@ -470,6 +473,17 @@ server.listen(PORT, async () => {
       // Hours+payroll model only in the Detalhado annex (A.4); 15-month source values only in the annex
       [fMil(EXP.P.time), fMil(EXP.P.retrabalho), fMil(EXP.P.mo), fMil(EXP.somaP), 'R$ 20,5 mil', 'R$ 10,25 mil', 'R$ 6,15 mil', fMil(EXP.P.velocidade), fMil(EXP.P.erros), fMil(EXP.somaG)].forEach(s => check('PCL ' + (MODE === 'resumido' ? 'sem' : 'com (Anexo)') + ' "' + s + '"', (allLow.indexOf(s.toLowerCase()) >= 0) === (MODE !== 'resumido')));
       check('PCL sem múltiplo da mensalidade (5,1×, 3,1×, 9,5×, 12,5×)', !/5,1×|3,1×|9,5×|12,5×/.test(all));
+      {
+        const ax = semNb(all).replace(/\s+/g, ' ');
+        check('rodada 5: "Custo indireto do prazo" e sem "Custos proporcionais" nem "Fator de captura" em nenhuma parte', /Custo indireto do prazo/.test(ax) && !/Custos proporcionais|Fator de captura|fator de captura/.test(ax));
+        check('rodada 5: glossário/bases com "Ajuste pela maturidade" e custos indiretos (15% × 10%)', /Ajuste pela maturidade/.test(ax) && /15% do orçamento × 10%/.test(ax));
+        if (MODE !== 'resumido') {
+          check('Anexo A.2 "Perda estimada por fonte": retrabalho = orçamento × 10% × ajuste ' + fPct(EXP.fator.retrabalho), ax.indexOf('A.2 Perda estimada por fonte') >= 0 || /A\.2 PERDA ESTIMADA POR FONTE/.test(ax) ? ax.indexOf('Orçamento R$ 3,5 mi × 10% × ' + fPct(EXP.fator.retrabalho) + ' (ajuste)') >= 0 : false);
+          check('Anexo A.2: custo indireto do prazo = orçamento × 15% (custos indiretos) × 10% (redução de prazo com o SIIGA) × ajuste ' + fPct(EXP.fator.velocidade), ax.indexOf('Orçamento R$ 3,5 mi × 15% (custos indiretos) × 10% (redução de prazo com o SIIGA) × ' + fPct(EXP.fator.velocidade) + ' (ajuste)') >= 0);
+          check('Anexo A.3 "Redução e ganho": retrabalho ' + fMil(EXP.P.retrabalho) + ' × 40%, erros ' + fMil(EXP.P.erros) + ' × 70%, horas ' + fMil(EXP.P.time) + ' × 100%, total com a captura ' + fPct(EXP.capEf), ax.indexOf(fMil(EXP.P.retrabalho) + ' × 40%') >= 0 && ax.indexOf(fMil(EXP.P.erros) + ' × 70%') >= 0 && ax.indexOf(fMil(EXP.P.time) + ' × 100%') >= 0 && ax.indexOf(fPct(EXP.capEf) + ' ' + fMil(EXP.somaG)) >= 0);
+          check('Anexo A.1: custos indiretos 15% do orçamento e redução de prazo 10% (referência SIIGA) em linhas separadas', /Custos indiretos do prazo \(equipe, equipamentos, canteiro\) 15% do orçamento/.test(ax) && /Redução de prazo com o SIIGA 10% \(referência SIIGA\)/.test(ax));
+        }
+      }
       check('PCL sem "custa R$ 26 mil" e sem bloco horas+folha no resumo', !/custa R\$ 26 mil/.test(all) && !/Perda em horas de gestão e folha/i.test(all));
       check('PCL folhas = ' + EXP_FOLHAS, dom.pages.length === EXP_FOLHAS, dom.pages.length);
     } else if (CASE === 'ajuste') {
@@ -485,9 +499,9 @@ server.listen(PORT, async () => {
     } else if (CASE === 'semhoras') {
       // No hours informed: 98 h/mês spent × 80% average saving = 78,4 h/mês recoverable; expected values come from the rule (78,4 h × R$ 115 × prazo × fator)
       const horasRec = 12.25 * 8 * 0.8, perdaTime = horasRec * 115 * EXP.prazo;
-      check('sem horas: perda do time = 78,4 h × R$ 115 × prazo', Math.abs(EXP.P.time - Math.round(perdaTime)) <= 1, EXP.P.time + ' x ' + perdaTime);
-      check('sem horas: ganho do time = perda × fator', Math.abs(EXP.G.time - Math.round(perdaTime * EXP.fator.time)) <= 1, EXP.G.time);
-      [fMil(EXP.P.time / EXP.prazo), fMil(EXP.G.time / EXP.prazo), fMil(EXP.perdaMes), fMil(EXP.ganhoMes), fPct(EXP.capEf)].forEach(s => check('sem horas contém "' + s + '"', all.indexOf(s) >= 0));
+      check('sem horas: referência do time = 78,4 h × R$ 115 × prazo', Math.abs(EXP.ref.time - perdaTime) <= 1, EXP.ref.time + ' x ' + perdaTime);
+      check('sem horas: perda estimada do time = 78,4 h × R$ 115 × prazo × ajuste, e o ganho é igual à perda (redução 100%)', Math.abs(EXP.P.time - Math.round(perdaTime * EXP.fator.time)) <= 1 && EXP.G.time === EXP.P.time, EXP.P.time);
+      [fMil(EXP.P.time / EXP.prazo), fMil(EXP.G.time / EXP.prazo), fMil(EXP.perdaMes), fMil(EXP.ganhoMes)].forEach(s => check('sem horas contém "' + s + '"', all.indexOf(s) >= 0));
       if (MODE !== 'resumido') {
         check('sem horas: Anexo A com 98 h/mês × 80% = 78,4 h/mês', /98\s*h/.test(all) && /80%/.test(all) && /78,4\s*h/.test(all));
         check('sem horas: sem a referência antiga "12,25 dias × 8 h"', !/12,25 dias × 8 ?h/.test(all));

@@ -161,9 +161,9 @@ server.listen(PORT, async () => {
         fluxosText: (document.getElementById('roi2-fluxos-table') || {innerText:'(sem tabela no HTML)'}).innerText,
         cenText: document.getElementById('roi2-cenarios-table').innerText,
         horas: getHorasGestao(), potPleno: r.operacional.potPleno, hMes: r.operacional.hMes, roi: r.estrategica.roi, ganho: r.estrategica.ganhoLiquido,
-        perdaTime: (function(){ var it = calculateROI().items.filter(function(i){ return i.key === 'time'; })[0]; return { base: it.baseValue, basis: it.basis }; })(),
+        perdaTime: (function(){ var it = calculateROI().items.filter(function(i){ return i.key === 'time'; })[0]; return { base: it.baseValue, ref: it.ref, fator: it.fator, basis: it.basis }; })(),
         presDias: (document.getElementById('pres-diaslib') || {}).textContent,
-        fallback: (function(){ var bak = S.roi2; S.roi2 = {folha:0,hPlanejar:0,hCurtoMedio:0,hMedicao:0,hQualidade:0,hConsolidar:0}; var it = calculateROI().items[0]; S.roi2 = bak; return { base: it.baseValue, basis: it.basis }; })(),
+        fallback: (function(){ var bak = S.roi2; S.roi2 = {folha:0,hPlanejar:0,hCurtoMedio:0,hMedicao:0,hQualidade:0,hConsolidar:0}; var it = calculateROI().items[0]; S.roi2 = bak; return { base: it.baseValue, ref: it.ref, fator: it.fator, basis: it.basis }; })(),
         faseLeft: (document.getElementById('screen-report').innerText.match(/\bFases?\b[^\n]{0,40}/g) || [])
       };
     });
@@ -187,9 +187,10 @@ server.listen(PORT, async () => {
     check('potencial pleno = 44×0,4 + (10+28+20+18)×0,9', Math.abs(rep.potPleno - (44 * 0.4 + 76 * 0.9)) < 1e-6, rep.potPleno);
     console.log('Mapa de Perdas (time):', JSON.stringify(rep.perdaTime), '| pressuposto:', rep.presDias);
     console.log('Fallback sem horas:', JSON.stringify(rep.fallback));
-    check('Mapa de Perdas usa horas do cliente: 86 h × R$115 × 22', rep.perdaTime.base === Math.round(86 * 115 * 22), rep.perdaTime.base);
+    check('Mapa de Perdas usa horas do cliente: referência 86 h × R$115 × 22', rep.perdaTime.ref === Math.round(86 * 115 * 22), rep.perdaTime.ref);
+    check('perda estimada do time = referência × ajuste pela maturidade (20% a 70%)', rep.perdaTime.fator >= 0.2 && rep.perdaTime.fator <= 0.7 && rep.perdaTime.base === Math.round(86 * 115 * 22 * rep.perdaTime.fator), rep.perdaTime.base + ' / fator ' + rep.perdaTime.fator);
     check('pressuposto mostra 86 h', /^86 h$/.test(rep.presDias || ''), rep.presDias);
-    check('sem horas: referência de mercado 98 h × 80% (78,4 h) × R$115 × 22', rep.fallback.base === Math.round(98 * 0.8 * 115 * 22) && /referência de mercado/.test(rep.fallback.basis), rep.fallback.base);
+    check('sem horas: referência de mercado 98 h × 80% (78,4 h) × R$115 × 22 × ajuste pela maturidade', rep.fallback.ref === Math.round(98 * 0.8 * 115 * 22) && rep.fallback.base === Math.round(98 * 0.8 * 115 * 22 * rep.fallback.fator) && /referência de mercado/.test(rep.fallback.basis), rep.fallback.base + ' / ref ' + rep.fallback.ref);
     check('tabela de cenários mantida (4 linhas)', (rep.cenText.match(/Pessimista|Conservador|Realista|Pleno/g) || []).length >= 4);
 
     if (WANT_PDF) {

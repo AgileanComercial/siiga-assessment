@@ -30,17 +30,16 @@ function esperado(Cc) {
   const fator = { time: cap(pm.f3 * 0.5 + pm.f4 * 0.5), retrabalho: cap(pm.f2 * 0.3 + pm.f3 * 0.7), velocidade: cap(pm.f1 * 0.5 + pm.f2 * 0.5), erros: cap(pm.f3 * 0.4 + pm.f4 * 0.6), mo: cap(pm.f3 * 0.7 + pm.f2 * 0.3) };
   // sem horas informadas: 98 h/mês (12,25 dias × 8 h) GASTAS × 80% de economia média ((40% + 4 × 90%) ÷ 5) = 78,4 h/mês recuperáveis
   const horasRec = Cc.horas ? Cc.horas.reduce((a, h, i) => a + h * [0.4, 0.9, 0.9, 0.9, 0.9][i], 0) : 12.25 * 8 * ((0.4 + 4 * 0.9) / 5);
-  const perda = { time: horasRec * 115 * prazo, retrabalho: orc * 0.10, velocidade: orc * 0.10 * 0.15, erros: orc * 0.45 * 0.05 };
-  const red = { time: 1, retrabalho: 0.40, velocidade: 1, erros: 1, mo: 0.70 };
+  const perda = { time: horasRec * 115 * prazo, retrabalho: orc * 0.10, velocidade: orc * 0.15 * 0.10, erros: orc * 0.45 * 0.05 };   // referências, antes do ajuste
+  const red = { time: 1, retrabalho: 0.40, velocidade: 1, erros: 0.70, mo: 0.70 };
   if (mo === 'propria') perda.mo = orc * 0.45 * 0.15; else if (mo === 'mista') perda.mo = orc * 0.45 * 0.50 * 0.15;
   const fontes = Object.keys(perda), P = {}, G = {};
-  fontes.forEach(k => { P[k] = Math.round(perda[k]); G[k] = Math.round(perda[k] * red[k] * fator[k]); });
+  fontes.forEach(k => { P[k] = Math.round(perda[k] * fator[k]); G[k] = Math.round(perda[k] * fator[k] * red[k]); });
   const somaP = fontes.reduce((a, k) => a + P[k], 0), somaG = fontes.reduce((a, k) => a + G[k], 0);
   const top3 = Cc.prioFontes || fontes.slice().sort((a, b) => P[b] - P[a]).slice(0, 3);   // 1 prioridade por fonte, das 3 mais caras (ou as fontes após a retirada)
-  return { prazo, obras, fator, P, G, somaP, somaG, perdaMes: somaP / prazo, ganhoMes: somaG / prazo, capEf: somaG / somaP,
+  return { prazo, obras, fator, red, ref: perda, P, G, somaP, somaG, perdaMes: somaP / prazo, ganhoMes: somaG / prazo, capEf: somaG / somaP,
     critPerda: top3.reduce((a, k) => a + P[k], 0), critMes: top3.reduce((a, k) => a + P[k], 0) / prazo, critCapMes: top3.reduce((a, k) => a + G[k], 0) / prazo, top3 };
 }
-
 const norm = t => String(t).replace(/\u00a0/g, ' ').replace(/\s+/g, ' ');
 const moeda = v => 'R$ ' + Math.round(v).toLocaleString('pt-BR');
 
@@ -216,7 +215,8 @@ server.listen(PORT, async () => {
       const paga = pb.mes && pb.mes > meses;
       check('10: plataforma entra a partir do mês ' + (meses + 1) + (paga ? ' e aparece no investimento, por obra' : ' (payback dentro do programa: sem plataforma)'), paga ? txt.indexOf('mensalidade') >= 0 && txt.indexOf('por obra, para ' + cfg.nObras + ' obra') >= 0 : txt.indexOf('plataforma R$') < 0);
       check('10: premissa "a partir do 3º mês" e ganho no período da obra (' + (prazo - 2) + ' meses)', txt.indexOf('Ganho no período da obra, a partir do 3º mês') >= 0 && txt.indexOf('(' + (prazo - 2) + ' meses)') >= 0);
-      check('10: "Captura efetiva (redução com o SIIGA × fator de maturidade, 20% a 70%)" com ' + fPct(EXP.capEf), txt.indexOf('Captura efetiva (redução com o SIIGA × fator de maturidade, 20% a 70%) ' + fPct(EXP.capEf)) >= 0);
+      const redTxt = Object.keys(EXP.red).filter(k => EXP.P[k] != null).map(k => ({ time: 'horas', retrabalho: 'retrabalho', velocidade: 'custo do prazo', erros: 'erros de medição', mo: 'estouro de MO' })[k] + ' ' + fPct(EXP.red[k])).join(' · ');
+      check('10: sem o percentual total de captura; "Redução com o SIIGA por fonte (referência SIIGA)" lista a redução de cada fonte (' + redTxt + ')', tem('Redução com o SIIGA por fonte (referência SIIGA) ' + redTxt) && !/Captura efetiva/i.test(txt) && !/captura efetiva de [0-9]+%/i.test(txt));
       check('10: exposição com o nº de obras da proposta (' + cfg.nObras + ')', tem('Exposição em Risco ' + fTela(EXP.somaP * cfg.nObras)), fTela(EXP.somaP * cfg.nObras));
       check('10: sem "Fator de captura (pela maturidade atual)"', txt.indexOf('Fator de captura (pela maturidade atual)') < 0);
 

@@ -618,41 +618,41 @@ pct_F4 = score_F4 / <span class="number">12</span>  →  contribuição_F4 = pct
     <!-- ROI -->
     <section id="roi">
       <h2><div class="sec-icon" style="background:var(--orange-dim)">💰</div> Cálculo de ROI</h2>
-      <p>O potencial de ganho é estimado com 5 componentes, cada um com pressupostos conservadores documentados:</p>
+      <p>A perda e o ganho são estimados com 5 fontes, cada uma com pressupostos conservadores documentados. A <strong>perda estimada da empresa</strong> de cada fonte é a referência de mercado × o <strong>ajuste pela maturidade</strong> (<code>0,20 + (1 − maturidade dos pilares da fonte) × 0,50</code>, entre 20% e 70%). O <strong>ganho</strong> é a perda estimada × a <strong>redução com o SIIGA</strong> (referência SIIGA); a captura de cada fonte é essa redução.</p>
 
       <div class="info-card" style="border-left:3px solid var(--blue);margin-bottom:12px">
         <div class="card-title" style="color:var(--blue)">⏱ C1 — Otimização do Time de Gestão</div>
         <div class="card-desc">
-          <code>Perda = horas recuperáveis/mês × R$115/h × prazo médio</code><br>
+          <code>Perda estimada = horas recuperáveis/mês × R$115/h × prazo médio × ajuste · Redução 100% (a perda já é a parte manual que o SIIGA elimina)</code><br>
           Horas informadas pelo cliente × % de economia de cada rotina. Sem horas informadas: referência de mercado de 98 h/mês (12,25 dias × 8 h) nas rotinas de gestão (medição, indicadores, reprogramação, folha, qualidade) × 80% de economia média = 78,4 h/mês recuperáveis.
         </div>
       </div>
       <div class="info-card" style="border-left:3px solid var(--red);margin-bottom:12px">
         <div class="card-title" style="color:var(--red)">🔧 C2 — Redução de Retrabalhos</div>
         <div class="card-desc">
-          <code>Ganho = Orçamento × 10% × 40% = Orçamento × 4%</code><br>
+          <code>Perda estimada = Orçamento × 10% × ajuste · Ganho = perda × 40%</code><br>
           Referência CBIC: 10-15% do custo é desperdiçado com retrabalhos. SIIGA reduz pelo menos 40%.
         </div>
       </div>
       <div class="info-card" style="border-left:3px solid var(--green);margin-bottom:12px">
-        <div class="card-title" style="color:var(--green)">🚀 C3 — Ganho em Velocidade</div>
+        <div class="card-title" style="color:var(--green)">🚀 C3 — Custo indireto do prazo</div>
         <div class="card-desc">
-          <code>Ganho = Orçamento × 10% × 15% = Orçamento × 1,5%</code><br>
-          Aumento de 10% na velocidade de produção, aplicado sobre os 15% de custos proporcionais ao tempo.
+          <code>Perda estimada = Orçamento × 15% × 10% × ajuste pela maturidade</code><br>
+          Redução de prazo de 10% com o SIIGA, aplicada sobre os 15% de custos indiretos (equipe, equipamentos e canteiro), que crescem com o tempo de obra. Redução 100%: a perda já é o tempo a mais de obra que o SIIGA elimina.
         </div>
       </div>
       <div class="info-card" style="border-left:3px solid var(--orange);margin-bottom:12px">
         <div class="card-title" style="color:var(--orange)">👷 C4 — Redução de Estouro de MO</div>
         <div class="card-desc">
-          <code>MO Própria: Orçamento × 45% × 15% × 70%</code><br>
-          <code>MO Mista: Orçamento × 45% × 50% × 15% × 70%</code><br>
+          <code>MO Própria: perda estimada = Orçamento × 45% × 15% × ajuste · Ganho = perda × 70%</code><br>
+          <code>MO Mista: perda estimada = Orçamento × 45% × 50% × 15% × ajuste · Ganho = perda × 70%</code><br>
           <code>MO Terceirizada: Zero (risco do empreiteiro)</code>
         </div>
       </div>
       <div class="info-card" style="border-left:3px solid var(--purple)">
         <div class="card-title" style="color:var(--purple)">📋 C5 — Erros de Medição</div>
         <div class="card-desc">
-          <code>Ganho = Orçamento × 45% × 2% = Orçamento × 0,9%</code><br>
+          <code>Perda estimada = Orçamento × 45% × 5% × ajuste · Ganho = perda × 70%</code><br>
           Desvios por erros em planilhas e medições manuais. Aplica-se a todos os modelos de MO.
         </div>
       </div>
