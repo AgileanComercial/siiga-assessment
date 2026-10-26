@@ -304,7 +304,7 @@ function ptDocNome(M) { return 'Relatório Diagnóstico SIIGA'; }
 function ptNivel(n) { return /Parcialmente Estruturado/.test(n || '') ? 'Em alerta · Gargalos de escala' : n; }
 function ptCarimbo(M, n, total) {
   return '<div><img src="' + PT_LOGO + '" alt="Agilean"></div>' +
-    '<div><span class="k">Documento</span><b>Diagnóstico SIIGA · ' + ptEsc(M.empresa) + '</b></div>' +
+    '<div><span class="k">Documento</span><b>' + (M.docRun || 'Diagnóstico SIIGA') + ' · ' + ptEsc(M.empresa) + '</b></div>' +
     '<div><span class="k">Versão</span>' + M.versao + '</div><div><span class="k">Data</span>' + M.data + '</div>' +
     '<div><span class="k">Folha</span><b>' + ptPad(n) + '</b> / ' + ptPad(total) + '</div>';
 }
@@ -705,16 +705,16 @@ function ptPaginate(root, M, blocks) {
   var MM = 96 / 25.4;
   var minGap = 10 * MM; // keep at least 10 mm above the stamp
   function newPage(sec, cont) {
-    var meta = PT_SECOES[sec];
+    var meta = (M.secoes || PT_SECOES)[sec];
     var pg = document.createElement('div');
     pg.className = 'page ' + (meta.cls || '');
-    pg.innerHTML = '<div class="run"><span><b>Diagnóstico SIIGA</b> · ' + ptEsc(M.empresa) + '</span><span>' + sec + ' ' + meta.run + '</span></div>' +
+    pg.innerHTML = '<div class="run"><span><b>' + (M.docRun || 'Diagnóstico SIIGA') + '</b> · ' + ptEsc(M.empresa) + '</span><span>' + sec + ' ' + meta.run + '</span></div>' +
       '<div class="body"></div><div class="carimbo">' + ptCarimbo(M, 0, 0) + '</div>';
     root.appendChild(pg);
     cur = { el:pg, body:pg.querySelector('.body'), sec:sec, n:0 };
     pages.push(cur);
     if (cont && !meta.noCont) {
-      var t = sec === '05' ? ptPlano06(M) : meta.run;
+      var t = (sec === '05' && !M.secoes) ? ptPlano06(M) : meta.run;
       cur.body.insertAdjacentHTML('beforeend', '<div class="row sec first"><div class="lbl rule">' + sec + ' · continuação</div><div class="lbl rule contsub">' + t + '</div></div>');
     }
   }
@@ -733,7 +733,7 @@ function ptPaginate(root, M, blocks) {
   }
   function remove(nodes) { nodes.forEach(function(n){ if (n.parentNode) n.parentNode.removeChild(n); }); }
   blocks.forEach(function(b) {
-    var meta = PT_SECOES[b.sec];
+    var meta = (M.secoes || PT_SECOES)[b.sec];
     var secChange = !cur || cur.sec !== b.sec;
     // flowIfWhole: the section starts on the current sheet when it fits there entirely, or, for a
     // row block, when at least its heading and 3 rows fit (the rest continues on the next sheet)
@@ -748,8 +748,8 @@ function ptPaginate(root, M, blocks) {
       var wn = add(noFirst((b.head || '') + (b.rows ? b.render(b.rows, true, true) : b.html)));
       if (fits()) { shareRun(); secStart[b.sec] = pages.length; cur.n++; return; }
       remove(wn);
-      if (b.rows && b.rows.length > 3) {
-        var pn = add(noFirst(b.head) + b.render(b.rows.slice(0, 3), true, false));
+      if (b.rows && b.rows.length > (M.flowRows || 3)) {
+        var pn = add(noFirst(b.head) + b.render(b.rows.slice(0, (M.flowRows || 3)), true, false));
         flowHere = fits();
         remove(pn);
         if (flowHere) { shareRun(); b = Object.assign({}, b, { head:noFirst(b.head), noWidow:true }); }

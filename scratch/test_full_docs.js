@@ -164,6 +164,7 @@ server.listen(PORT, async () => {
     // ── Gera o PDF da PROPOSTA ──
     const propUri = await page.evaluate(async () => new Promise(resolve => {
       window.__LAST_PROPOSTA_PDF_DATA = null;
+      window.__PT_KEEP_DOM = true;
       generateProposta('detalhado');
       const it = setInterval(() => { if (!document.getElementById('pdf-loading') && window.__LAST_PROPOSTA_PDF_DATA) { clearInterval(it); resolve(window.__LAST_PROPOSTA_PDF_DATA); } }, 300);
       setTimeout(() => { clearInterval(it); resolve(window.__LAST_PROPOSTA_PDF_DATA || null); }, 120000);
@@ -175,11 +176,11 @@ server.listen(PORT, async () => {
     } else { check('PDF da Proposta gerado', false); }
 
     // ── Verifica que a PROPOSTA repete os MESMOS números do diagnóstico ──
-    const prop = await page.evaluate(() => document.getElementById('screen-proposta').innerHTML);
-    const propTxt = await page.evaluate(() => document.getElementById('screen-proposta').innerText);
+    const prop = (await page.evaluate(() => (document.getElementById('ptr-root') || { innerHTML: '' }).innerHTML)).replace(/&nbsp;/g, ' ');
+    const propTxt = (await page.evaluate(() => (document.getElementById('ptr-root') || { innerText: '' }).innerText)).replace(/\u00a0/g, ' ');
     const phas = s => prop.indexOf(s) >= 0;
     const phasT = s => propTxt.indexOf(s) >= 0;  // innerText: score sem <span>, payback sem &lt;
-    check('Proposta: mesmo score /57 do diagnóstico', phasT(canon.scoreStr), canon.scoreStr);
+    check('Proposta: mesmo score /57 do diagnóstico', phasT(canon.scoreStr.replace('.', ',')), canon.scoreStr);
     check('Proposta: mesma exposição BRUTA do diagnóstico', phasT(canon.perdaBrutaStr), canon.perdaBrutaStr);
     // Ganho do Mapa (o do relatório) a partir do 3º mês; payback sobre o investimento total, calculado à parte, mês a mês
     const gMes = canon.porObra / canon.prazo * canon.cfg.nObras, mesesGanho = canon.prazo - 2;
@@ -196,7 +197,7 @@ server.listen(PORT, async () => {
     check('Proposta: payback sobre o investimento total (' + pbTxt + ')', propTxt.replace(/\s+/g, ' ').toLowerCase().indexOf('payback ' + pbTxt) >= 0, pbTxt);
     check('Proposta: nível de maturidade do diagnóstico presente', phas(canon.nivel), canon.nivel);
     // pilares: score sc/max de cada pilar aparece no recap da proposta
-    canon.pilares.forEach(function(p){ check('Proposta: pilar '+p.k+' '+p.sc+'/'+p.max+' presente', phas(p.sc+' / '+p.max), p.sc+' / '+p.max); });
+    canon.pilares.forEach(function(p){ const sc = String(p.sc).replace('.', ','); check('Proposta: pilar '+p.k+' '+sc+'/'+p.max+' presente', phas(sc+' / '+p.max), sc+' / '+p.max); });
 
   } catch (e) { console.error('ERROR', e); fails.push('exception: ' + e.message); }
   console.log(fails.length ? ('\n' + fails.length + ' FALHA(S): ' + fails.join('; ')) : '\nTODOS OS CHECKS PASSARAM — informações batem entre os dois documentos');

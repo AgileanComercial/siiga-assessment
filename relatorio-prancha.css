@@ -319,3 +319,29 @@
 .ptr .leg5{display:flex;gap:6mm;margin-top:2mm;font-size:var(--t-nota)}
 .ptr .leg5 i{display:inline-block;width:3mm;height:2.4mm;margin-right:1.4mm;vertical-align:-.2mm}
 .ptr tr.rec td{color:var(--ok);font-weight:var(--w-forte)}
+
+/* ===================== Proposta (proposta-prancha.js): mesma identidade, classes extras ===================== */
+.ptr .ext{position:absolute;top:0;bottom:0;background:var(--marca)}
+.ptr .nt{margin-top:3mm;padding:1.6mm 0 1.6mm 4mm;border-left:2pt solid var(--marca);font-size:var(--t-nota);line-height:11pt;color:var(--texto2)}
+.ptr .nt b{color:var(--tinta);font-weight:var(--w-forte)}
+.ptr .bl{list-style:none}
+.ptr .bl li{position:relative;padding-left:4mm;font-size:8.6pt;line-height:12pt;margin-bottom:.8mm}
+.ptr .bl li::before{content:"";position:absolute;left:0;top:2.1mm;width:2mm;border-top:1pt solid var(--marca)}
+.ptr .strip.five{grid-template-columns:repeat(5,1fr)}
+.ptr .strip.one{grid-template-columns:1fr}
+.ptr .strip.five>div{padding-right:2mm}
+.ptr .strip.five>div+div{padding-left:2.4mm}
+.ptr .logos{display:flex;flex-wrap:wrap;gap:2mm 3mm;align-items:center;margin-top:3.4mm}
+.ptr .logos .lg{height:8.4mm;min-width:20mm;padding:1mm 2mm;border:.5pt solid var(--hair);display:flex;align-items:center;justify-content:center;background:#fff}
+.ptr .logos .lg.on{border:1.6pt solid var(--marca)}
+.ptr .logos img{max-height:5.6mm;max-width:20mm;object-fit:contain}
+.ptr .cover .fotos{position:absolute;left:var(--m-left);right:var(--m-right);bottom:18mm}
+.ptr .cover .fg{display:grid;grid-template-columns:1fr 1fr;column-gap:4mm}
+.ptr .cover .fg img{width:100%;aspect-ratio:1264/714;object-fit:cover;display:block;border:.4pt solid var(--hair)}
+.ptr .progr .pc.row{border-top:.75pt solid var(--tinta)}
+.ptr .strip s{text-decoration:line-through}
+.ptr.prop .lead{font-size:10pt;line-height:15pt;max-width:none}
+.ptr.prop .sec{margin-top:6.5mm}
+.ptr.prop .sec.first{margin-top:5mm}
+.ptr.prop .progr .pc{padding-top:1.6mm}
+.ptr.prop .bl li{line-height:11.4pt;margin-bottom:.5mm}

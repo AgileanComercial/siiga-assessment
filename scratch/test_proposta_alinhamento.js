@@ -146,16 +146,27 @@ server.listen(PORT, async () => {
       const M = await page.evaluate(() => { var m = ptModel('resumido'); return { crit: m.criticos.map(c => ({ n: c.n, code: c.code, titulo: c.titulo, pilar: c.pilar, frase: c.frase, mes: c.mes, fonte: c.fonte.label, alerta: c.alerta, fase: c.fase })), demais: m.demais.length, fontesLabels: m.roi.items.map(i => m.fontes[i.key].label) }; });
       // Proposta
       const P = await page.evaluate(async () => {
-        window.__LAST_PROPOSTA_PDF_DATA = null; generateProposta('detalhado');
+        window.__LAST_PROPOSTA_PDF_DATA = null; window.__PT_KEEP_DOM = true; generateProposta('detalhado');
         await new Promise(resolve => { const it = setInterval(() => { if (!document.getElementById('pdf-loading') && window.__LAST_PROPOSTA_PDF_DATA) { clearInterval(it); resolve(); } }, 250); setTimeout(() => { clearInterval(it); resolve(); }, 120000); });
-        return { txt: document.getElementById('screen-proposta').innerText, cfg: getPropostaCfg() };
+        var rr = document.getElementById('ptr-root');
+        var tabela = rr ? Array.prototype.filter.call(rr.querySelectorAll('table'), function(t){ return /Pilar · fonte de perda/i.test(t.innerText); })[0] : null;
+        var linhas = tabela ? Array.prototype.map.call(tabela.querySelectorAll('tbody tr'), function(tr){ return Array.prototype.map.call(tr.children, function(td){ return td.innerText.replace(/ /g, ' ').replace(/\s+/g, ' ').trim(); }); }) : [];
+        var pgs = rr ? Array.prototype.slice.call(rr.querySelectorAll(':scope > .page')) : [];
+        var estrutura = { paginas: pgs.length, capaImgs: pgs[0] ? Array.prototype.map.call(pgs[0].querySelectorAll('img'), function(i){ return i.getAttribute('src'); }) : [],
+          carimbos: pgs.filter(function(p){ return !p.classList.contains('cover'); }).map(function(p){ var c = p.querySelector('.carimbo'); return c ? c.innerText.replace(/ /g, ' ').replace(/\s+/g, ' ').trim() : ''; }),
+          folgas: pgs.filter(function(p){ return !p.classList.contains('cover'); }).map(function(p){ var st = p.querySelector('.carimbo').getBoundingClientRect().top, b = 0; p.querySelectorAll('.body > *').forEach(function(e){ b = Math.max(b, e.getBoundingClientRect().bottom); }); return +((st - b) / (96 / 25.4)).toFixed(1); }),
+          ultimoEhTitulo: pgs.filter(function(p){ return !p.classList.contains('cover'); }).map(function(p){ var k = p.querySelector('.body').lastElementChild; return !!(k && k.querySelector && k.querySelector('.secnum') && !k.nextElementSibling && k.parentNode.children.length >= 1 && /^\s*$/.test((k.nextSibling || {}).textContent || '')); }),
+          secnums: rr ? Array.prototype.map.call(rr.querySelectorAll('.secnum'), function(e){ return e.textContent.trim(); }) : [],
+          calcW: rr ? (function(){ var td = Array.prototype.filter.call(rr.querySelectorAll('td'), function(t){ return /^Exposição bruta no portfólio/.test(t.innerText); })[0]; return td ? +(td.getBoundingClientRect().width / (96 / 25.4)).toFixed(1) : 0; })() : 0,
+          fontes: rr ? [getComputedStyle(rr).getPropertyValue('--papel').trim(), getComputedStyle(rr.querySelector('.page')).backgroundColor] : [] };
+        return { txt: rr ? rr.innerText : '', cfg: getPropostaCfg(), linhas: linhas, est: estrutura };
       });
       const txt = norm(P.txt), cfg = P.cfg, lo = txt.toLowerCase();   // rótulos de KPI e títulos saem em maiúsculas no innerText
       const tem = x => lo.indexOf(x.toLowerCase()) >= 0;
 
       // ── prioridades iguais às do relatório ──
       const esperaN = { terc: 3, pcl: 3, ajuste: 3, pcl2: 4, p5: 5, prop: 3 }[nome];
-      check('prioridades: ' + esperaN + ' no relatório e na proposta', M.crit.length === esperaN && (txt.match(/Prioridade \d/g) || []).length >= esperaN, M.crit.length);
+      check('prioridades: ' + esperaN + ' no relatório e na tabela da proposta', M.crit.length === esperaN && P.linhas.length === esperaN, M.crit.length + ' / ' + P.linhas.length);
       if (nome === 'ajuste') check('ajuste: prioridades = MO.6, F4.3, F4.4 (MO.3 retirado) e a proposta não traz o título do MO.3', M.crit.map(c => c.code).join(',') === 'MO.6,F4.3,F4.4' && txt.indexOf('Implantação da gestão de aditivos de verba') < 0, M.crit.map(c => c.code).join(','));
       let ordem = -1, okOrd = true;
       M.crit.forEach(c => {
@@ -164,12 +175,12 @@ server.listen(PORT, async () => {
         if (ip <= ordem) okOrd = false; ordem = ip;
         check('prioridade ' + c.n + ': pilar e fonte "' + c.pilar + ' · ' + c.fonte + '"', txt.indexOf(c.pilar + ' · ' + c.fonte) >= 0);
         if (c.frase) check('prioridade ' + c.n + ': frase do cliente entre aspas', txt.indexOf('“' + c.frase.replace(/\.$/, '') + '.”') >= 0 && rel.indexOf(c.frase.replace(/\.$/, '')) >= 0);
-        if (c.mes != null) check('prioridade ' + c.n + ': perda por mês ' + fMil(c.mes) + ' igual no relatório e na proposta', txt.indexOf('Perda por mês sem tratamento: ' + fMil(c.mes)) >= 0 && rel.indexOf(fMil(c.mes)) >= 0);
+        { const ln = P.linhas.filter(l => l[1].indexOf(c.titulo) === 0)[0] || []; check('prioridade ' + c.n + ': perda por mês ' + (c.mes != null ? fMil(c.mes) : '—') + ' na proposta (1ª prioridade da fonte) e no relatório', (c.mes != null ? ln[ln.length - 1] === fMil(c.mes) && rel.indexOf(fMil(c.mes)) >= 0 : ln[ln.length - 1] === '—'), ln[ln.length - 1]); }
       });
       check('prioridades na mesma ordem do relatório', okOrd);
       const fontesDist = new Set(M.crit.map(c => c.fonte)).size;
-      check('perda por mês só na 1ª prioridade de cada fonte (' + fontesDist + ')', (txt.match(/Perda por mês sem tratamento:/g) || []).length === fontesDist);
-      check('etiquetas Crítico / Em alerta conforme a nota (' + M.crit.filter(c => c.alerta).length + ' em alerta)', (txt.match(/Em alerta Prioridade/gi) || []).length === M.crit.filter(c => c.alerta).length);
+      check('perda por mês só na 1ª prioridade de cada fonte (' + fontesDist + ')', P.linhas.filter(l => l[l.length - 1] !== '—').length === fontesDist);
+      check('etiquetas Crítico / Em alerta conforme a nota (' + M.crit.filter(c => c.alerta).length + ' em alerta)', P.linhas.filter(l => /Em alerta/.test(l.join(' '))).length === M.crit.filter(c => c.alerta).length);
       check('"Demais pontos críticos do diagnóstico: ' + M.demais + '"', M.demais === 0 || txt.indexOf('Demais pontos críticos do diagnóstico: ' + M.demais) >= 0, M.demais);
       check('composição da exposição com os nomes de fonte do relatório', M.fontesLabels.every(l => txt.indexOf(l) >= 0), M.fontesLabels.join(' | '));
 
@@ -196,9 +207,9 @@ server.listen(PORT, async () => {
       ['I', 'II', 'III'].forEach(f => {
         const ns = M.crit.filter(c => c.fase.charAt(0) === f && c.fase.charAt(1) !== 'I' || (c.fase === f)).map(c => c.n);
         const esp = ns.length ? (ns.length === 1 ? 'Prioridade ' + ns[0] : 'Prioridades ' + ns.slice(0, -1).join(', ') + ' e ' + ns[ns.length - 1]) : null;
-        const ini = txt.indexOf('Fase de Implementação ' + f + ' '), fim = f === 'III' ? txt.indexOf('Construção · ~75%') : txt.indexOf('Fase de Implementação ' + (f === 'I' ? 'II' : 'III') + ' ');
-        const bloco = txt.slice(ini, fim);
-        check('04: Fase ' + f + (esp ? ' liga "' + esp + '"' : ' sem prioridade, sem linha de prioridades e sem "Nenhuma"'), esp ? bloco.indexOf(esp) >= 0 : !/Prioridades? \d/.test(bloco) && bloco.indexOf('Nenhuma') < 0, bloco.slice(-60));
+        const ini = lo.indexOf('fase de implementação ' + f.toLowerCase() + ' '), fim = f === 'III' ? lo.indexOf('construção · ~75%') : lo.indexOf('fase de implementação ' + (f === 'I' ? 'ii' : 'iii') + ' ');
+        const bloco = lo.slice(ini, fim);
+        check('04: Fase ' + f + (esp ? ' liga "' + esp + '"' : ' sem prioridade, sem linha de prioridades e sem "Nenhuma"'), esp ? bloco.indexOf(esp.toLowerCase()) >= 0 : !/prioridades? \d/.test(bloco) && bloco.indexOf('nenhuma') < 0, bloco.slice(-60));
       });
       check('04: sem linha de continuidade do Customer Success', txt.indexOf('segue com o Customer Success') < 0);
       check('06: título "Governança, Ritos e Time" e papel do Customer Success nos ' + meses + ' meses', tem('Governança, Ritos e Time') && txt.indexOf('programa nos ' + meses + ' meses') >= 0);
@@ -206,6 +217,14 @@ server.listen(PORT, async () => {
       check('11: "inicia a Fase de Implementação I"', txt.indexOf('inicia a Fase de Implementação I na semana') >= 0);
       check('03: sem a promessa de benchmark do setor', !/benchmark do setor/i.test(txt));
 
+      // ── identidade do relatório: tema claro, folga, carimbo, numeração, capa ──
+      const E = P.est;
+      check('visual: tema claro do relatório (papel ' + E.fontes[0] + ') e proposta paginada fora da tela (' + E.paginas + ' folhas)', /^#?F{3,6}$|#FFFFFF/i.test(E.fontes[0]) && E.paginas >= 6 && E.paginas <= 12, E.fontes.join(' / '));
+      check('visual: folga mínima de 10 mm até o carimbo em todas as folhas (' + E.folgas.join(', ') + ')', E.folgas.every(f => f >= 10), Math.min.apply(null, E.folgas));
+      check('visual: carimbo "Proposta SIIGA · empresa", versão e "Folha N / ' + E.paginas + '" em sequência', E.carimbos.every((c, i) => /Proposta SIIGA ·/.test(c) && new RegExp('FOLHA 0?' + (i + 2) + ' / 0?' + E.paginas, 'i').test(c) || new RegExp('Folha 0?' + (i + 2) + ' / 0?' + E.paginas, 'i').test(c)), E.carimbos[0]);
+      check('visual: tabela "Como é calculado" com a coluna de itens larga (' + E.calcW + ' mm; sem quebra letra a letra)', E.calcW >= 70, E.calcW);
+      check('visual: capa com as 2 fotos do Lean Experience', E.capaImgs.filter(s => /img\/lean\/lean[12]\.jpg/.test(s)).length === 2, E.capaImgs.join(','));
+      check('visual: seções numeradas em sequência (01..' + E.secnums.length + ') e sem título órfão no fim de folha', E.secnums.every((n, i) => n === (i + 1 < 10 ? '0' : '') + (i + 1)) && E.ultimoEhTitulo.every(x => !x), E.secnums.join(',') + ' / ' + E.ultimoEhTitulo.join(','));
       // ── seção 10: payback sobre o investimento total, ganho a partir do mês 3 (esperado calculado à parte) ──
       const prazo = +C.prazo, ganhoMes = EXP.somaG / prazo * cfg.nObras;
       const pb = paybackEsperado(cfg, ganhoMes, prazo, meses, 3);

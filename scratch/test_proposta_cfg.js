@@ -33,12 +33,14 @@ async function gerar(page, cfg) {
   return await page.evaluate(async (cfg) => {
     S.proposta = cfg;
     window.__LAST_PROPOSTA_PDF_DATA = null;
+    window.__PT_KEEP_DOM = true;
     generateProposta('detalhado');
     const uri = await new Promise(resolve => {
       const it = setInterval(() => { if (!document.getElementById('pdf-loading') && window.__LAST_PROPOSTA_PDF_DATA) { clearInterval(it); resolve(window.__LAST_PROPOSTA_PDF_DATA); } }, 250);
       setTimeout(() => { clearInterval(it); resolve(window.__LAST_PROPOSTA_PDF_DATA || null); }, 90000);
     });
-    return { txt: document.getElementById('screen-proposta').innerText, uri: uri };
+    var rr = document.getElementById('ptr-root'); var out = { txt: (rr ? rr.innerText : '').replace(/\u00a0/g, ' '), uri: uri }; if (rr) rr.parentNode.removeChild(rr);
+    return out;
   }, cfg);
 }
 function savePdf(uri, name, check) {

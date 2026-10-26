@@ -114,6 +114,7 @@ server.listen(PORT, async () => {
     async function gerar(mode) {
       const uri = await page.evaluate(async (m) => new Promise(resolve => {
         window.__LAST_PROPOSTA_PDF_DATA = null;
+        window.__PT_KEEP_DOM = true;
         generateProposta(m);
         const it = setInterval(() => { if (!document.getElementById('pdf-loading') && window.__LAST_PROPOSTA_PDF_DATA) { clearInterval(it); resolve(window.__LAST_PROPOSTA_PDF_DATA); } }, 300);
         setTimeout(() => { clearInterval(it); resolve(window.__LAST_PROPOSTA_PDF_DATA || null); }, 120000);
@@ -131,11 +132,13 @@ server.listen(PORT, async () => {
     await gerar('detalhado');
 
     // ── Assertions sobre o DOM da proposta (modo detalhado, já construído) ──
-    const t = await page.evaluate(() => document.getElementById('screen-proposta').innerHTML);
-    const has = s => t.indexOf(s) >= 0;
+    const t = (await page.evaluate(() => (document.getElementById('ptr-root') || { innerHTML: '' }).innerHTML)).replace(/&nbsp;/g, ' ');
+    const tl = t.toLowerCase();
+    const has = s => tl.indexOf(s.toLowerCase()) >= 0;      // títulos saem em maiúsculas só por CSS; o HTML guarda o texto original
+    const hasCS = s => t.indexOf(s) >= 0;
     check('#1 hero renomeado', has('Proposta do Escopo de Projeto para a'));
     check('#1 subtítulo consultivo (nasce do diagnóstico)', has('nasce diretamente do diagnóstico'));
-    check('#1 faixa Lean Experience na capa (3 fotos)', has('Workshop Lean Experience') && (t.match(/img\/lean\/Foto/g)||[]).length === 3);
+    check('#1 faixa Lean Experience na capa (2 fotos)', has('Workshop Lean Experience') && (t.match(/img\/lean\/lean\d\.jpg/g)||[]).length === 2);
     check('#2 faixa "prêmio/valor em jogo" removida', !has('valor em jogo') && !has('O PRÊMIO'));
     check('#3 recap com nome da empresa', has('Recapitulação Executiva do Diagnóstico SIIGA da CONSTRUTORA MERIDIANO'));
     check('#4 principais pontos críticos', has('Principais pontos críticos do diagnóstico') && has('composição da exposição'));
@@ -150,7 +153,7 @@ server.listen(PORT, async () => {
     check('#9 implantação x redesenho', has('Implantação de Sistema × Redesenho SIIGA'));
     check('#10 depoimentos (CONX/Dimas/Dasart)', has('CONX') && has('Natalia V. de Dios') && has('Claudio Barreira'));
     check('#11 investimento personalizado', has('Investimento Personalizado para a CONSTRUTORA MERIDIANO'));
-    check('#11 sem chips de módulos', !has('MO3') && !has('MOP') && !has('CPO'));
+    check('#11 sem chips de módulos', !hasCS('MO3') && !hasCS('MOP') && !hasCS('CPO'));
     check('#12 retorno projetado personalizado', has('Retorno Projetado para a CONSTRUTORA MERIDIANO'));
     check('#12 exposição bruta × ganho no período + payback sobre o investimento total (sem ROI Mensal, horas nem % da jornada)', has('Exposição em Risco') && has('Ganho capturável com o programa') && has('Redução com o SIIGA por fonte (referência SIIGA)') && has('Payback') && has('a partir do 3º mês') && !/ROI Mensal|Horas recuperadas|% da jornada liberada/i.test(t));
     const mesesEsp = MO === 'terceirizada' ? 3 : 5;

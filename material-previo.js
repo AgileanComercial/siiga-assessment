@@ -29,7 +29,7 @@ var MPV_LOGO_AREA = 104, MPV_LOGO_WMAX = 24, MPV_LOGO_HMAX = 6.6; // mm², mm, m
 var MPV_PILARES = ['Planejamento estratégico do fluxo de produção', 'Proteção e garantia da execução do plano',
   'Gestão integrada da produção', 'Controle real e performance da produção'];
 
-// Depoimentos aprovados, texto literal da proposta (buildPropostaDepoimentos em script.js).
+// Depoimentos aprovados, texto literal da proposta (ptpDepoimentos em proposta-prancha.js).
 var MPV_DEPOIMENTOS = [
   ['“Uma das maiores vantagens que o Agilean nos trouxe foi a capacidade de rastrear e monitorar o progresso das nossas obras em tempo real, permitindo decisões rápidas com dados confiáveis de canteiro. Aumentamos consideravelmente o cumprimento dos prazos.”',
     'Alessandra Silva', 'Coordenação de Planejamento e Controle · CONX', 'https://www.youtube.com/watch?v=cxprJ6c4Z70'],

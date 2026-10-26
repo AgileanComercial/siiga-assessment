@@ -33,12 +33,14 @@ async function gerar(page, cfg) {
   return await page.evaluate(async (cfg) => {
     S.proposta = cfg;
     window.__LAST_PROPOSTA_PDF_DATA = null;
+    window.__PT_KEEP_DOM = true;
     generateProposta('detalhado');
     const uri = await new Promise(resolve => {
       const it = setInterval(() => { if (!document.getElementById('pdf-loading') && window.__LAST_PROPOSTA_PDF_DATA) { clearInterval(it); resolve(window.__LAST_PROPOSTA_PDF_DATA); } }, 250);
       setTimeout(() => { clearInterval(it); resolve(window.__LAST_PROPOSTA_PDF_DATA || null); }, 90000);
     });
-    return { txt: document.getElementById('screen-proposta').innerText, uri: uri };
+    var rr = document.getElementById('ptr-root'); var out = { txt: (rr ? rr.innerText : '').replace(/\u00a0/g, ' '), secnums: rr ? Array.prototype.map.call(rr.querySelectorAll('.secnum'), function(e){ return e.textContent.trim(); }) : [], uri: uri }; if (rr) rr.parentNode.removeChild(rr);
+    return out;
   }, cfg);
 }
 function savePdf(uri, name, check) {
@@ -129,7 +131,7 @@ server.listen(PORT, async () => {
     check('A: cobrança desde o 1º mês de uso', rA.txt.indexOf('1º mês de uso') >= 0);
     check('A: sem "Fase 1"/Kick-Off do programa', rA.txt.indexOf('Fase 1') < 0);
     check('A: sem total multiplicado (R$ 8.500 /mês)', rA.txt.indexOf('8.500') < 0 && rA.txt.indexOf('9.660') < 0);
-    const nums = await page.evaluate(() => Array.from(document.querySelectorAll('#screen-proposta .card')).filter(c => c.style.display !== 'none').map(c => { var e = c.querySelector('.prop-sec-num'); return e ? e.textContent : null; }).filter(Boolean));
+    const nums = rA.secnums;
     check('A: numeração contínua 01..N', nums.every((v, i) => v === (i + 1 < 10 ? '0' : '') + (i + 1)), nums.join(','));
 
     // ── B: os dois produtos ativos, desconto por obra ──

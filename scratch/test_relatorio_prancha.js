@@ -238,7 +238,7 @@ server.listen(PORT, async () => {
     // Proposta e diagnóstico focado (telas montadas aqui só para ler o texto; o PDF do relatório vem depois e não depende delas)
     const outras = await page.evaluate(() => {
       var r = {};
-      try { buildProposta('detalhado'); showScreen('screen-proposta'); r.proposta = document.getElementById('screen-proposta').innerText; } catch (e) { r.proposta = 'ERRO ' + e.message; }
+      try { var pb = ptpBuild(); r.proposta = pb.root.innerText; pb.root.parentNode.removeChild(pb.root); } catch (e) { r.proposta = 'ERRO ' + e.message; }
       try { focusedPilar = 'f3'; showFocusedResult(); r.focado = document.getElementById('screen-focused-result').innerText; } catch (e) { r.focado = 'ERRO ' + e.message; }
       showScreen('screen-report');
       return r;
