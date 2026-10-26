@@ -84,7 +84,7 @@ server.listen(PORT, async () => {
       page.on('pageerror', err => { console.log('PAGE ERROR:', err.message); fails.push(nome + ' pageerror: ' + err.message); });
       page.on('dialog', d => d.dismiss());
       await page.setViewport({ width: 1280, height: 1000, deviceScaleFactor: 1 });
-      await page.goto('http://localhost:' + PORT + '/index.html', { waitUntil: 'networkidle0' });
+      await page.goto(process.env.PROD_URL || ('http://localhost:' + PORT + '/index.html'), { waitUntil: 'networkidle0' });   // PROD_URL=https://siiga.vercel.app roda em produção
       await page.evaluate(() => { try { localStorage.clear(); } catch (e) {} });
       await page.type('#c-empresa', C.empresa); await page.type('#c-contato', C.contato);
       await page.evaluate(v => { document.getElementById('c-cargo').value = v; }, C.cargo);
