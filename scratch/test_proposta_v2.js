@@ -144,7 +144,7 @@ server.listen(PORT, async () => {
     check('#7 resultados por nível', has('Resultados Esperados por Nível'));
     check('#7 integração com ERP do cliente (Sienge)', has('Integrações Nativas de ERP') && has('nativamente ao Sienge'));
     check('#7 cards de integração padrão (orçamento×plan. + medições)', has('Orçamento × Planejamento') && has('Envio das medições físico-financeiras'));
-    check('#8 jornada/governança', has('Jornada, Governança e Time'));
+    check('#8 governança, ritos e time (sem "Jornada")', has('Governança, Ritos e Time') && !/jornada/i.test(t.replace(/<[^>]+>/g, ' ')));
     check('#8 formato remoto (sem "3 encontros presenciais")', has('forma') && has('remota') && !has('3 encontros presenciais'));
     check('#9 método SIIGA + base metodologia', has('O Método SIIGA') && has('A base da nossa Metodologia SIIGA'));
     check('#9 implantação x redesenho', has('Implantação de Sistema × Redesenho SIIGA'));
@@ -152,7 +152,10 @@ server.listen(PORT, async () => {
     check('#11 investimento personalizado', has('Investimento Personalizado para a CONSTRUTORA MERIDIANO'));
     check('#11 sem chips de módulos', !has('MO3') && !has('MOP') && !has('CPO'));
     check('#12 retorno projetado personalizado', has('Retorno Projetado para a CONSTRUTORA MERIDIANO'));
-    check('#12 exposição bruta × ganho capturável + payback', has('Exposição em Risco') && has('Ganho capturável com o programa') && has('fator de captura pela maturidade') && has('Payback'));
+    check('#12 exposição bruta × ganho no período + payback sobre o investimento total (sem ROI Mensal, horas nem % da jornada)', has('Exposição em Risco') && has('Ganho capturável com o programa') && has('Captura efetiva (redução com o SIIGA × fator de maturidade, 20% a 70%)') && has('Payback') && has('a partir do 3º mês') && !/ROI Mensal|Horas recuperadas|% da jornada liberada/i.test(t));
+    const mesesEsp = MO === 'terceirizada' ? 3 : 5;
+    check('#6 programa pelas Fases de Implementação I, II e III, sem Pilar macro/tático/operacional e sem "Fase 1"', has('Fase de Implementação I') && has('Fase de Implementação II') && has('Fase de Implementação III') && !/Pilar (macro|tático|operacional)/.test(t) && !has('Fase 1'));
+    check('programa com a duração do tipo de MO (' + MO + ': ' + mesesEsp + ' meses, R$ ' + (15 * mesesEsp) + '.000)', has('Mês ' + mesesEsp + ' — Análise e resultados') && has('R$ 15.000/mês × ' + mesesEsp + ' meses') && has('R$ ' + (15 * mesesEsp) + '.000'));
     check('#12 sem duplo desconto (sem "captura de 50%")', !has('captura de 50%') && !has('AGRESSIVO') && !has('Agressivo'));
     check('#13 próximo passo consultivo (kick-off + orçamento das obras)', has('data do Kick-Off') && has('planejamento e o orçamento das obras'));
     check('sem título antigo "Proposta Comercial" na tela', !has('Proposta Comercial'));

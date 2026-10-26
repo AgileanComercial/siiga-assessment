@@ -130,9 +130,10 @@ server.listen(PORT, async () => {
     // ── CENÁRIO 2: só consultoria — Ativação "não se aplica", sem piloto ──
     const r2 = await gerar(page, { plan:'maestria', ativNA:true, piloto:false, validade:15 });
     savePdf(r2.uri, 'SIIGA_Proposta_Teste2_SoConsultoria_SemAtivacao.pdf', check);
-    check('C2: Ativação "Não se aplica" presente', r2.txt.indexOf('Não se aplica') >= 0);
+    check('C2: sem card de Ativação ("não se aplica")', r2.txt.indexOf('Produto 2') < 0 && r2.txt.indexOf('setup único') < 0);
     check('C2: NÃO cita Modelo Piloto', r2.txt.indexOf('Modelo Piloto') < 0);
-    check('C2: consultoria em valor cheio (60.000)', r2.txt.indexOf('60.000') >= 0);
+    const mesesC2 = await page.evaluate(() => S.modeloMO === 'terceirizada' ? 3 : 5);   // duração do programa = a das Fases do tipo de MO
+    check('C2: consultoria em valor cheio (15.000 × ' + mesesC2 + ' = ' + (15 * mesesC2) + '.000)', r2.txt.indexOf((15 * mesesC2) + '.000') >= 0);
 
     // ── CENÁRIO 3: Escala + módulos (MO terc. + Qualidade), valores cheios ──
     const r3 = await gerar(page, { plan:'escala', mods:{ mo3:true, qq:true }, validade:30 });

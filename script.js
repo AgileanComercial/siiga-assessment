@@ -5529,12 +5529,20 @@ var PROPOSTA_WEEK_DEFERRED = 'A partir da Semana 13 (Mês 4+)';
 //  fórmula nova nem LLM. Ver [[project_siiga_proposta_reuniao2]].
 // ───────────────────────────────────────────────────────────────────────────
 
-// Programa de consultoria: ticket e duração fixos por escopo (decisão de
-// negócio travada — R$15.000/mês × 4 meses = R$60.000). NÃO é implementação
-// única; é a mensalidade da consultoria (Modelo 4 / WR).
+// Programa de consultoria: ticket mensal fixo (R$15.000/mês) e duração igual à das
+// Fases de Implementação do relatório para o tipo de MO (propProgramaMeses): 3 meses
+// na terceirizada, 5 na própria e na mista. NÃO é implementação única; é a
+// mensalidade da consultoria (Modelo 4 / WR).
 var PROP_PROGRAMA_MENSAL = 15000;
-var PROP_PROGRAMA_MESES  = 4;
-var PROP_PROGRAMA_TOTAL  = PROP_PROGRAMA_MENSAL * PROP_PROGRAMA_MESES;
+// Meses do programa = dia final da última Fase ÷ 30, derivado de ptFrentesIII (relatorio-prancha.js):
+// Fases I e II até o dia 60; Fase III até o dia 90 (terceirizada) ou 150 (própria / mista).
+function propProgramaMeses(mo) {
+  var fim = 60;
+  ptFrentesIII(mo || '').forEach(function(f){ if (f.fim > fim) fim = f.fim; });
+  return Math.ceil(fim / 30);
+}
+// Meses do programa desta proposta (o padrão do tipo de MO, salvo override em S.proposta.progMeses)
+function propProgMeses() { return getPropostaCfg().progMeses; }
 
 // ── Preços comerciais da Proposta (planilha Agilean_Preços Revisados_2026) ────
 // Os DOIS produtos da proposta: (1) Redesenho de Processos SIIGA = consultoria
@@ -5582,7 +5590,7 @@ function getPropostaCfg(){
   var n = Math.max(1, Math.round(u.nObras || S.numObras || 1));   // nº de obras COTADO (vendedor pode ajustar)
   var plan = u.plan || 'maestria';
   if(!PROP_ATIVACAO[plan]) plan = 'maestria';
-  var progMeses = u.progMeses || PROP_PROGRAMA_MESES;
+  var progMeses = u.progMeses || propProgramaMeses(S.modeloMO);
   var mods = u.mods || {};
   var precoObra = propPrecoPlanoObra(plan, n);
   var modsPerObra = 0;
@@ -5613,14 +5621,6 @@ function propPilotoObs(cfg){
     : 'As '+pm+' primeiras mensalidades da plataforma são isentas (Modelo Piloto); a cobrança começa no '+(pm+1)+'º mês de uso.';
 }
 
-// Nomes curtos dos pilares para a Proposta (mesmos do relatório, encurtados
-// como no protótipo revisado).
-var PROP_PILAR_NOMES = {
-  f1: 'Pilar 1 · Planejamento Estratégico do Fluxo',
-  f2: 'Pilar 2 · Proteção e Garantia da Execução',
-  f3: 'Pilar 3 · Gestão Integrada da Produção',
-  f4: 'Pilar 4 · Controle e Performance'
-};
 // Benchmark de mercado por pilar (mesmo vetor do radar do diagnóstico) — usado
 // como marcador ("tick") nas barras de maturidade da Proposta.
 var PROP_BENCHMARK = { f1: 0.70, f2: 0.62, f3: 0.55, f4: 0.58 };
@@ -5683,7 +5683,7 @@ function buildPropostaHero(mode) {
       '<div style="font-family:Bai Jamjuree;font-size:34px;font-weight:700;line-height:1.15;color:#f8fafc;margin-bottom:18px">Proposta do Escopo de Projeto para a<br>Evolução da <span style="color:#ea580c">'+emp+'</span></div>' +
       '<div style="font-size:14px;color:#cbd5e1;line-height:1.65;max-width:640px">Este escopo nasce diretamente do diagnóstico SIIGA da '+emp+'. '+(soAtiv
         ? 'Ele coloca a plataforma SIIGA para rodar na sua operação, apoiando a gestão das obras com os dados do diagnóstico.'
-        : 'Ele traduz os pontos críticos identificados em um programa de '+PROP_PROGRAMA_MESES+' meses para redesenhar a forma de planejar e executar — destravando valor real na sua operação e deixando o time autônomo para sustentar o ganho.')+'</div>' +
+        : 'Ele traduz os pontos críticos identificados em um programa de '+propProgMeses()+' meses para redesenhar a forma de planejar e executar — destravando valor real na sua operação e deixando o time autônomo para sustentar o ganho.')+'</div>' +
       // Faixa de fotos do Lean Experience no rodapé da capa (imagens em img/lean/,
       // da pág. 7 da proposta modelo WR Engenharia). O kick-off do programa é o
       // Workshop Lean Experience — a capa ancora essa prova visual.
@@ -5703,76 +5703,108 @@ function buildPropostaHero(mode) {
     '</div>';
 }
 
+// Nome do pilar como no relatório ("Pilar N · ..."), lido de PT_PILAR_NOME (relatorio-prancha.js) na hora de montar.
+function propPilarNome(k) { return 'Pilar ' + k.charAt(1) + ' · ' + PT_PILAR_NOME[k]; }
+
+// Investimento mês a mês e payback sobre o INVESTIMENTO TOTAL (Redesenho + Ativação + plataforma).
+// Ganho mensal do portfólio = (roi.totalPorObra ÷ prazo) × nº de obras da proposta, o mesmo ganho do relatório.
+// Redesenho: progPor em progMeses parcelas iguais. Ativação: ativPor no mês 1. Plataforma: mensalPor × nObras
+// a partir do mês seguinte ao programa (desde o mês 1 sem Redesenho), menos as isenções do Modelo Piloto.
+// Payback = 1º mês, até `horizonte`, em que o ganho acumulado alcança o investimento acumulado (null se não alcança).
+function propPayback(roi, cfg, horizonte, inicioGanho) {
+  var P = S.prazoMedio || 18;
+  var ganhoMes = roi.totalPorObra / P * cfg.nObras;
+  var ini = inicioGanho || 1;
+  var parcela = cfg.progNA ? 0 : cfg.progPor / cfg.progMeses;
+  var plataIni = cfg.progNA ? 1 : cfg.progMeses + 1;
+  var inv = 0, ganho = 0, mes = null, invRed = 0, invAtiv = 0, invPlat = 0, mesesPlat = 0;
+  for (var m = 1; m <= horizonte; m++) {
+    var d = 0;
+    if (!cfg.progNA && m <= cfg.progMeses) { d += parcela; invRed += parcela; }
+    if (!cfg.ativNA && m === 1) { d += cfg.ativPor; invAtiv += cfg.ativPor; }
+    if (m >= plataIni) {
+      var k = m - plataIni + 1;
+      if (!(cfg.piloto && k <= cfg.pilotoMeses)) { d += cfg.mensalPor * cfg.nObras; invPlat += cfg.mensalPor * cfg.nObras; mesesPlat++; }
+    }
+    inv += d;
+    if (m >= ini) ganho += ganhoMes;
+    if (mes === null && ganho >= inv) { mes = m; break; }
+  }
+  return { mes: mes, ganhoMes: ganhoMes, inv: inv, ganho: ganho, invRed: invRed, invAtiv: invAtiv, invPlat: invPlat, mesesPlat: mesesPlat, horizonte: horizonte, inicioGanho: ini };
+}
+
 // ── SEÇÃO 01: RECAPITULAÇÃO EXECUTIVA DO DIAGNÓSTICO (#3) ────────────────────
-// Título com nome da empresa (#3). Reaproveita os 3 números do Executive
-// Snapshot (Score, Exposição, Payback) + barras de maturidade por pilar.
+// Os 3 números que o cliente viu na 1ª reunião, iguais aos do relatório: SIIGA Score, Perda por mês
+// (por obra e no portfólio) e Recuperável com o plano (das prioridades). Nomes de pilar do relatório.
 function buildPropostaRecap(mode) {
   var c = document.getElementById('prop-recap-container'); if (!c) return;
   var emp = S.empresa || 'sua empresa';
-  var m = getMaturityScoreSummary();
-  var roi = calculateROI();
-  var r = window._lastROIReal || calcROIReal(ROI_CAPTURA_FIXA);
-  var paybackTxt = r ? fmtPayback(r.estrategica.payback).txt : '—';
+  var M = ptModel('resumido');
+  var m = M.score;
+  var nC = M.criticos.length;
+  var perdaMes = M.roi.totalBase / M.prazo;
 
-  var bars = ['f1','f2','f3','f4'].map(function(k){
-    var cur = getAvgPct(k);
-    var sc = getScore(k), mx = SCORE_MAX_PILAR[k];
-    return propBar(PROP_PILAR_NOMES[k], cur, sc+' / '+mx+' · '+Math.round(cur*100)+'%', PROP_BENCHMARK[k]);
+  var bars = M.pilares.map(function(p){
+    var sc = ptNum(p.pts, 0, 1);
+    return propBar(propPilarNome(p.k), p.pct, sc+' / '+p.max+' · '+Math.round(p.pct*100)+'%', PROP_BENCHMARK[p.k]);
   }).join('');
 
   c.innerHTML =
     propSecHead('01', 'Recapitulação Executiva do Diagnóstico SIIGA da ' + emp) +
     propLead('Os três números que fecharam a 1ª reunião — a régua contra a qual mediremos o programa.') +
     '<div style="display:grid;grid-template-columns:repeat(3,1fr);gap:14px;margin-bottom:22px">' +
-      propKpi('SIIGA Score', m.score+'<span style="font-size:15px;color:#94a3b8">/'+m.max+'</span>', 'Nível '+m.nivel+' — '+Math.round(m.pct*100)+'% da maturidade de referência.') +
-      propKpi('Exposição em Risco', fmtNum(Math.round(roi.totalBase*(S.numObras||5))), 'Perda bruta estimada no portfólio, sem intervenção.', true) +
-      propKpi('Payback Projetado', paybackTxt, 'Tempo para o programa se pagar com o valor recuperado.') +
+      propKpi('SIIGA Score', ptNum(m.score,0,1)+'<span style="font-size:15px;color:#94a3b8">/'+m.max+'</span>', 'Nível '+m.nivel+' — '+Math.round(m.pct*100)+'% da maturidade de referência.') +
+      propKpi('Perda por mês', ptMil(perdaMes,1), (M.obras > 1 ? 'por obra · ' + ptMil(perdaMes * M.obras, 1) + ' no portfólio de ' + M.obras + ' obras, sem intervenção.' : 'na obra, sem intervenção.'), true) +
+      propKpi('Recuperável com o plano', ptMil(M.critCapMes,1)+'/mês', (nC === 1 ? 'na prioridade' : 'nas ' + (PT_NUM_EXT_F[nC] || nC) + ' prioridades') + ' do diagnóstico, ' + ptPorObra(M) + '.') +
     '</div>' +
     '<div style="font-size:10.5px;font-weight:700;text-transform:uppercase;letter-spacing:0.1em;color:#94a3b8;margin-bottom:12px">Maturidade por pilar <span style="font-weight:400;text-transform:none;letter-spacing:0">· marcador claro = benchmark de mercado</span></div>' +
     bars;
 }
 
-// ── SEÇÃO 02: MAIORES GAPS IDENTIFICADOS NO DIAGNÓSTICO (#4) ─────────────────
-// Título simplificado (#4). Traz os 6 gaps mais críticos (generateOpportunities
-// já ordena pior score primeiro) + o quadro de composição da exposição
-// (calculateROI().items) renomeado.
+// ── SEÇÃO 02: PRINCIPAIS PONTOS CRÍTICOS DO DIAGNÓSTICO (#4) ──────────────────
+// As MESMAS prioridades do relatório (getGapPlan via ptModel, já com os ajustes da Conferência): título, pilar,
+// fonte de perda, perda por mês (só na 1ª prioridade de cada fonte), frase do cliente e etiqueta Crítico / Em alerta.
+// A composição da exposição usa os nomes das fontes do relatório.
 function buildPropostaGaps(mode) {
   var c = document.getElementById('prop-gaps-container'); if (!c) return;
   var emp = S.empresa || 'sua empresa';
-  var top = generateOpportunities().slice(0, 6);
-  var roi = calculateROI();
+  var M = ptModel('resumido');
 
-  var cards = top.map(function(o){
-    var crit = o.severity === 'critico';
+  var cards = M.criticos.map(function(p){
+    var crit = !p.alerta;
     var tagColor = crit ? '#f87171' : '#fbbf24';
     var tagBg = crit ? 'rgba(248,113,113,0.12)' : 'rgba(251,191,36,0.12)';
-    var tag = crit ? 'CRÍTICO' : 'OPORTUNIDADE';
+    var tag = crit ? 'Crítico' : 'Em alerta';
     return '<div style="padding:16px 18px;background:#1a1c26;border:1px solid rgba(255,255,255,0.08);border-left:3px solid '+tagColor+';border-radius:10px">' +
-      '<div style="font-size:9.5px;font-weight:700;letter-spacing:0.08em;color:'+tagColor+';background:'+tagBg+';display:inline-block;padding:2px 7px;border-radius:4px;margin-bottom:10px">'+tag+'</div>' +
-      '<div style="font-size:13.5px;font-weight:700;color:#f8fafc;margin-bottom:6px;line-height:1.3">'+o.gap+'</div>' +
-      '<div style="font-size:11.5px;color:#94a3b8;line-height:1.5">'+o.impact+'</div>' +
+      '<div style="display:flex;justify-content:space-between;align-items:center;gap:8px;margin-bottom:10px"><span style="font-size:9.5px;font-weight:700;letter-spacing:0.08em;text-transform:uppercase;color:'+tagColor+';background:'+tagBg+';display:inline-block;padding:2px 7px;border-radius:4px">'+tag+'</span>' +
+        '<span style="font-size:10px;font-weight:700;color:#94a3b8">Prioridade '+p.n+'</span></div>' +
+      '<div style="font-size:13.5px;font-weight:700;color:#f8fafc;margin-bottom:6px;line-height:1.3">'+ptEsc(p.titulo)+'</div>' +
+      (p.frase ? '<div style="font-size:11.5px;font-style:italic;color:#cbd5e1;line-height:1.5;margin-bottom:6px">“'+ptEsc(p.frase.replace(/\.$/, ''))+'.”</div>' : '') +
+      '<div style="font-size:11px;color:#94a3b8;line-height:1.5">'+p.pilar+' · '+ptEsc(p.fonte.label)+'</div>' +
+      (p.mes != null ? '<div style="font-size:11px;color:#94a3b8;line-height:1.5;margin-top:4px">Perda por mês sem tratamento: <strong style="color:#f8fafc">'+ptMil(p.mes,1)+'</strong></div>' : '') +
     '</div>';
   }).join('');
+  var demais = M.demais.length;
+  var demaisTxt = demais ? '<div style="font-size:11.5px;color:#94a3b8;margin:-10px 0 20px">Demais pontos críticos do diagnóstico: <strong style="color:#e2e8f0">'+demais+'</strong>, tratados na sequência das Fases de Implementação.</div>' : '';
 
-  // Composição da EXPOSIÇÃO (perda bruta = baseValue × nº de obras, antes do fator
-  // de captura) — mesma base do "Perda bruta (portfólio)" do diagnóstico.
-  var nObras = S.numObras || 5;
-  var perdaBruta = Math.round(roi.totalBase * nObras);
-  var items = roi.items.slice().sort(function(a,b){ return b.baseValue - a.baseValue; });
-  var maxV = items.reduce(function(a,b){ return Math.max(a, b.baseValue); }, 1);
-  var compRows = items.map(function(it){
-    var w = Math.max(3, Math.round((it.baseValue / maxV) * 100));
+  // Composição da EXPOSIÇÃO (perda bruta = baseValue × nº de obras, antes do fator de captura), com os nomes de fonte do relatório.
+  var nObras = getPropostaCfg().nObras;   // mesmo nº de obras da seção 10, para a exposição bater nas duas
+  var perdaBruta = Math.round(M.roi.totalBase * nObras);
+  var items = M.roi.items.map(function(it){ return M.fontes[it.key]; }).sort(function(a,b){ return b.perda - a.perda; });
+  var maxV = items.reduce(function(a,b){ return Math.max(a, b.perda); }, 1);
+  var compRows = items.map(function(f){
+    var w = Math.max(3, Math.round((f.perda / maxV) * 100));
     return '<div style="display:flex;align-items:center;gap:12px;margin-bottom:9px">' +
-      '<div style="flex:0 0 210px;font-size:11.5px;color:#e2e8f0">'+it.label+'</div>' +
+      '<div style="flex:0 0 210px;font-size:11.5px;color:#e2e8f0">'+ptEsc(f.label)+'</div>' +
       '<div style="flex:1;height:16px;background:rgba(255,255,255,0.05);border-radius:5px;overflow:hidden"><div style="height:100%;width:'+w+'%;background:linear-gradient(90deg,#ea580c,#f97316);border-radius:5px"></div></div>' +
-      '<div style="flex:0 0 90px;text-align:right;font-size:11.5px;font-weight:700;color:#f8fafc;font-variant-numeric:tabular-nums">'+fmtNum(it.baseValue*nObras)+'</div>' +
+      '<div style="flex:0 0 90px;text-align:right;font-size:11.5px;font-weight:700;color:#f8fafc;font-variant-numeric:tabular-nums">'+fmtNum(f.perda*nObras)+'</div>' +
     '</div>';
   }).join('');
 
   c.innerHTML =
     propSecHead('02', 'Principais pontos críticos do diagnóstico') +
-    propLead('A operação da '+emp+' escala mais rápido que os controles. Cada ponto crítico abaixo tem um custo que hoje passa despercebido.') +
-    '<div style="display:grid;grid-template-columns:repeat(3,1fr);gap:14px;margin-bottom:24px">' + cards + '</div>' +
+    propLead('A operação da '+emp+' escala mais rápido que os controles. As prioridades abaixo são as mesmas do relatório que revisamos na 1ª reunião, e cada uma tem um custo que hoje passa despercebido.') +
+    '<div style="display:grid;grid-template-columns:repeat(3,1fr);gap:14px;margin-bottom:24px">' + cards + '</div>' + demaisTxt +
     '<div style="padding:18px 20px;background:#151824;border:1px solid rgba(255,255,255,0.06);border-radius:10px">' +
       '<div style="font-size:12px;font-weight:700;color:#e2e8f0;margin-bottom:14px">Onde o '+fmtNum(perdaBruta)+' se forma — composição da exposição no portfólio</div>' +
       compRows +
@@ -5793,7 +5825,7 @@ function buildPropostaObjetivo(mode) {
     metaScore += Math.round(SCORE_MAX_PILAR[k] * meta);
     var right = Math.round(cur*100)+'% <span style="color:#ea580c">→ '+Math.round(meta*100)+'%</span>';
     return '<div style="margin-bottom:14px">' +
-      '<div style="display:flex;justify-content:space-between;font-size:12px;color:#e2e8f0;margin-bottom:6px"><span>'+PROP_PILAR_NOMES[k]+'</span><span>'+right+'</span></div>' +
+      '<div style="display:flex;justify-content:space-between;font-size:12px;color:#e2e8f0;margin-bottom:6px"><span>'+propPilarNome(k)+'</span><span>'+right+'</span></div>' +
       '<div style="position:relative;height:10px;background:rgba(255,255,255,0.06);border-radius:6px">' +
         '<div style="height:100%;width:'+Math.round(cur*100)+'%;background:#7c2d12;border-radius:6px"></div>' +
         '<div style="position:absolute;top:0;height:100%;left:'+Math.round(cur*100)+'%;width:'+Math.max(2,Math.round((meta-cur)*100))+'%;background:linear-gradient(90deg,#ea580c,#f97316);border-radius:0 6px 6px 0"></div>' +
@@ -5804,45 +5836,50 @@ function buildPropostaObjetivo(mode) {
 
   c.innerHTML =
     propSecHead('03', 'Objetivo do Redesenho SIIGA') +
-    propLead('Consultoria de resultado se compromete com número. O objetivo central é levar a '+emp+' do nível <strong style="color:#f8fafc">'+m.nivel+'</strong> à <strong style="color:#f8fafc">Referência SIIGA</strong> em '+PROP_PROGRAMA_MESES+' meses — com cada pilar alcançando, no mínimo, o benchmark do setor.') +
+    propLead('Consultoria de resultado se compromete com número. O objetivo central é levar a '+emp+' do nível <strong style="color:#f8fafc">'+m.nivel+'</strong> rumo à <strong style="color:#f8fafc">Referência SIIGA</strong> em '+propProgMeses()+' meses, com a meta de maturidade por pilar abaixo.') +
     '<div style="display:flex;align-items:center;gap:18px;flex-wrap:wrap;padding:18px 22px;margin-bottom:22px;background:rgba(234,88,12,0.08);border:1.5px solid rgba(234,88,12,0.4);border-radius:12px">' +
       '<div><div style="font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:0.08em;color:#ea580c;margin-bottom:4px">Meta Central · SIIGA Score</div>' +
-      '<div style="font-family:Bai Jamjuree;font-size:30px;font-weight:700;color:#f8fafc">'+m.score+' <span style="color:#ea580c">→ '+metaScore+'</span> <span style="font-size:15px;color:#94a3b8">/'+m.max+'</span></div></div>' +
-      '<div style="flex:1;min-width:200px;font-size:12.5px;color:#cbd5e1;line-height:1.55">Subir a maturidade de <strong style="color:#f8fafc">'+Math.round(m.pct*100)+'%</strong> para <strong style="color:#f8fafc">'+metaPctFmt+'%</strong> da referência — em '+PROP_PROGRAMA_MESES+' meses.</div>' +
+      '<div style="font-family:Bai Jamjuree;font-size:30px;font-weight:700;color:#f8fafc">'+ptNum(m.score,0,1)+' <span style="color:#ea580c">→ '+metaScore+'</span> <span style="font-size:15px;color:#94a3b8">/'+m.max+'</span></div></div>' +
+      '<div style="flex:1;min-width:200px;font-size:12.5px;color:#cbd5e1;line-height:1.55">Subir a maturidade de <strong style="color:#f8fafc">'+Math.round(m.pct*100)+'%</strong> para <strong style="color:#f8fafc">'+metaPctFmt+'%</strong> da referência — em '+propProgMeses()+' meses.</div>' +
     '</div>' +
     bars +
-    '<div style="margin-top:16px;padding:12px 16px;border-left:3px solid #ea580c;background:#151824;border-radius:6px;font-size:11.5px;color:#94a3b8;line-height:1.6">As metas de maturidade acima saem direto do diagnóstico. As metas <strong style="color:#e2e8f0">operacionais e financeiras</strong> — aderência plano × realizado, dias de fechamento da folha, % de retrabalho — são pactuadas sobre a baseline real medida na Fase 1, nunca estimadas antes.</div>';
+    '<div style="margin-top:16px;padding:12px 16px;border-left:3px solid #ea580c;background:#151824;border-radius:6px;font-size:11.5px;color:#94a3b8;line-height:1.6">As metas de maturidade acima saem direto do diagnóstico. As metas <strong style="color:#e2e8f0">operacionais e financeiras</strong> — aderência plano × realizado, '+porModeloMO('dias de fechamento da medição','dias de fechamento da folha','dias de fechamento da medição e da folha')+', % de retrabalho — são pactuadas sobre a baseline real medida na Fase de Implementação I, nunca estimadas antes.</div>';
 }
 
 // ── SEÇÃO 04: O PROGRAMA DE REDESENHO SIIGA (#6) ────────────────────────────
-// Ex-"Fluxo / Como os 4 meses funcionam", retitulada (#6). Conteúdo estrutural
-// do programa (fixo por escopo).
+// Estruturado pelas Fases de Implementação I, II e III do relatório (ptFases): mesmos nomes e prazos, cada
+// prioridade ligada à sua Fase (PT_FASE). O Kick-off / Lean Experience continua como ponto de partida.
 function buildPropostaPrograma(mode) {
   var c = document.getElementById('prop-programa-container'); if (!c) return;
-  var etapas = [
-    ['Kick-off', 'Lean Experience', 'Workshop presencial de nivelamento Lean, até 25 pessoas.', 'CORTESIA · INCLUSA'],
-    ['Pilar macro', 'Planejamento × orçamento', 'Planejamento do fluxo conectado ao orçamento e ao ERP.', ''],
-    ['Pilar tático', 'Proteção do plano', 'Análise de restrições e planejamento de médio prazo.', ''],
-    ['Pilar operacional', 'Curto prazo & MO', 'Last Planner, mão de obra e ' + porModeloMO('medição de empreiteiros', 'folha de produção', 'folha de produção') + ' no canteiro.', '']
-  ];
+  var M = ptModel('resumido');
+  var fases = ptFases(S.modeloMO || '');
+  var prios = function(id){
+    var ns = M.criticos.filter(function(p){ return p.fase === id; }).map(function(p){ return p.n; });
+    return ns.length ? ptPrioLista(ns) : '';
+  };
+  var etapas = [{ rot:'Ponto de partida', tit:'Kick-off · Lean Experience', desc:'Workshop presencial de nivelamento Lean, até 25 pessoas.', badge:'CORTESIA · INCLUSA', lig:'' }]
+    .concat(fases.map(function(f){
+      return { rot:'Fase de Implementação ' + f.id, tit:f.nome, desc:f.fd, badge:'', lig:prios(f.id) };
+    }));
   var cards = etapas.map(function(e){
-    var badge = e[3] ? '<div style="margin-top:12px;display:inline-block;font-size:9.5px;font-weight:700;color:#34d399;border:1px solid rgba(52,211,153,0.5);border-radius:20px;padding:3px 10px">'+e[3]+'</div>' : '';
+    var badge = e.badge ? '<div style="margin-top:12px;display:inline-block;font-size:9.5px;font-weight:700;color:#34d399;border:1px solid rgba(52,211,153,0.5);border-radius:20px;padding:3px 10px">'+e.badge+'</div>' : '';
+    var lig = e.lig ? '<div style="margin-top:10px;font-size:10.5px;font-weight:700;color:#fbbf24">'+e.lig+'</div>' : '';
     return '<div style="padding:16px 18px;background:#1a1c26;border:1px solid rgba(255,255,255,0.08);border-radius:10px">' +
-      '<div style="font-size:11px;color:#ea580c;font-weight:600;margin-bottom:8px">'+e[0]+'</div>' +
-      '<div style="font-size:14px;font-weight:700;color:#f8fafc;margin-bottom:8px;line-height:1.25">'+e[1]+'</div>' +
-      '<div style="font-size:11.5px;color:#94a3b8;line-height:1.5">'+e[2]+'</div>' + badge +
+      '<div style="font-size:11px;color:#ea580c;font-weight:600;margin-bottom:8px">'+e.rot+'</div>' +
+      '<div style="font-size:14px;font-weight:700;color:#f8fafc;margin-bottom:8px;line-height:1.25">'+e.tit+'</div>' +
+      '<div style="font-size:11.5px;color:#94a3b8;line-height:1.5">'+e.desc+'</div>' + lig + badge +
     '</div>';
   }).join('');
 
   c.innerHTML =
     propSecHead('04', 'O Programa de Redesenho SIIGA') +
-    propLead('Do workshop de nivelamento à governança contínua — começa com o time no mesmo idioma (Lean Experience) e avança do macro ao chão de obra, com meta, entregável e responsável definidos em cada etapa.') +
+    propLead('Do workshop de nivelamento à governança contínua — começa com o time no mesmo idioma (Lean Experience) e avança pelas três Fases de Implementação do relatório, com cada prioridade do diagnóstico ligada à sua Fase e com meta, entregável e responsável definidos em cada etapa.') +
     '<div style="display:grid;grid-template-columns:repeat(4,1fr);gap:12px;margin-bottom:20px">' + cards + '</div>' +
     '<div style="display:flex;height:44px;border-radius:8px;overflow:hidden;border:1px solid rgba(255,255,255,0.08)">' +
       '<div style="flex:0 0 75%;background:linear-gradient(90deg,#b91c1c,#ea580c);display:flex;align-items:center;padding:0 16px;font-size:12px;font-weight:700;color:#fff">Construção · ~75%</div>' +
       '<div style="flex:1;background:#1a1c26;display:flex;align-items:center;padding:0 16px;font-size:12px;color:#94a3b8">Validação · ~25%</div>' +
     '</div>' +
-    '<div style="display:flex;justify-content:space-between;font-size:10.5px;color:#94a3b8;margin-top:8px"><span>Mês 1 — Kick-off / Lean Experience</span><span>Mês '+PROP_PROGRAMA_MESES+' — Análise e resultados</span></div>';
+    '<div style="display:flex;justify-content:space-between;font-size:10.5px;color:#94a3b8;margin-top:8px"><span>Mês 1 — Kick-off / Lean Experience</span><span>Mês '+propProgMeses()+' — Análise e resultados</span></div>';
 }
 
 // ── SEÇÃO 05: RESULTADOS ESPERADOS POR NÍVEL (#7) ───────────────────────────
@@ -5936,9 +5973,9 @@ function buildPropostaResultados(mode) {
 function buildPropostaJornada(mode) {
   var c = document.getElementById('prop-jornada-container'); if (!c) return;
   var etapas = [
-    ['01','Diagnóstico','Alinhamento da estratégia da jornada'],
-    ['02','Implantação','Setup dos processos essenciais'],
-    ['03','Adoção','Ampliação para as demais frentes'],
+    ['01','Diagnóstico','Alinhamento da estratégia do programa'],
+    ['02','Implantação','Setup dos processos essenciais (Fases de Implementação I e II)'],
+    ['03','Adoção','Fase de Implementação III e ampliação para as demais frentes'],
     ['04','Engajamento','Avaliação proativa do uso'],
     ['05','Acompanhamento','Ritos até a cultura enraizar']
   ];
@@ -5963,7 +6000,7 @@ function buildPropostaJornada(mode) {
   }).join('');
   var papeis = [
     ['APRESENTA','Comercial','Conduz a proposta e a transição para a execução.'],
-    ['EXECUTA','Customer Success','Responsável pela condução do programa nos '+PROP_PROGRAMA_MESES+' meses.'],
+    ['EXECUTA','Customer Success','Responsável pela condução do programa nos '+propProgMeses()+' meses.'],
     ['APOIA','Sócio / CEO','Presença pontual em momentos-chave da transformação.']
   ];
   var papelCards = papeis.map(function(p){
@@ -5975,7 +6012,7 @@ function buildPropostaJornada(mode) {
   }).join('');
 
   c.innerHTML =
-    propSecHead('06', 'Jornada, Governança e Time') +
+    propSecHead('06', 'Governança, Ritos e Time') +
     propLead('Cinco etapas de intensidade decrescente — do redesenho à autonomia — sustentadas por uma cadência de ritos e medidas por Health Score.') +
     '<div style="display:flex;gap:10px;flex-wrap:wrap;margin-bottom:20px">' + etapaCards + '</div>' +
     '<div style="display:flex;gap:12px;flex-wrap:wrap;margin-bottom:16px">' + ritoCards + '</div>' +
@@ -6157,62 +6194,65 @@ function buildPropostaInvestimento(mode) {
       ? 'A <strong style="color:#f8fafc">Ativação SIIGA</strong> coloca a plataforma para rodar na '+emp+'; a assinatura mensal, calculada <strong style="color:#f8fafc">por obra</strong>, é cobrada a partir do 1º mês de uso.'
       : (cfg.ativNA
         ? 'O <strong style="color:#f8fafc">Redesenho de Processos SIIGA</strong> (consultoria) conduz a evolução da '+emp+'; a plataforma fica inclusa durante os '+cfg.progMeses+' meses e a assinatura recorrente, calculada <strong style="color:#f8fafc">por obra</strong>, entra depois, se a '+emp+' seguir.'
-        : 'Dois produtos, uma jornada: o <strong style="color:#f8fafc">Redesenho de Processos SIIGA</strong> (consultoria) em destaque e a <strong style="color:#f8fafc">Ativação SIIGA</strong> da plataforma; a plataforma fica inclusa durante os '+cfg.progMeses+' meses e a assinatura recorrente entra depois, se a '+emp+' seguir.')) +
+        : 'Dois produtos, um só programa: o <strong style="color:#f8fafc">Redesenho de Processos SIIGA</strong> (consultoria) em destaque e a <strong style="color:#f8fafc">Ativação SIIGA</strong> da plataforma; a plataforma fica inclusa durante os '+cfg.progMeses+' meses e a assinatura recorrente entra depois, se a '+emp+' seguir.')) +
     '<div style="display:grid;grid-template-columns:'+((cfg.progNA||cfg.ativNA)?'1fr':'1fr 1fr')+';gap:14px">' + cardRedesenho + cardAtivacao + '</div>' +
     mensalRow + pilotoObs + memoria;
 }
 
 // ── SEÇÃO 10: RETORNO PROJETADO (#12) ───────────────────────────────────────
-// #12: título com nome da empresa; cenário ÚNICO Base (captura 50% =
-// ROI_CAPTURA_FIXA); duração do ROI = média das obras (S.prazoMedio, já usada
-// internamente por calcROIReal); payback recapitulado.
+// Ganho do MAPA (o mesmo do relatório): ganho mensal por obra = roi.totalPorObra ÷ prazo. Payback sobre o
+// INVESTIMENTO TOTAL (Redesenho + Ativação + plataforma), mês a mês (propPayback); sem número se não houver payback
+// dentro da duração média das obras.
 function buildPropostaRetorno(mode) {
   var c = document.getElementById('prop-retorno-container'); if (!c) return;
   var emp = S.empresa || 'sua empresa';
   var roi = calculateROI();
-  var _pcfg = getPropostaCfg();
-  var precoObra = _pcfg.precoObra;   // preço/obra do plano selecionado (não mais só Maestria)
-  var r = calcROIRealComMensalidade(ROI_CAPTURA_FIXA, precoObra);
-  var pb = fmtPayback(r.estrategica.payback);
-  var prazo = r.prazo;
-  var fmtH = function(n){ return (n||0).toLocaleString('pt-BR',{maximumFractionDigits:1}) + ' h'; };
+  var cfg = getPropostaCfg();
+  var prazo = S.prazoMedio || 18;
+  var nObras = cfg.nObras;   // nº de obras da proposta, em toda a seção (exposição, ganho e payback)
+  var money = function(v){ return 'R$ ' + Number(v||0).toLocaleString('pt-BR', { minimumFractionDigits:0, maximumFractionDigits:0 }); };
 
-  // Perda bruta (exposição, sem intervenção) × ganho capturável com o SIIGA —
-  // mesmos conceitos do diagnóstico (seção "Da Perda ao Ganho Capturável"). O
-  // fator de captura (pela maturidade) já está embutido em roi.totalPortfolio;
-  // NÃO aplicar nenhum desconto adicional aqui.
-  var nObras = S.numObras || 5;
   var perdaBruta = Math.round(roi.totalBase * nObras);
-  var capturavel = roi.totalPortfolio;
-  var fatorCapturaPct = perdaBruta ? Math.round(capturavel / perdaBruta * 100) : 0;
+  var capPct = roi.totalBase ? Math.round(roi.totalPorObra / roi.totalBase * 100) : 0;
+  var pb = propPayback(roi, cfg, prazo, 3);   // ganho a partir do 3º mês, após a implantação inicial
+  var ganhoMes = pb.ganhoMes;
+  var mesesGanho = Math.max(0, prazo - 2);
+  var ganhoPeriodo = ganhoMes * mesesGanho;
+  var pbTxt, pbSub;
+  if (pb.mes != null) {
+    pbTxt = pb.mes + (pb.mes === 1 ? ' mês' : ' meses');
+    pbSub = 'Investimento total até o mês ' + pb.mes + ': ' + money(pb.inv) + ' · ganho acumulado: ' + money(pb.ganho) + ' (ganho a partir do 3º mês).';
+  } else {
+    pbTxt = 'Sem payback';
+    pbSub = 'O ganho acumulado não cobre o investimento total nos ' + prazo + ' meses da duração média das obras.';
+  }
 
-  // Documento único: "Como é calculado" sempre exibido (mantido por decisão do
-  // Israel em 2026-09-28).
+  var linhaInv = [];
+  if (!cfg.progNA) linhaInv.push('Redesenho de Processos SIIGA ' + money(pb.invRed));
+  if (!cfg.ativNA) linhaInv.push('Ativação SIIGA ' + money(pb.invAtiv));
+  if (pb.invPlat) linhaInv.push('plataforma ' + money(pb.invPlat) + ' (' + pb.mesesPlat + ' mensalidade' + (pb.mesesPlat === 1 ? '' : 's') + ' de ' + money(cfg.mensalPor) + ' por obra, para ' + cfg.nObras + ' obra' + (cfg.nObras === 1 ? '' : 's') + ')');
+
   var memoria =
     '<div style="margin-top:16px;padding-top:12px;border-top:1px solid rgba(255,255,255,0.08)">' +
       '<div style="font-size:10.5px;font-weight:700;text-transform:uppercase;letter-spacing:0.08em;color:#94a3b8;margin-bottom:8px">Como é calculado</div>' +
       '<table class="roi-table"><thead><tr><th>Item</th><th style="text-align:right">Valor</th></tr></thead><tbody>' +
         '<tr><td>Exposição bruta no portfólio (sem intervenção)</td><td style="text-align:right" class="roi-val">'+fmtNum(perdaBruta)+'</td></tr>' +
-        '<tr><td>Fator de captura (pela maturidade atual)</td><td style="text-align:right" class="roi-val">'+fatorCapturaPct+'%</td></tr>' +
-        '<tr class="roi-total"><td>Ganho capturável com o SIIGA</td><td style="text-align:right">'+fmtNum(capturavel)+'</td></tr>' +
-        '<tr><td>Recuperação financeira + capacidade de gestão liberada ('+fmtH(r.estrategica.horasLib)+'/mês)</td><td style="text-align:right" class="roi-val">'+fmtNum(r.estrategica.recTotal + r.estrategica.valorCapacidade)+'/mês</td></tr>' +
-        '<tr><td>Investimento (preço da plataforma por obra)</td><td style="text-align:right" class="roi-val">− '+fmtNum(precoObra)+'/mês</td></tr>' +
+        '<tr><td>Captura efetiva (redução com o SIIGA × fator de maturidade, 20% a 70%)</td><td style="text-align:right" class="roi-val">'+capPct+'%</td></tr>' +
+        '<tr class="roi-total"><td>Ganho mensal do portfólio (ganho por obra ÷ '+prazo+' meses × '+cfg.nObras+' obra'+(cfg.nObras === 1 ? '' : 's')+')</td><td style="text-align:right">'+money(ganhoMes)+'/mês</td></tr>' +
+        '<tr><td>Ganho no período da obra, a partir do 3º mês, após a implantação inicial ('+mesesGanho+' meses)</td><td style="text-align:right" class="roi-val">'+fmtNum(ganhoPeriodo)+'</td></tr>' +
+        '<tr><td>Investimento total até o payback'+(linhaInv.length ? ' ('+linhaInv.join(' + ')+')' : '')+'</td><td style="text-align:right" class="roi-val">'+(pb.mes != null ? money(pb.inv) : '—')+'</td></tr>' +
+        '<tr><td>Payback: 1º mês em que o ganho acumulado (a partir do mês 3) alcança o investimento acumulado</td><td style="text-align:right" class="roi-val">'+(pb.mes != null ? pb.mes + (pb.mes === 1 ? ' mês' : ' meses') : 'sem payback em ' + prazo + ' meses')+'</td></tr>' +
         '<tr><td>Duração considerada (média das obras)</td><td style="text-align:right">'+prazo+' meses</td></tr>' +
       '</tbody></table>' +
     '</div>';
 
   c.innerHTML =
     propSecHead('10', 'Retorno Projetado para a ' + emp) +
-    propLead('Consultoria de resultado não promete número mágico. Partimos da exposição de <strong style="color:#f8fafc">'+fmtNum(perdaBruta)+'</strong> do diagnóstico; aplicando o fator de captura pela maturidade atual ('+fatorCapturaPct+'%), o ganho que o programa propõe recuperar é <strong style="color:#f8fafc">'+fmtNum(capturavel)+'</strong> — medido sobre a duração média das obras da '+emp+' ('+prazo+' meses).') +
+    propLead('Consultoria de resultado não promete número mágico. Partimos da exposição de <strong style="color:#f8fafc">'+fmtNum(perdaBruta)+'</strong> do diagnóstico; aplicando a captura efetiva ('+capPct+'%, a redução com o SIIGA vezes o fator de maturidade), o ganho mensal do portfólio é <strong style="color:#f8fafc">'+money(ganhoMes)+'</strong>. No período da obra, a partir do 3º mês, após a implantação inicial ('+mesesGanho+' dos '+prazo+' meses de duração média), o ganho é <strong style="color:#f8fafc">'+fmtNum(ganhoPeriodo)+'</strong>.') +
     '<div style="display:grid;grid-template-columns:repeat(3,1fr);gap:14px">' +
       propKpi('Exposição em Risco', fmtNum(perdaBruta), 'Perda bruta no portfólio, sem intervenção.') +
-      propKpi('Ganho capturável com o programa', fmtNum(capturavel), 'O que o SIIGA propõe recuperar (fator de captura da maturidade).', true) +
-      propKpi('Payback', pb.txt, pb.sub) +
-    '</div>' +
-    '<div style="display:grid;grid-template-columns:repeat(3,1fr);gap:12px;margin-top:12px">' +
-      propKpi('ROI Mensal', Math.round(r.estrategica.roi*100)+'%', 'sobre o preço por obra da plataforma, por mês.') +
-      propKpi('Horas recuperadas/mês', fmtH(r.operacional.hMes), 'por obra') +
-      propKpi('% da jornada liberada', (Math.round(r.operacional.pctJornada*1000)/10)+'%', 'do time técnico') +
+      propKpi('Ganho capturável com o programa', fmtNum(ganhoPeriodo), 'No período da obra, a partir do 3º mês ('+mesesGanho+' meses × '+money(ganhoMes)+'), com captura efetiva de '+capPct+'%.', true) +
+      propKpi('Payback', pbTxt, pbSub) +
     '</div>' +
     memoria;
 }
@@ -6257,7 +6297,7 @@ function buildPropostaTermos(mode) {
     '<div style="display:grid;grid-template-columns:repeat('+termoCards.length+',1fr);gap:12px;margin-bottom:16px">' + termoCards.join('') + '</div>' + pilotoObsBox +
     (cfg.progNA ? propProximoPassoAtivacao(kickTxt, validadeFmt, dias) : '<div style="margin-top:16px;padding:22px 24px;background:linear-gradient(135deg,rgba(234,88,12,0.14),rgba(234,88,12,0.04));border:1.5px solid rgba(234,88,12,0.4);border-radius:12px">' +
       '<div style="font-size:16px;font-weight:700;color:#f8fafc;margin-bottom:12px">Próximo passo</div>' +
-      '<div style="font-size:13px;color:#e2e8f0;line-height:1.7">Para avançarmos, será necessário <strong style="color:#f8fafc">confirmarmos a data do Kick-Off</strong>'+(kickTxt? ' — nossa sugestão é <strong style="color:#ea580c">'+kickTxt+'</strong>' : '')+' e <strong style="color:#f8fafc">recebermos o planejamento e o orçamento das obras</strong> que serão contempladas no programa. Confirmada a data, a Agilean inicia a Fase 1 na semana seguinte, começando pelo Workshop Lean Experience.</div>' +
+      '<div style="font-size:13px;color:#e2e8f0;line-height:1.7">Para avançarmos, será necessário <strong style="color:#f8fafc">confirmarmos a data do Kick-Off</strong>'+(kickTxt? ' — nossa sugestão é <strong style="color:#ea580c">'+kickTxt+'</strong>' : '')+' e <strong style="color:#f8fafc">recebermos o planejamento e o orçamento das obras</strong> que serão contempladas no programa. Confirmada a data, a Agilean inicia a Fase de Implementação I na semana seguinte, começando pelo Workshop Lean Experience.</div>' +
       '<div style="display:inline-block;margin-top:16px;padding:10px 20px;border:1px solid rgba(234,88,12,0.5);border-radius:8px;font-size:12px;color:#fbbf24">⏳ Validade até '+validadeFmt+' · '+dias+' dias'+(kickTxt? ' · Kick-Off sugerido: '+kickTxt : '')+'</div>' +
     '</div>');
 }
@@ -6349,7 +6389,7 @@ function openPropostaModal() {
     if(!w.mensalTouched) w.mensalPor = mensalDe;
     var ativDe = PROP_ATIVACAO[w.plan].tab, ativPiso = PROP_ATIVACAO[w.plan].piso;
     if(!w.ativTouched) w.ativPor = ativDe;
-    var progDe = PROP_PROGRAMA_MENSAL * PROP_PROGRAMA_MESES;
+    var progDe = PROP_PROGRAMA_MENSAL * propProgMeses();
     if(!w.progTouched) w.progPor = progDe;
 
     var planRows = PROP_PLANOS.map(function(p){

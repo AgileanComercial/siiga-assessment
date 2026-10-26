@@ -26,6 +26,8 @@ const server = http.createServer((req, res) => {
     fs.createReadStream(filePath).pipe(res);
   } else { res.writeHead(404); res.end('Not found'); }
 });
+// Cópia no Node do fmtNum do app (valor abreviado), para o esperado ser calculado fora da página
+const fmtNumNode = n => (!n || isNaN(n)) ? '—' : (n >= 1e6 ? 'R$ ' + (n / 1e6).toFixed(1).replace('.', ',') + 'M' : (n >= 1000 ? 'R$ ' + Math.round(n / 1000) + 'K' : 'R$ ' + Math.round(n)));
 const sleep = ms => new Promise(r => setTimeout(r, ms));
 const active = page => page.evaluate(() => { var el = document.querySelector('.screen.active'); return el ? el.id : null; });
 
@@ -121,6 +123,7 @@ server.listen(PORT, async () => {
         scoreStr: m.score + '/' + m.max, nivel: m.nivel,
         perdaBrutaStr: fmtNum(Math.round(roi.totalBase * (S.numObras||5))),
         capturavelStr: fmtNum(roi.totalPortfolio),
+        porObra: roi.totalPorObra, cfg: getPropostaCfg(), progMeses: getPropostaCfg().progMeses,
         paybackDiag: fmtPayback(r.estrategica.payback).txt,
         paybackProp: fmtPayback(rp.estrategica.payback).txt,
         prazo: rp.prazo,
@@ -131,7 +134,7 @@ server.listen(PORT, async () => {
     console.log('\n=== NÚMEROS CANÔNICOS (fonte única: motores do diagnóstico) ===');
     console.log('Empresa:', canon.empresaUpper, '| Nível:', canon.nivel);
     console.log('SIIGA Score:', canon.scoreStr, '| Exposição bruta:', canon.perdaBrutaStr, '| Ganho capturável:', canon.capturavelStr);
-    console.log('Payback (diag / proposta):', canon.paybackDiag, '/', canon.paybackProp, '| duração ROI:', canon.prazo, 'meses');
+    console.log('Payback do diagnóstico:', canon.paybackDiag, '| duração ROI:', canon.prazo, 'meses | programa:', canon.progMeses, 'meses');
     console.log('Pilares:', canon.pilares.map(function(p){ return p.k+' '+p.sc+'/'+p.max+' ('+p.pct+'%)'; }).join(' · '));
 
     // ── Verifica no RELATÓRIO (tela report) ──
@@ -178,8 +181,19 @@ server.listen(PORT, async () => {
     const phasT = s => propTxt.indexOf(s) >= 0;  // innerText: score sem <span>, payback sem &lt;
     check('Proposta: mesmo score /57 do diagnóstico', phasT(canon.scoreStr), canon.scoreStr);
     check('Proposta: mesma exposição BRUTA do diagnóstico', phasT(canon.perdaBrutaStr), canon.perdaBrutaStr);
-    check('Proposta: mesmo ganho CAPTURÁVEL do diagnóstico', phasT(canon.capturavelStr), canon.capturavelStr);
-    check('Proposta: payback presente', phasT(canon.paybackProp), canon.paybackProp);
+    // Ganho do Mapa (o do relatório) a partir do 3º mês; payback sobre o investimento total, calculado à parte, mês a mês
+    const gMes = canon.porObra / canon.prazo * canon.cfg.nObras, mesesGanho = canon.prazo - 2;
+    let inv = 0, gan = 0, pbMes = null;
+    for (let m = 1; m <= canon.prazo && pbMes === null; m++) {
+      if (m <= canon.progMeses) inv += canon.cfg.progPor / canon.progMeses;
+      if (m === 1) inv += canon.cfg.ativPor;
+      if (m > canon.progMeses) inv += canon.cfg.mensalPor * canon.cfg.nObras;
+      if (m >= 3) gan += gMes;
+      if (gan >= inv) pbMes = m;
+    }
+    const pbTxt = pbMes ? pbMes + (pbMes === 1 ? ' mês' : ' meses') : 'sem payback';
+    check('Proposta: ganho no período da obra (' + mesesGanho + ' meses a partir do 3º) = ganho mensal do Mapa × meses', phasT(fmtNumNode(gMes * mesesGanho)), fmtNumNode(gMes * mesesGanho));
+    check('Proposta: payback sobre o investimento total (' + pbTxt + ')', propTxt.replace(/\s+/g, ' ').toLowerCase().indexOf('payback ' + pbTxt) >= 0, pbTxt);
     check('Proposta: nível de maturidade do diagnóstico presente', phas(canon.nivel), canon.nivel);
     // pilares: score sc/max de cada pilar aparece no recap da proposta
     canon.pilares.forEach(function(p){ check('Proposta: pilar '+p.k+' '+p.sc+'/'+p.max+' presente', phas(p.sc+' / '+p.max), p.sc+' / '+p.max); });
