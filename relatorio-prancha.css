@@ -345,3 +345,22 @@
 .ptr.prop .sec.first{margin-top:5mm}
 .ptr.prop .progr .pc{padding-top:1.6mm}
 .ptr.prop .bl li{line-height:11.4pt;margin-bottom:.5mm}
+
+/* Proposta: colunas de cartões (fio de tinta em cima, sem sombra) e comparação em 2 colunas */
+.ptr .cols{display:grid;column-gap:4mm;align-items:start}
+.ptr .cols.c2{grid-template-columns:repeat(2,minmax(0,1fr))} .ptr .cols.c3{grid-template-columns:repeat(3,minmax(0,1fr))}
+.ptr .cols.c4{grid-template-columns:repeat(4,minmax(0,1fr))} .ptr .cols.c5{grid-template-columns:repeat(5,minmax(0,1fr))}
+.ptr .cols.c5{column-gap:3mm}
+.ptr .col{border-top:.75pt solid var(--tinta);padding-top:1.8mm;break-inside:avoid}
+.ptr .col .k{font-family:var(--f-disp);font-weight:var(--w-rotulo);font-size:6.2pt;line-height:9pt;letter-spacing:var(--ls-rot);text-transform:uppercase;color:var(--marca-txt)}
+.ptr .col .t{font-family:var(--f-disp);font-weight:var(--w-subtitulo);font-size:9.6pt;line-height:12.4pt;margin:.8mm 0 1mm}
+.ptr .col .d{font-size:8pt;line-height:11pt;color:var(--texto2)}
+.ptr .col .n2{font-family:var(--f-numero);font-weight:var(--w-titulo);font-size:13pt;line-height:15pt;color:var(--marca)}
+.ptr .col .dep{font-style:var(--fs-cit);font-size:8pt;line-height:11.2pt;color:var(--tinta)}
+.ptr .col .dep-a{font-size:7.2pt;line-height:9.6pt;color:var(--texto2);margin-top:1.6mm}
+.ptr .cmp{display:grid;grid-template-columns:1fr 1fr;column-gap:4mm;margin-top:3mm}
+.ptr .cmp .ch{font-family:var(--f-disp);font-weight:var(--w-rotulo);font-size:7pt;letter-spacing:var(--ls-rot);text-transform:uppercase;color:var(--texto3);border-top:.75pt solid var(--tinta);padding:1.8mm 0 1.4mm;border-bottom:.75pt solid var(--tinta)}
+.ptr .cmp .ch.s{color:var(--marca-txt)}
+.ptr .cmp .cl{font-size:8.6pt;line-height:12pt;padding:1.6mm 0;border-bottom:.4pt solid var(--hair);color:var(--texto2)}
+.ptr .cmp .cl.s{color:var(--tinta);font-weight:var(--w-forte)}
+.ptr .grp{break-inside:avoid}

@@ -26,6 +26,14 @@ function ptpRow(label, body, extra) {
 }
 // render de bloco de linhas (`.pc.row`) para o paginador: o título e as 2 primeiras linhas ficam juntos; o resto continua na folha seguinte
 function ptpRender(rows) { return '<div class="progr">' + rows.join('') + '</div>'; }
+// colunas de cartões (fio de tinta em cima, sem sombra nem cantos): a mesma estrutura da versão escura, no tema claro
+function ptpCols(n, cards, extra) {
+  return '<div class="cols c' + n + '" style="margin-top:' + (extra || '4mm') + '">' + cards.join('') + '</div>';
+}
+function ptpCol(k, t, d, extra) {
+  return '<div class="col">' + (k ? '<div class="k">' + k + '</div>' : '') + (t ? '<div class="t">' + t + '</div>' : '') + (d ? '<div class="d">' + d + '</div>' : '') + (extra || '') + '</div>';
+}
+function ptpGrupo(label, html) { return '<div class="grp"><div class="lbl rule" style="margin-top:6mm">' + label + '</div>' + html + '</div>'; }
 function ptpHead(num, titulo) { return ptSec(num, titulo, false); }
 function ptpTabela(cols, rows, cls) {
   return '<table' + (cls ? ' class="' + cls + '"' : '') + '><thead><tr>' + cols.map(function(c){ return '<th' + (c.n ? ' class="n"' : '') + (c.w ? ' style="width:' + c.w + '"' : '') + '>' + c.t + '</th>'; }).join('') + '</tr></thead><tbody>' +
@@ -111,16 +119,16 @@ function ptpPrograma(M, num) {
   };
   var etapas = [{ rot: 'Ponto de partida', tit: 'Kick-off · Lean Experience', desc: 'Workshop presencial de nivelamento Lean, até 25 pessoas.', badge: 'Cortesia · inclusa', lig: '' }]
     .concat(fases.map(function(f){ return { rot: 'Fase de Implementação ' + f.id, tit: f.nome, desc: f.fd, badge: '', lig: prios(f.id) }; }));
-  var rows = etapas.map(function(e, i) {
-    return '<div class="pc row" style="' + (i === 0 ? 'margin-top:4mm;' : '') + 'margin-bottom:0;padding-bottom:2.4mm"><div><div class="lbl" style="color:var(--marca-txt)">' + e.rot + '</div>' + (e.badge ? '<div class="note" style="margin-top:1mm">' + e.badge + '</div>' : '') + '</div>' +
-      '<div><div class="tt" style="margin-bottom:.8mm">' + ptEsc(e.tit) + '</div><div class="txt">' + ptEsc(e.desc) + '</div>' + (e.lig ? '<div class="note" style="margin-top:1mm"><b class="b6">' + e.lig + '</b></div>' : '') + '</div></div>';
+  var cards = etapas.map(function(e) {
+    return ptpCol(e.rot, ptEsc(e.tit), ptEsc(e.desc), (e.badge ? '<div class="note" style="margin-top:1.6mm">' + e.badge + '</div>' : '') + (e.lig ? '<div class="note" style="margin-top:1.6mm"><b class="b6">' + e.lig + '</b></div>' : ''));
   });
   var tl = '<div class="tl" style="grid-template-columns:30mm minmax(0,1fr)"><div class="nm">Programa: ' + M.cfg.progMeses + ' meses</div><div class="tp" style="margin-right:0"><div class="tb a" style="left:0;width:75%">Construção · ~75%</div><div class="tb b" style="left:75%;right:0;padding-left:1.2mm;font-size:6.6pt">Validação · ~25%</div></div></div>' +
     '<div class="note" style="display:flex;justify-content:space-between;margin-top:1.6mm"><span>Mês 1 — Kick-off / Lean Experience</span><span>Mês ' + M.cfg.progMeses + ' — Análise e resultados</span></div>';
-  var h1 = ptpHead(num, 'O Programa de Redesenho SIIGA') +
-    '<div class="row" style="margin-top:5mm"><div><div class="lbl rule">Etapas</div></div><div><p class="lead">Do workshop de nivelamento à governança contínua — começa com o time no mesmo idioma (Lean Experience) e avança pelas três Fases de Implementação do relatório, com cada prioridade do diagnóstico ligada à sua Fase e com meta, entregável e responsável definidos em cada etapa.</p></div></div>';
+  var b1 = ptpHead(num, 'O Programa de Redesenho SIIGA') +
+    '<div class="row" style="margin-top:5mm"><div><div class="lbl rule">Etapas</div></div><div><p class="lead">Do workshop de nivelamento à governança contínua — começa com o time no mesmo idioma (Lean Experience) e avança pelas três Fases de Implementação do relatório, com cada prioridade do diagnóstico ligada à sua Fase e com meta, entregável e responsável definidos em cada etapa.</p></div></div>' +
+    ptpCols(4, cards, '5mm');
   var b2 = ptpRow('Duração', tl);
-  return [{ sec: num, head: h1, rows: rows, render: ptpRender }, { sec: num, html: b2 }];
+  return [{ sec: num, html: b1 }, { sec: num, html: b2 }];
 }
 
 // ── 05 · Resultados esperados por nível ──────────────────────────────────
@@ -158,14 +166,15 @@ function ptpGov(M, num) {
     ['03', 'Adoção', 'Fase de Implementação III e ampliação para as demais frentes'], ['04', 'Engajamento', 'Avaliação proativa do uso'], ['05', 'Acompanhamento', 'Ritos até a cultura enraizar']];
   var ritos = [['Mensal', 'Comitê Executivo', 'Diretoria + Agilean: leitura do Health Score, avanço das metas e decisões de curso.'], ['Quinzenal', 'Rito Tático', 'Sala técnica: análise de restrições e planejamento de médio prazo.'], ['Semanal', 'Rito Operacional', 'Obra: Last Planner, compromissos de curto prazo e mão de obra.']];
   var papeis = [['Apresenta', 'Comercial', 'Conduz a proposta e a transição para a execução.'], ['Executa', 'Customer Success', 'Responsável pela condução do programa nos ' + meses + ' meses.'], ['Apoia', 'Sócio / CEO', 'Presença pontual em momentos-chave da transformação.']];
-  var t1 = ptpTabela([{ t: 'Etapa', w: '12mm' }, { t: '', w: '36mm' }, { t: 'O que acontece' }], etapas.map(function(e){ return { c: [e[0], '<span class="b6">' + e[1] + '</span>', e[2]] }; }));
-  var t2 = ptpTabela([{ t: 'Cadência', w: '24mm' }, { t: 'Rito', w: '36mm' }, { t: 'Pauta' }], ritos.map(function(r){ return { c: [r[0], '<span class="b6">' + r[1] + '</span>', r[2]] }; }));
-  var t3 = ptpTabela([{ t: 'Papel', w: '24mm' }, { t: 'Quem', w: '36mm' }, { t: 'Responsabilidade' }], papeis.map(function(r){ return { c: [r[0], '<span class="b6">' + r[1] + '</span>', r[2]] }; }));
+  var c1 = etapas.map(function(e){ return ptpCol('', ptEsc(e[1]), ptEsc(e[2]), '').replace('<div class="col">', '<div class="col"><div class="n2">' + e[0] + '</div>'); });
+  var c2 = ritos.map(function(r){ return ptpCol(r[0], r[1], r[2]); });
+  var c3 = papeis.map(function(r){ return ptpCol(r[0], r[1], r[2]); });
   var b1 = ptpHead(num, 'Governança, Ritos e Time') +
-    '<div class="row" style="margin-top:5mm"><div><div class="lbl rule">Etapas</div></div><div><p class="lead">Cinco etapas de intensidade decrescente — do redesenho à autonomia — sustentadas por uma cadência de ritos e medidas por Health Score.</p><div style="margin-top:3mm">' + t1 + '</div></div></div>' +
-    ptpRow('Ritos de governança', t2 + '<div class="nt">Gatilho de intensificação: se a aderência cair abaixo de <b>70% da baseline</b>, a cadência sobe automaticamente até o indicador se recuperar.</div>');
-  var b2 = ptpRow('Time', t3 + '<div class="nt"><b>Formato de atuação:</b> programa conduzido de forma <b>remota</b>, com os ritos de governança e a sala técnica em cadência semanal/quinzenal/mensal. Encontros presenciais são exceção, reservados a momentos-chave como o kick-off (Lean Experience).</div>');
-  return [{ sec: num, html: b1 }, { sec: num, html: b2 }];
+    '<div class="row" style="margin-top:5mm"><div><div class="lbl rule">Etapas</div></div><div><p class="lead">Cinco etapas de intensidade decrescente — do redesenho à autonomia — sustentadas por uma cadência de ritos e medidas por Health Score.</p></div></div>' +
+    ptpCols(5, c1, '4mm');
+  var b2 = ptpGrupo('Ritos de governança', ptpCols(3, c2, '3mm') + '<div class="nt">Gatilho de intensificação: se a aderência cair abaixo de <b>70% da baseline</b>, a cadência sobe automaticamente até o indicador se recuperar.</div>');
+  var b3 = ptpGrupo('Time', ptpCols(3, c3, '3mm') + '<div class="nt"><b>Formato de atuação:</b> programa conduzido de forma <b>remota</b>, com os ritos de governança e a sala técnica em cadência semanal/quinzenal/mensal. Encontros presenciais são exceção, reservados a momentos-chave como o kick-off (Lean Experience).</div>');
+  return [{ sec: num, html: b1 }, { sec: num, html: b2 }, { sec: num, html: b3 }];
 }
 
 // ── 07 · O Método SIIGA ──────────────────────────────────────────────────
@@ -175,12 +184,13 @@ function ptpMetodo(M, num) {
     ['Tecnologia', 'Agilean como consequência', 'A plataforma entra para dar visibilidade e governança ao processo já maduro — integrada ao ERP, não como uma ilha a mais de dados.']];
   var linhas = [['Treino de tela padrão, igual para todos', 'Diagnóstico com score e programa sob medida'], ['Não mapeia o processo da empresa', 'Redesenha o fluxo de produção antes do sistema'], ['Sem definição de papéis', 'RACI definido para cada rotina'],
     ['Sistema vira mais uma ilha de dados', 'Integração nativa com o ERP'], ['Acaba na entrega, sem acompanhamento', 'Health Score e ritos até a cultura enraizar']];
-  var tp = ptpTabela([{ t: '', w: '26mm' }, { t: '', w: '44mm' }, { t: '' }], pil.map(function(p){ return { c: ['<span class="lbl" style="color:var(--marca-txt)">' + p[0] + '</span>', '<span class="b6">' + p[1] + '</span>', p[2]] }; }));
-  var tc = ptpTabela([{ t: 'Implantação tradicional' }, { t: 'Programa SIIGA' }], linhas.map(function(l){ return { c: [l[0], '<span class="b6">' + l[1] + '</span>'] }; }));
+  var cards = pil.map(function(p){ return ptpCol(p[0], p[1], p[2]); });
+  var cmp = '<div class="cmp"><div class="ch">✕ Implantação tradicional</div><div class="ch s">✓ Programa SIIGA</div>' +
+    linhas.map(function(l){ return '<div class="cl">' + l[0] + '</div><div class="cl s">' + l[1] + '</div>'; }).join('') + '</div>';
   var b1 = ptpHead(num, 'O Método SIIGA') +
     '<div class="row" style="margin-top:5mm"><div><div class="lbl rule">Por que vamos além da tecnologia</div></div><div><p class="lead">O SIIGA não é a implantação de um sistema. É o redesenho de como a empresa planeja e executa — a plataforma entra como consequência do processo maduro.</p></div></div>' +
-    ptpRow('A base da nossa Metodologia SIIGA', tp);
-  var b2 = ptpRow('Implantação de Sistema × Redesenho SIIGA', tc);
+    ptpGrupo('A base da nossa Metodologia SIIGA', ptpCols(3, cards, '3mm'));
+  var b2 = ptpGrupo('Implantação de Sistema × Redesenho SIIGA', cmp);
   return [{ sec: num, html: b1 }, { sec: num, html: b2 }];
 }
 
@@ -189,14 +199,15 @@ function ptpDepoimentos(M, num) {
   var deps = [['Gestão de Mão de Obra', '“O Agilean nos trouxe praticidade e soluções reais para acompanhar a mão de obra em grandes construções. Nossas obras têm entre 150 e 200 pessoas e era um desafio gerenciar e integrar todos os recursos. Agora tenho tempo para analisar, criar estratégias e focar no que agrega valor.”', 'Natalia V. de Dios', 'Gerência de Processos e Qualidade · Dimas Construções'],
     ['Decisão em Tempo Real', '“Uma das maiores vantagens que o Agilean nos trouxe foi a capacidade de rastrear e monitorar o progresso das nossas obras em tempo real, permitindo decisões rápidas com dados confiáveis de canteiro. Aumentamos consideravelmente o cumprimento dos prazos.”', 'Alessandra Silva', 'Coordenação de Planejamento e Controle · CONX'],
     ['Linha de Balanço Ágil', '“Saímos de um modelo operacional e trabalhoso para planejar e elaborar nossa linha de balanço; nossos engenheiros passavam meses no processo. Com o Agilean fazemos em questão de horas, simulando múltiplos cenários e planos de ataque.”', 'Claudio Barreira', 'Diretor de Engenharia · Dasart']];
-  var stats = [['22', 'estados com operação'], ['70 mi', 'm² construídos com Agilean'], ['+5.000', 'canteiros impactados'], ['+5 mil', 'gestores usando por dia'], ['25%', 'de ganho médio de produtividade']];
+  var stats = [['22', 'estados com operação'], ['70 mi', 'm² construídos com Agilean'], ['+5.000', 'canteiros impactados'], ['+5 mil', 'gestores usando por dia'], ['+25%', 'de ganho médio de produtividade']];
   var strip = '<div class="strip five">' + stats.map(function(s){ return '<div><div class="big">' + s[0] + '</div><div class="note">' + s[1] + '</div></div>'; }).join('') + '</div>';
-  var cards = deps.map(function(d, i) {
-    return '<div class="pc row" style="' + (i === 0 ? 'margin-top:5mm;' : '') + 'margin-bottom:0;padding-bottom:2.4mm"><div><div class="lbl" style="color:var(--marca-txt)">' + d[0] + '</div></div><div><div class="dep">' + d[1] + '</div><div class="dep-a"><b class="b6">' + d[2] + '</b> · ' + d[3] + '</div></div></div>';
+  var cards = deps.map(function(d) {
+    return ptpCol(d[0], '', '', '<div class="dep">' + d[1] + '</div><div class="dep-a"><b class="b6">' + d[2] + '</b><br>' + d[3] + '</div>');
   });
   var b1 = ptpHead(num, 'Pareceres de Lideranças & Resultados Comprovados') +
     '<div class="row" style="margin-top:5mm"><div><div class="lbl rule">Resultados comprovados</div></div><div>' + strip + '</div></div>';
-  return [{ sec: num, head: b1, rows: cards, render: ptpRender }];
+  var b2 = ptpCols(3, cards, '6mm');
+  return [{ sec: num, html: b1 }, { sec: num, html: b2 }];
 }
 
 // ── 09 · Investimento ────────────────────────────────────────────────────
@@ -271,7 +282,7 @@ function ptpTermos(M, num) {
   if (!cfg.ativNA) termos.push(['Ativação SIIGA', fmtBRL(cfg.ativPor) + ' · setup único']);
   termos.push([cfg.progNA ? 'Plataforma' : 'Plataforma (após)', fmtBRL(cfg.mensalPor) + '/obra/mês · para ' + cfg.nObras + ' obra' + (cfg.nObras === 1 ? '' : 's') + (cfg.progNA ? ' · cobrança desde o 1º mês' : '')]);
   termos.push(['Validade', dias + ' dias — até ' + validadeFmt]);
-  var tab = ptpTabela([{ t: 'Termo', w: '56mm' }, { t: 'Condição' }], termos.map(function(t){ return { c: ['<span class="b6">' + t[0] + '</span>', t[1]] }; }));
+  var tab = ptpCols(termos.length, termos.map(function(t){ return ptpCol(t[0], '', t[1]).replace('<div class="k">', '<div class="k">'); }), '3mm');
   var obs = cfg.piloto ? '<div class="nt"><b>Modelo Piloto:</b> ' + propPilotoObs(cfg) + '</div>' : '';
   var passo = cfg.progNA
     ? 'Para avançarmos, será necessário <b>confirmarmos a data de início da Ativação SIIGA</b>' + (kickTxt ? ' — nossa sugestão é <b>' + kickTxt + '</b>' : '') + ' e <b>recebermos o planejamento e o orçamento das obras</b> que serão contempladas. A assinatura da plataforma é cobrada a partir do 1º mês de uso.'
@@ -279,7 +290,7 @@ function ptpTermos(M, num) {
   var card = '<div class="plano"><div class="kk sq">Próximo passo</div><h3>Próximo passo</h3><p>' + passo + '</p><p class="note" style="margin-bottom:0">Validade até ' + validadeFmt + ' · ' + dias + ' dias' + (kickTxt ? ' · ' + (cfg.progNA ? 'Início' : 'Kick-Off') + ' sugerido: ' + kickTxt : '') + '</p></div>';
   var b1 = ptpHead(num, 'Termos & Próximo Passo') + ptpRow('Termos', tab + obs);
   var b2 = '<div class="row sec"><div><div class="lbl rule">Próximo passo</div></div><div>' + card + '</div></div>';
-  return [{ sec: num, html: b1, breakBefore: true }, { sec: num, html: b2 }];   // a folha final traz os termos e o próximo passo juntos
+  return [{ sec: num, html: b1 }, { sec: num, html: b2 }];
 }
 
 // ── Capa ────────────────────────────────────────────────────────────────

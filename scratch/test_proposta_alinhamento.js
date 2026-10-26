@@ -243,6 +243,7 @@ server.listen(PORT, async () => {
       [['ROI Mensal', /ROI Mensal/i], ['% da jornada', /% da jornada/i], ['Horas recuperadas', /Horas recuperadas/i], ['Pilar macro/tático/operacional', /Pilar (macro|tático|operacional)/i],
        ['Fase 1', /Fase 1\b/], ['Jornada', /jornada/i], ['gap', /\bgaps?\b/i], ['OPORTUNIDADE', /OPORTUNIDADE/i], ['capacidade de gestão liberada', /capacidade de gestão liberada/i]]
         .forEach(([n, re]) => check('sem "' + n + '"', !re.test(txt), (txt.match(re) || [''])[0]));
+      check('08: faixa de resultados com "+25%" de ganho médio de produtividade (número institucional, sempre o maior e com "+")', tem('+25% de ganho médio de produtividade') && !/(^|[^+0-9])25% de ganho médio/.test(txt));
       check('depoimento do Claudio Barreira (Dasart) mantido', txt.indexOf('Claudio Barreira') >= 0 && txt.indexOf('Dasart') >= 0);
       await page.close();
     }
