@@ -1202,7 +1202,7 @@ function showPhaseResult(bk) {
       '</div>' +
       '<div class="score-bar"><div class="score-fill" style="width:'+pctPx+'%;background:'+col+'"></div></div>' +
       '<p style="font-size:13px;color:var(--gray2);line-height:1.65;margin-bottom:12px">'+insight+'</p>' +
-      (gapItems ? '<div style="font-size:10px;text-transform:uppercase;letter-spacing:0.1em;color:var(--gray2);margin-bottom:7px">Principais gaps identificados</div><ul style="list-style:none">'+gapItems+'</ul>' : '') +
+      (gapItems ? '<div style="font-size:10px;text-transform:uppercase;letter-spacing:0.1em;color:var(--gray2);margin-bottom:7px">Principais pontos críticos identificados</div><ul style="list-style:none">'+gapItems+'</ul>' : '') +
     '</div>';
 
   // Next button logic
@@ -1344,7 +1344,7 @@ function updateFocusUI() {
     }
     if(btn) btn.textContent = 'Iniciar diagnóstico focado (' + count + ' pilares) →';
   } else {
-    if(priorityHint) priorityHint.textContent = 'O plano de ação vai priorizar os gaps encontrados neste pilar.';
+    if(priorityHint) priorityHint.textContent = 'O plano de ação vai priorizar os pontos críticos encontrados neste pilar.';
     if(priorityOrder) priorityOrder.style.display = 'none';
     if(btn) btn.textContent = 'Iniciar diagnóstico — ' + PILAR_LABELS[selectedPilars[0]] + ' →';
   }
@@ -1572,13 +1572,13 @@ function showFocusedResult() {
     '</div>' +
 
     // Gaps
-    (gapHtml ? '<div style="margin-bottom:20px"><div style="font-size:11px;text-transform:uppercase;letter-spacing:0.1em;color:var(--gray2);margin-bottom:10px;font-weight:700">Gaps identificados neste pilar</div>' + gapHtml + '</div>' : '') +
+    (gapHtml ? '<div style="margin-bottom:20px"><div style="font-size:11px;text-transform:uppercase;letter-spacing:0.1em;color:var(--gray2);margin-bottom:10px;font-weight:700">Pontos críticos identificados neste pilar</div>' + gapHtml + '</div>' : '') +
 
     // Next step teaser
     '<div style="padding:20px;background:var(--orange-dim);border-radius:8px;border:1px solid var(--orange-mid)">' +
       '<div style="font-family:Bai Jamjuree;font-size:14px;font-weight:700;margin-bottom:8px">Próximo passo</div>' +
       '<p style="font-size:13px;color:rgba(255,255,255,0.85);line-height:1.65;margin-bottom:12px">' +
-        'O diagnóstico focado revelou os principais gaps do <strong>' + bd.label.split('·')[0].trim() + '</strong>. ' +
+        'O diagnóstico focado revelou os principais pontos críticos do <strong>' + bd.label.split('·')[0].trim() + '</strong>. ' +
         'Para ter a visão completa da operação — com potencial de ganho total e road map executivo de 90 dias — ' +
         'recomendamos o Diagnóstico Completo na próxima reunião.' +
       '</p>' +
@@ -2422,7 +2422,7 @@ function renderAnchorGapCards(plan, roi) {
   Array.prototype.forEach.call(wrapper.querySelectorAll(':scope > .anchor-gap-card'), function(c){ wrapper.removeChild(c); });
   var lead = document.getElementById('gaps-anchor-lead');
   if(lead) lead.textContent = plan.anchors.length ?
-    'Os ' + plan.anchors.length + ' pontos abaixo foram escolhidos pela fonte de perda mais cara e pelo que vocês mesmos relataram. Os demais gaps estão na sequência.' : '';
+    'Os ' + plan.anchors.length + ' pontos abaixo foram escolhidos pela fonte de perda mais cara e pelo que vocês mesmos relataram. Os demais pontos críticos estão na sequência.' : '';
   var obras = S.numObras || 5;
   var item = {}; roi.items.forEach(function(i){ item[i.key] = i; });
   var pilarLabel = {F1:'Pilar 1', F2:'Pilar 2', F3:'Pilar 3', F4:'Pilar 4', MO:'Mão de obra'};
@@ -2478,7 +2478,7 @@ function renderGapsIdentificados(plan) {
   if(oppTableCard) {
     if(!plan.all.length) {
       oppTableCard.innerHTML = '<div style="padding:14px 16px;text-align:center;color:#888;font-size:12px">' +
-        'Nenhum gap crítico ou oportunidade de melhoria identificada nesta fase do diagnóstico.</div>';
+        'Nenhum ponto crítico ou oportunidade de melhoria identificado nesta fase do diagnóstico.</div>';
     } else {
       var lista = gapsNumerados(plan);
       var nAlerta = plan.attention.length;
@@ -2502,10 +2502,10 @@ function renderGapsIdentificados(plan) {
       }).join('') : '<tr><td colspan="5" style="color:var(--rep-text-mut, #999)">Nenhum outro ponto crítico além das prioridades.</td></tr>';
       var alertaTxt = nAlerta ? '<p style="font-size:12px;color:#666;margin-top:10px">' + (nAlerta === 1 ? 'Outro ponto está em alerta' : 'Outros ' + nAlerta + ' pontos estão em alerta') +
         ': a prática existe, mas é informal. ' + (nAlerta === 1 ? 'Ele entra' : 'Eles entram') + ' no plano de implantação.</p>' : '';
-      oppTableCard.innerHTML = '<div class="rep-sec-title"><span class="rep-sec-num">03</span>Gaps Identificados</div>' +
+      oppTableCard.innerHTML = '<div class="rep-sec-title"><span class="rep-sec-num">03</span>Pontos Críticos Identificados</div>' +
         '<p style="font-size:12px;color:#666;margin-bottom:10px">Demais pontos críticos (nota 0 ou 1), por fonte de perda. São referência para a equipe e não precisam ser comentados na reunião; o foco são as prioridades do topo.</p>' +
         '<div style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:0.08em;color:#999;margin-bottom:8px">Por fonte de perda · '+lista.length+(lista.length === 1 ? ' ponto crítico' : ' pontos críticos')+'</div>' +
-        '<table class="opp-table" id="opp-table-el"><thead><tr><th>#</th><th>Gap Identificado</th><th>Pilar</th><th>Situação</th><th>Fase</th></tr></thead><tbody id="opp-body">'+rows+'</tbody></table>' + alertaTxt;
+        '<table class="opp-table" id="opp-table-el"><thead><tr><th>#</th><th>Ponto Crítico</th><th>Pilar</th><th>Situação</th><th>Fase</th></tr></thead><tbody id="opp-body">'+rows+'</tbody></table>' + alertaTxt;
     }
   }
   // Attention points (nota 1,5) now live in the single table above; the old card stays hidden.
@@ -2610,14 +2610,14 @@ function buildReport() {
   if (tDiag) tDiag.textContent = 'Diagnóstico SIIGA da ' + nomeEmpresa;
 
   var tGaps = document.getElementById('rep-title-gaps');
-  if (tGaps) tGaps.innerHTML = '<span class="rep-sec-num">02</span>Gaps do Processo atual da ' + nomeEmpresa;
+  if (tGaps) tGaps.innerHTML = '<span class="rep-sec-num">02</span>Pontos críticos do processo atual da ' + nomeEmpresa;
 
   var tGanhos = document.getElementById('rep-title-ganhos');
   if (tGanhos) tGanhos.innerHTML = '<span class="rep-sec-num">06</span>Plano de Ganho de Maturidade Lean — Escopo SIIGA para ' + nomeEmpresa;
 
   var subGanhos = document.getElementById('rep-sub-ganhos');
   if (subGanhos) {
-    subGanhos.textContent = 'Com base nos gaps identificados, o plano de aumento da maturidade Lean para a ' + nomeEmpresa + ' contempla os seguintes ajustes em seus processos, estruturando o método SIIGA e a tecnologia Agilean para estancar perdas e destravar a produtividade da sua operação:';
+    subGanhos.textContent = 'Com base nos pontos críticos identificados, o plano de aumento da maturidade Lean para a ' + nomeEmpresa + ' contempla os seguintes ajustes em seus processos, estruturando o método SIIGA e a tecnologia Agilean para estancar perdas e destravar a produtividade da sua operação:';
   }
 
   var fechConsultor = document.getElementById('rep-fechamento-consultor');
@@ -2699,7 +2699,7 @@ function buildReport() {
       '</div>' +
       '<div style="padding:12px 14px;background:#f8f8f8;border-radius:8px;border:1px solid #e8e8e8;text-align:center">' +
         '<div style="font-family:\'Bai Jamjuree\';font-size:16px;font-weight:700;color:#14141b">' + worstOppLabel + '</div>' +
-        '<div style="font-size:10px;color:#888;text-transform:uppercase;letter-spacing:0.06em;margin-top:2px">Gap mais crítico</div>' +
+        '<div style="font-size:10px;color:#888;text-transform:uppercase;letter-spacing:0.06em;margin-top:2px">Ponto mais crítico</div>' +
       '</div>' +
       '<div style="padding:12px 14px;background:#f8f8f8;border-radius:8px;border:1px solid #e8e8e8;text-align:center">' +
         '<div style="font-family:\'Bai Jamjuree\';font-size:16px;font-weight:700;color:#14141b">' + radarWorstLabel + ' · ' + radarWorstPct + '</div>' +
@@ -3118,7 +3118,7 @@ var GAP_INFO = {
   'F4.3':{title:'Performance HUB — visão integrada', impact:'Sem painel único, alguém precisa compilar manualmente prazo, custo e qualidade antes de cada reunião — tempo gasto montando o dado, não decidindo.'},
   'F4.4':{title:'Governança financeira do fechamento (ERP)', impact:'Fechamento sem fluxo de aprovação hierárquica integrado ao ERP paga por estimativa ou negociação — sem rastreabilidade e sem auditoria possível.'},
   'MO.1':{title:'Transparência de metas para equipes', impact:'Quando o operário não sabe o que vai ganhar, não tem como se comprometer com uma meta — a produtividade fica ao acaso.'},
-  'MO.2':{title:'Visibilidade de improdutividade', impact:'Funcionário improdutivo é custo sem dono. Em múltiplas obras simultâneas, esse gap se multiplica — não é problema de uma obra, é padrão de operação.'},
+  'MO.2':{title:'Visibilidade de improdutividade', impact:'Funcionário improdutivo é custo sem dono. Em múltiplas obras simultâneas, esse ponto se multiplica — não é problema de uma obra, é padrão de operação.'},
   'MO.3':{title:'Gestão de aditivos de verba', impact:'Verba extra aprovada só depois de executada distorce o custo real de cada serviço e cria passivo de ajuste.'},
   'MO.4':{title:'Eficiência do fechamento de folha', impact:'Cada dia de engenharia gasto fechando folha é um dia a menos de gestão ativa da obra — e indica ausência de dados estruturados.'},
   'MO.5':{title:'Alinhamento de metas com empreiteiros', impact:'Empreiteiro sem meta clara trabalha no ritmo dele — não no ritmo da obra.'},
@@ -3638,7 +3638,7 @@ var ROADMAP_SPRINTS = {
   f1_critical: {
     color:'#1B4F8A',
     title:'Estruturar a base do planejamento',
-    focus:'Os gaps de planejamento identificados impedem que os demais pilares funcionem. A prioridade é criar uma linha de base confiável antes de qualquer outra iniciativa.',
+    focus:'Os pontos críticos de planejamento identificados impedem que os demais pilares funcionem. A prioridade é criar uma linha de base confiável antes de qualquer outra iniciativa.',
     items: [
       'Lean EAP e Dicionário de Pacotes validados — o que inclui, o que exclui e critério de terminalidade por pacote',
       'Linha de Balanço elaborada com lotes, ritmos e equipes dimensionadas',
@@ -3704,7 +3704,7 @@ var ROADMAP_SPRINTS = {
   f3_critical: {
     color:'#0D6B45',
     title:'Fazer o planejamento chegar ao canteiro',
-    focus:'O principal gap está entre o que é planejado e o que chega ao dia a dia da obra. O objetivo é criar o ciclo diário e semanal que conecta planejamento e execução.',
+    focus:'O principal ponto crítico está entre o que é planejado e o que chega ao dia a dia da obra. O objetivo é criar o ciclo diário e semanal que conecta planejamento e execução.',
     items: [
       'Plano semanal com metas por equipe desdobrado do lookahead',
       'Ritual de check-in e checkout implantado — pauta fixa, até 30 min, causa padrão registrada',
@@ -4520,6 +4520,8 @@ var SYSTEM_PROMPT = `Voce e o Agente Consultor SIIGA da Agilean. Especialista se
 
 POSTURA: Linguagem executiva, pratica, orientada a decisao. Nunca academica. Nunca condescendente. Nao diga "voces estao errados" ou "sua obra e desorganizada". Use: "pelo que voce descreveu...", "e muito comum nesse estagio...", "a principal oportunidade parece estar em...".
 
+VOCABULARIO: nunca use a palavra "gap" nos textos que voce gera. Use "ponto critico" (nota 0 ou 1) ou "ponto em alerta" (nota 1,5).
+
 PRODUTOS AGILEAN:
 - Planejamento e Controle: Linha de Balanco digital, reprogramacoes automatizadas, Curva S fisico-financeira, IDP, gestao de restricoes com IRR, assistente Angelina via WhatsApp. Porta de entrada natural.
 - Qualidade: FVS automatica pos-medicao, PPCQ, controle de NCs, vinculo producao x qualidade x pagamento. Pre-requisito: P&C ativo.
@@ -4568,7 +4570,7 @@ BLOCO_CLIENTE_INICIO
 [2 paragrafos consultivos. Sem score numerico. Especifico: cite tipologia, modelo de MO, momento estrategico.]
 
 ### Onde esta a maior oportunidade
-[1 paragrafo focado no gargalo raiz. Por que esse gap vem antes dos outros. Custo de nao agir.]
+[1 paragrafo focado no gargalo raiz. Por que esse ponto crítico vem antes dos outros. Custo de nao agir.]
 
 ### Potencial de resultado
 [Use benchmarks reais + dados da operacao. Cite 2-3 referencias maximas. Linguagem de negocio.]
@@ -5681,7 +5683,7 @@ function buildPropostaHero(mode) {
       '<div style="font-family:Bai Jamjuree;font-size:34px;font-weight:700;line-height:1.15;color:#f8fafc;margin-bottom:18px">Proposta do Escopo de Projeto para a<br>Evolução da <span style="color:#ea580c">'+emp+'</span></div>' +
       '<div style="font-size:14px;color:#cbd5e1;line-height:1.65;max-width:640px">Este escopo nasce diretamente do diagnóstico SIIGA da '+emp+'. '+(soAtiv
         ? 'Ele coloca a plataforma SIIGA para rodar na sua operação, apoiando a gestão das obras com os dados do diagnóstico.'
-        : 'Ele traduz os gaps identificados em um programa de '+PROP_PROGRAMA_MESES+' meses para redesenhar a forma de planejar e executar — destravando valor real na sua operação e deixando o time autônomo para sustentar o ganho.')+'</div>' +
+        : 'Ele traduz os pontos críticos identificados em um programa de '+PROP_PROGRAMA_MESES+' meses para redesenhar a forma de planejar e executar — destravando valor real na sua operação e deixando o time autônomo para sustentar o ganho.')+'</div>' +
       // Faixa de fotos do Lean Experience no rodapé da capa (imagens em img/lean/,
       // da pág. 7 da proposta modelo WR Engenharia). O kick-off do programa é o
       // Workshop Lean Experience — a capa ancora essa prova visual.
@@ -5768,8 +5770,8 @@ function buildPropostaGaps(mode) {
   }).join('');
 
   c.innerHTML =
-    propSecHead('02', 'Maiores Gaps Identificados no Diagnóstico') +
-    propLead('A operação da '+emp+' escala mais rápido que os controles. Cada gap abaixo tem um custo que hoje passa despercebido.') +
+    propSecHead('02', 'Principais pontos críticos do diagnóstico') +
+    propLead('A operação da '+emp+' escala mais rápido que os controles. Cada ponto crítico abaixo tem um custo que hoje passa despercebido.') +
     '<div style="display:grid;grid-template-columns:repeat(3,1fr);gap:14px;margin-bottom:24px">' + cards + '</div>' +
     '<div style="padding:18px 20px;background:#151824;border:1px solid rgba(255,255,255,0.06);border-radius:10px">' +
       '<div style="font-size:12px;font-weight:700;color:#e2e8f0;margin-bottom:14px">Onde o '+fmtNum(perdaBruta)+' se forma — composição da exposição no portfólio</div>' +

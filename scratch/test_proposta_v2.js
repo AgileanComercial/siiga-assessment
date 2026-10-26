@@ -138,7 +138,7 @@ server.listen(PORT, async () => {
     check('#1 faixa Lean Experience na capa (3 fotos)', has('Workshop Lean Experience') && (t.match(/img\/lean\/Foto/g)||[]).length === 3);
     check('#2 faixa "prêmio/valor em jogo" removida', !has('valor em jogo') && !has('O PRÊMIO'));
     check('#3 recap com nome da empresa', has('Recapitulação Executiva do Diagnóstico SIIGA da CONSTRUTORA MERIDIANO'));
-    check('#4 maiores gaps', has('Maiores Gaps Identificados no Diagnóstico') && has('composição da exposição'));
+    check('#4 principais pontos críticos', has('Principais pontos críticos do diagnóstico') && has('composição da exposição'));
     check('#5 objetivo do redesenho', has('Objetivo do Redesenho SIIGA') && has('Meta Central'));
     check('#6 programa de redesenho', has('O Programa de Redesenho SIIGA'));
     check('#7 resultados por nível', has('Resultados Esperados por Nível'));

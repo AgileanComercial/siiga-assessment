@@ -82,6 +82,8 @@ function esperado(Cc) {
 const EXP = esperado(C);
 const avisos = {}; // code -> warning visible after the star (score 3 only)
 let telaF44 = ''; // questionnaire card text where F4.4 is asked
+const telasPilar = []; // innerText of each pillar result screen (word "gap" must not appear)
+const GAP = /gaps?/i;
 let telaFerr = null, telaHoras = ''; // tools screen (fields shown) and hours screen text
 
 const server = http.createServer((req, res) => {
@@ -164,7 +166,7 @@ server.listen(PORT, async () => {
     for (let i = 0; i < 90; i++) {
       const scr = await active(page);
       if (scr === 'screen-radar' || scr === 'screen-confirmacao') break;
-      if (scr === 'screen-phase-result') { await page.click('#result-next-btn'); await sleep(200); continue; }
+      if (scr === 'screen-phase-result') { telasPilar.push(await page.evaluate(() => document.getElementById('screen-phase-result').innerText)); await page.click('#result-next-btn'); await sleep(200); continue; }
       if (scr === 'screen-horas') {
         telaHoras = await page.evaluate(() => document.getElementById('horas-card').innerText);
         await page.evaluate(v => document.querySelectorAll('#horas-card input').forEach((el, i) => el.value = v ? String(v[i]) : ''), C.horas);
@@ -227,8 +229,22 @@ server.listen(PORT, async () => {
     check('AHA: composição por fonte em perda bruta e subtotal = perda bruta', JSON.stringify(aha.comps) === JSON.stringify(ordem.map(k => fTela(EXP.P[k]))) && aha.sub === fTela(EXP.somaP), aha.comps.join(' | ') + ' / ' + ordem.map(k => fTela(EXP.P[k])).join(' | '));
     check('AHA: ganho rotulado como recuperável (' + fTela(EXP.somaG) + ' por obra, ' + fPct(EXP.capEf) + ' da perda)', aha.rec === 'Recuperável com o plano: ' + fTela(EXP.somaG) + ' por obra (' + fPct(EXP.capEf) + ' da perda)' + (EXP.obras > 1 ? ' · ' + fTela(EXP.somaG * EXP.obras) + ' no portfólio' : ''), aha.rec);
     check('AHA sem atalho para a Conferência', !aha.hasConf);
+    check('AHA: texto visível sem a palavra "gap"', !GAP.test(await page.evaluate(() => document.getElementById('screen-aha').innerText)));
     await page.evaluate(() => document.querySelector('#screen-aha button[onclick="showReport()"]').click()); await sleep(1200);
     check('relatório sem o botão "← Conferência" (sem atalho visível ao cliente)', await page.evaluate(() => !/Conferência/.test(document.getElementById('screen-report').innerText) && !document.querySelector('#screen-report [onclick*="showConfirmacao"]')));
+
+    check('telas de resultado por pilar (' + telasPilar.length + '): texto visível sem a palavra "gap"', telasPilar.length >= 4 && telasPilar.every(t => !GAP.test(t)), (telasPilar.map(t => (t.match(GAP) || [''])[0]).join('|')));
+    check('relatório na tela: texto visível sem a palavra "gap"', !GAP.test(await page.evaluate(() => document.getElementById('screen-report').innerText)));
+    // Proposta e diagnóstico focado (telas montadas aqui só para ler o texto; o PDF do relatório vem depois e não depende delas)
+    const outras = await page.evaluate(() => {
+      var r = {};
+      try { buildProposta('detalhado'); showScreen('screen-proposta'); r.proposta = document.getElementById('screen-proposta').innerText; } catch (e) { r.proposta = 'ERRO ' + e.message; }
+      try { focusedPilar = 'f3'; showFocusedResult(); r.focado = document.getElementById('screen-focused-result').innerText; } catch (e) { r.focado = 'ERRO ' + e.message; }
+      showScreen('screen-report');
+      return r;
+    });
+    check('proposta na tela: texto visível sem a palavra "gap" e com o título novo', !GAP.test(outras.proposta) && /Principais pontos críticos do diagnóstico/i.test(outras.proposta) && !/^ERRO/.test(outras.proposta), (outras.proposta.match(GAP) || [outras.proposta.slice(0, 40)])[0]);
+    check('diagnóstico focado: texto visível sem a palavra "gap"', !GAP.test(outras.focado) && !/^ERRO/.test(outras.focado), (outras.focado.match(GAP) || [outras.focado.slice(0, 40)])[0]);
 
     // Uses the on-screen dark toggle first: the PDF must come out in the light Direction A anyway.
     await page.evaluate(() => changeReportTheme('dark'));
