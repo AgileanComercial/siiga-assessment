@@ -2827,8 +2827,7 @@ function buildReport() {
       basesRow('Orçamento médio por obra', fmtNum(S.orcamentoMedio||8000000)) +
       basesRow('Portfólio estimado sob gestão', fmtNum(portfolio)) +
       basesRow('Prazo médio das obras', (S.prazoMedio||18)+' meses') +
-      basesRow('Horas de gestão informadas', (_rr && _rr.operacional ? fmtHorasBR(_rr.operacional.horasInformadas)+' h/mês' : '—')) +
-      basesRow('Cenário adotado', Math.round(ROI_CAPTURA_FIXA*100)+'% · '+roiCapturaLabel(ROI_CAPTURA_FIXA));
+      basesRow('Horas de gestão informadas', (_rr && _rr.operacional ? fmtHorasBR(_rr.operacional.horasInformadas)+' h/mês' : '—'));
   }
 
   // Aplica na tela o tema (claro/escuro) selecionado no toggle — feito por
@@ -4554,10 +4553,11 @@ REGRAS DE DEPENDENCIA (inviolaveis):
 8. Consolidacao: ganho de controle, margem e previsibilidade
 
 CLASSIFICACAO POR PERCENTUAL:
-- Critico: < 35%
-- Em Construcao: 35-59%
-- Estruturado: 60-84%
-- Avancado/Referencia: 85%+
+- Critico / Vulneravel: < 40%
+- Operacao Artesanal / Risco de Desvio: 40-59%
+- Em alerta · Gargalos de escala: 60-74%
+- Estruturado com Perdas Ocultas: 75-89%
+- Referencia SIIGA / Alta Performance: 90%+
 
 OBJECOES COMUNS:
 "Ja tentamos Last Planner e nao funcionou" -> explore por que nao funcionou: sem suporte, sem dados, sem ferramenta. A Agilean resolve os tres.

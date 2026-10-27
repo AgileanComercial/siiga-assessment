@@ -1,9 +1,10 @@
 // Real E2E (clicks through the questionnaire) for the Direction A report PDF
 // ("Prancha técnica", relatorio-prancha.js). Supabase writes and AI calls are blocked.
 // Usage:
-//   CASE=pcl  MODE=detalhado OUT="Piloto Relatorio v2/SIIGA_APP_v3_DETALHADO_PCL.pdf" node scratch/test_relatorio_prancha.js
-//   CASE=terc MODE=resumido  OUT="Piloto Relatorio v2/SIIGA_APP_v3_RESUMIDO_TERC.pdf"  node scratch/test_relatorio_prancha.js
-//   CASE: pcl (mixed labor), pcl2 (★ on alert point), prop (own labor), terc (outsourced). PROD_URL=https://siiga.vercel.app/ runs it in production.
+//   CASE=pcl  MODE=detalhado OUT="scratch/SIIGA_APP_v3_DETALHADO_PCL.pdf" node scratch/test_relatorio_prancha.js
+//   CASE=terc MODE=resumido  OUT="scratch/SIIGA_APP_v3_RESUMIDO_TERC.pdf"  node scratch/test_relatorio_prancha.js
+//   CASE: pcl (mixed labor), pcl2 (★ on alert point), prop (own labor), terc (outsourced). OUT: absolute path, or relative to the siiga-assessment folder.
+//   Production: PROD_URL=https://siiga.vercel.app/index.html CASE=pcl MODE=detalhado node scratch/test_relatorio_prancha.js
 const http = require('http');
 const fs = require('fs');
 const path = require('path');
@@ -549,7 +550,7 @@ server.listen(PORT, async () => {
 
     if (uri && uri.startsWith('data:application/pdf')) {
       const b64 = uri.replace(/^data:application\/pdf;[^,]*base64,/, '');
-      const target = path.isAbsolute(OUT) ? OUT : path.join(ROOT_DIR, OUT);
+      const target = path.isAbsolute(OUT) ? OUT : path.join(BASE_DIR, OUT);
       fs.mkdirSync(path.dirname(target), { recursive: true });
       fs.writeFileSync(target, Buffer.from(b64, 'base64'));
       console.log('PDF salvo:', target);
