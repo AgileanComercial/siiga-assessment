@@ -402,8 +402,10 @@ function ptSecPerdaGanho(M) {
       (l ? ptPrioLista(l) : '—') + '</td></tr>';
   }).join('');
   var portf = porObra ? '<tr class="tot"><td>Total no portfólio (' + M.obras + ' obras)</td><td class="n">' + ptMil(M.roi.totalBase * M.obras / P, 1) + '</td><td class="n"></td><td class="n">' + ptMil(M.roi.totalPortfolio / P, 1) + '</td><td></td></tr>' : '';
+  var consNota = '<p class="note" style="margin-top:3mm"><b class="b6">Mesmo recuperando só ' + ptPct(ROI_CENARIO_CONSERVADOR) + ' do proposto: ' + ptMil(ganhoMes * ROI_CENARIO_CONSERVADOR, 1) + ' por mês' + (porObra ? ', por obra' : '') + '</b>' +
+    (porObra ? ' (' + ptMil(M.roi.totalPortfolio / P * ROI_CENARIO_CONSERVADOR, 1) + ' por mês no portfólio de ' + M.obras + ' obras)' : '') + '.</p>';
   var b2 = '<div class="row sec"><div><div class="lbl rule">Composição</div></div><div><table><thead><tr><th>Fonte de perda</th><th class="n" style="width:22mm">Perda/mês</th><th class="n" style="width:16mm">Captura</th><th class="n" style="width:24mm">Ganho/mês</th><th class="wrap" style="width:31mm;padding-left:5mm">Prioridade ligada</th></tr></thead><tbody>' + rows +
-    '<tr class="tot"><td>' + (porObra ? 'Total por obra' : 'Total, 1 obra') + '</td><td class="n perda">' + ptMil(perdaMes, 1) + '</td><td class="n"></td><td class="n ganho">' + ptMil(ganhoMes, 1) + '</td><td></td></tr>' + portf + '</tbody></table><div class="src">Nas fontes Horas do time de gestão e Custo indireto do prazo a captura é 100%: a perda já é a parte que o SIIGA elimina (a parte manual das rotinas e o tempo a mais de obra).</div></div></div>';
+    '<tr class="tot"><td>' + (porObra ? 'Total por obra' : 'Total, 1 obra') + '</td><td class="n perda">' + ptMil(perdaMes, 1) + '</td><td class="n"></td><td class="n ganho">' + ptMil(ganhoMes, 1) + '</td><td></td></tr>' + portf + '</tbody></table><div class="src">Nas fontes Horas do time de gestão e Custo indireto do prazo a captura é 100%: a perda já é a parte que o SIIGA elimina (a parte manual das rotinas e o tempo a mais de obra).</div>' + consNota + '</div></div>';
   return [{ sec:'02', html:b1 }, { sec:'02', html:b2 }];
 }
 
@@ -616,7 +618,6 @@ function ptSecBases(M) {
   var oper = [['Obras em andamento', String(M.obras)], [M.obras === 1 ? 'Orçamento da obra' : 'Orçamento médio por obra', ptMilVar(M.orc)], ['Prazo da obra', M.prazo + ' meses'],
     ['Horas de gestão informadas', M.horasInf > 0 ? ptNum(M.horasInf, 0, 1) + ' h/mês' : 'Não informadas']];
   if (M.folha > 0) oper.push(['Folha de produção', ptMilVar(M.folha) + '/mês']);
-  oper.push(['Cenário adotado', ptPct(ROI_CAPTURA_FIXA) + ' · ' + roiCapturaLabel(ROI_CAPTURA_FIXA)]);
   var glos = [['P1 a P4', 'Pilares: P1 ' + PT_PILAR_NOME.f1 + '; P2 ' + PT_PILAR_NOME.f2 + '; P3 ' + PT_PILAR_NOME.f3 + '; P4 ' + PT_PILAR_NOME.f4 + '.'],
     ['EAP','Estrutura analítica do projeto.'],['FVS','Ficha de verificação de serviço.']].concat(semMOPropria() ? [] : [['HH','Homem-hora.']], [['IRR','Índice de remoção de restrições.'],
     ['Lookahead','Planejamento de médio prazo, com janela de semanas à frente da execução.'],['MO','Mão de obra.'],['PPC','Percentual de planos concluídos.'],
@@ -632,7 +633,7 @@ function ptSecBases(M) {
 }
 
 function ptSecAnexo(M) {
-  var orcT = ptMilVar(M.orc), P = M.prazo, F = M.fontes, cap = ptPct(ROI_CAPTURA_FIXA), custoH = ROI_REAL_K.CUSTO_HORA_TECNICA;
+  var orcT = ptMilVar(M.orc), P = M.prazo, F = M.fontes, custoH = ROI_REAL_K.CUSTO_HORA_TECNICA;
   var hasMo = !!F.mo;
   var pres = [['Mão de obra como % do custo da obra', '45%']];
   if (hasMo) pres.push(['Estouro médio de mão de obra', '15%'], ['Redução do estouro de MO com o SIIGA', '70% (referência SIIGA)']);
@@ -665,21 +666,17 @@ function ptSecAnexo(M) {
   var a3 = '<div class="row sec"><div><div class="lbl rule">A.3 Redução e ganho</div></div><div><table class="ax"><thead><tr><th style="width:44mm">Fonte de perda</th><th>Fórmula (perda × redução)</th><th class="n" style="width:16mm">Captura</th><th class="n" style="width:20mm">Ganho</th></tr></thead><tbody>' + a3rows +
     '<tr class="tot"><td>Total</td><td></td><td class="n">' + ptPct(M.roi.totalBase ? M.roi.totalPorObra / M.roi.totalBase : 0) + '</td><td class="n">' + ptMil(M.roi.totalPorObra, 1) + '</td></tr></tbody></table>' +
     '<div class="src">Ganho = perda estimada × redução com o SIIGA (referência SIIGA); captura = ganho ÷ perda = a redução de cada fonte. O ajuste pela maturidade (20% a 70% por fonte; quanto menor a maturidade, maior o ajuste) já está na perda estimada (A.2). Em Horas do time de gestão e Custo indireto do prazo a captura é 100%: a perda já é a parte que o SIIGA elimina (a parte manual das rotinas e o tempo a mais de obra). Ajustes arredondados na exibição; cálculo com o valor exato.</div></div></div>';
-  var Pm = M.perdaMes, G = M.ganhoMes, temFolha = (Pm.retr + Pm.indev) > 0;
-  var hPot = M.horasPot, hMes = M.cons.operacional.hMes;
-  var compR = '<tr><td>Horas do time técnico</td><td class="f">' + ptHoras(hPot) + ' × R$ ' + custoH + '/h; ganho: horas recuperadas (' + ptHoras(hMes) + ') × R$ ' + custoH + '/h</td><td class="n">' + ptMil(Pm.horas, 2) + '</td><td class="n">' + ptMil(G.horas, 2) + '</td></tr>' +
-    (temFolha ? '<tr><td>Retrabalho pago na folha</td><td class="f">Folha de MO própria × 5% de retrabalho; ganho: × captura do cenário (' + cap + ')</td><td class="n">' + ptMil(Pm.retr, 2) + '</td><td class="n">' + ptMil(G.retr, 2) + '</td></tr>' +
-      '<tr><td>Pagamentos indevidos na folha</td><td class="f">Folha de MO própria × 5% indevidos × 80% sem sobreposição; ganho: × ' + cap + '</td><td class="n">' + ptMil(Pm.indev, 2) + '</td><td class="n">' + ptMil(G.indev, 2) + '</td></tr>' : '');
-  var gp = M.ganhoPess.total;
-  var ind = [['Potencial pleno de horas', 'Horas informadas em cada rotina × % de economia da rotina (40% planejar, 90% demais)', ptNum(hPot, 0, 1) + ' h/mês'],
-    ['Horas recuperadas por mês', 'Potencial pleno × captura do cenário (' + cap + ')', ptNum(hMes, 0, 1) + ' h/mês'],
-    ['Horas recuperadas por obra', 'Horas recuperadas por mês × prazo da obra (' + P + ' meses)', ptHoras(M.cons.operacional.hObra)],
-    ['Horas recuperadas no mês de 1 profissional', ptHoras(hMes) + ' ÷ ' + ROI_REAL_K.JORNADA + ' h úteis por mês', ptNum(M.cons.operacional.pctJornada * 100, 1, 1) + '%'],
-    ['Cenário Pessimista (30%)', 'Horas recuperadas por mês: ' + ptHoras(M.pess.operacional.hMes), ptMil(gp, 2) + '/mês']];
-  var a4 = '<div class="row sec"><div><div class="lbl rule">A.4 Retorno mensal</div></div><div><p class="note" style="margin-top:4mm">Premissas: captura do cenário ' + cap + ' (Conservador)' +
-      (M.folha > 0 ? '; folha de MO própria ' + ptMilVar(M.folha) + '/mês' : '') + '; hora técnica R$ ' + custoH + '/h; horas de gestão informadas ' + ptNum(M.horasInf, 0, 1) + ' h/mês.</p>' +
-    '<div style="margin-top:4mm"><table class="ax"><thead><tr><th style="width:44mm">Componente</th><th>Fórmula</th><th class="n wrap" style="width:22mm">Perda/mês (' + (temFolha ? 'horas e folha' : 'horas') + ')</th><th class="n" style="width:20mm">Ganho/mês</th></tr></thead><tbody>' + compR +
-      '<tr class="tot"><td>Total</td><td></td><td class="n">' + ptMil(Pm.total, 2) + '</td><td class="n">' + ptMil(G.total, 2) + '</td></tr></tbody></table></div>' +
+  var CC = ROI_CENARIO_CONSERVADOR, ccPct = ptPct(CC), perdaMesT = M.roi.totalBase / P, ganhoMesT = M.roi.totalPorObra / P;
+  var compR = M.roi.items.map(function(it){ var f = F[it.key]; return '<tr><td>' + f.labelTab + '</td><td class="f">' + ptMil(f.perda, 1) + ' ÷ ' + P + '</td><td class="n">' + ptMil(f.perda / P, 2) + '</td><td class="n">' + ptMil(f.cap / P, 2) + '</td></tr>'; }).join('');
+  var hMesRec = F.time ? M.roi.horasRecup * F.time.fator : 0, hObraRec = hMesRec * P;
+  var ind = [['Horas recuperáveis por mês', ptNum(M.roi.horasRecup, 0, 1) + ' h/mês × ' + ptPct(F.time ? F.time.fator : 0) + ' (ajuste da fonte Horas do time de gestão)', ptNum(hMesRec, 0, 1) + ' h/mês'],
+    ['Horas recuperáveis por obra', 'Horas por mês × prazo da obra (' + P + ' meses)', ptHoras(hObraRec)],
+    ['Horas recuperáveis no mês de 1 profissional', ptHoras(hMesRec) + ' ÷ ' + ROI_REAL_K.JORNADA + ' h úteis por mês', ptNum(hMesRec / ROI_REAL_K.JORNADA * 100, 1, 1) + '%'],
+    ['Cenário conservador (' + ccPct + ')', 'Horas recuperáveis por mês × ' + ccPct, ptNum(hMesRec * CC, 0, 1) + ' h/mês']];
+  var a4 = '<div class="row sec"><div><div class="lbl rule">A.4 Retorno mensal</div></div><div><p class="note" style="margin-top:4mm">Premissas: hora técnica R$ ' + custoH + '/h; horas de gestão informadas ' + ptNum(M.horasInf, 0, 1) + ' h/mês; prazo da obra ' + P + ' meses.</p>' +
+    '<div style="margin-top:4mm"><table class="ax"><thead><tr><th style="width:44mm">Fonte de perda</th><th>Fórmula</th><th class="n" style="width:22mm">Perda/mês</th><th class="n" style="width:20mm">Ganho/mês</th></tr></thead><tbody>' + compR +
+      '<tr class="tot"><td>Total' + (M.obras > 1 ? ' por obra' : '') + '</td><td class="f">' + ptMil(M.roi.totalBase, 1) + ' ÷ ' + P + ' · ' + ptMil(M.roi.totalPorObra, 1) + ' ÷ ' + P + '</td><td class="n">' + ptMil(perdaMesT, 2) + '</td><td class="n">' + ptMil(ganhoMesT, 2) + '</td></tr>' +
+      '<tr class="rec"><td colspan="3">Cenário conservador (' + ccPct + ' do ganho proposto)</td><td class="n">' + ptMil(ganhoMesT * CC, 2) + '</td></tr></tbody></table></div>' +
     '<div style="margin-top:5mm"><table class="ax"><thead><tr><th style="width:44mm">Indicador</th><th>Fórmula</th><th class="n" style="width:24mm">Valor</th></tr></thead><tbody>' +
       ind.map(function(r){ return '<tr><td>' + r[0] + '</td><td class="f">' + r[1] + '</td><td class="n">' + r[2] + '</td></tr>'; }).join('') + '</tbody></table>' +
     '<div class="src">Estimativa a partir dos dados informados pelo cliente; não representa garantia contratual.</div></div></div></div>';

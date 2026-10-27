@@ -76,7 +76,7 @@ function esperado(Cc) {
   fontes.forEach(k => { P[k] = Math.round(perda[k] * fator[k]); G[k] = Math.round(perda[k] * fator[k] * red[k]); });
   const somaP = fontes.reduce((a, k) => a + P[k], 0), somaG = fontes.reduce((a, k) => a + G[k], 0);
   const top3 = Cc.prioFontes || fontes.slice().sort((a, b) => P[b] - P[a]).slice(0, 3);   // 1 prioridade por fonte, das 3 mais caras (ou as fontes após a retirada)
-  return { prazo, obras, fator, red, ref: perda, P, G, somaP, somaG, perdaMes: somaP / prazo, ganhoMes: somaG / prazo, capEf: somaG / somaP,
+  return { prazo, obras, fator, red, ref: perda, horasRec, P, G, somaP, somaG, perdaMes: somaP / prazo, ganhoMes: somaG / prazo, capEf: somaG / somaP,
     critPerda: top3.reduce((a, k) => a + P[k], 0), critMes: top3.reduce((a, k) => a + P[k], 0) / prazo, critCapMes: top3.reduce((a, k) => a + G[k], 0) / prazo, top3 };
 }
 const EXP = esperado(C);
@@ -425,6 +425,31 @@ server.listen(PORT, async () => {
       check('folha 03: captura por fonte = redução com o SIIGA (' + linhas.map(r => r[2]).join(', ') + ')', linhas.length >= 4 && linhas.every(r => { const f = Object.keys(EXP.P).filter(k => fMil(EXP.P[k] / EXP.prazo) === r[1] && fMil(EXP.G[k] / EXP.prazo) === r[3])[0]; return f && r[2] === fPct(EXP.red[f]); }), JSON.stringify(linhas));
       check('folha 03: título em reais ("' + fMil(EXP.ganhoMes) + ' dos ' + fMil(EXP.perdaMes) + ' de perda estimada por mês' + (EXP.obras > 1 ? ', por obra,' : '') + ' são recuperáveis com o plano")', semNb(dom.pages[2] || '').replace(/\s+/g, ' ').indexOf(fMil(EXP.ganhoMes) + ' dos ' + fMil(EXP.perdaMes) + ' de perda estimada por mês' + (EXP.obras > 1 ? ', por obra,' : '') + ' são recuperáveis com o plano') >= 0);
       check('folha 03: nota das fontes com captura 100% (horas e custo indireto do prazo)', /captura é 100%: a perda já é a parte que o SIIGA elimina/.test(semNb(dom.pages[2] || '').replace(/\s+/g, ' ')));
+      // rodada 6: cenário conservador = 50% do ganho proposto (esperado da regra, não da saída do app)
+      const CONS = 0.5, nf2 = v => 'R$ ' + (v / 1000).toLocaleString('pt-BR', { minimumFractionDigits: 1, maximumFractionDigits: 2, useGrouping: true }) + ' mil', nf1 = v => v.toLocaleString('pt-BR', { maximumFractionDigits: 1 });
+      const f03 = semNb(dom.pages[2] || '').replace(/\s+/g, ' ');
+      const notaEsp = 'Mesmo recuperando só 50% do proposto: ' + fMil(EXP.ganhoMes * CONS) + ' por mês' + (EXP.obras > 1 ? ', por obra' : '');
+      check('rodada 6: folha 03 (' + MODE + ') com a nota "' + notaEsp + '"', f03.indexOf(notaEsp) >= 0, f03.slice(-300));
+      if (EXP.obras > 1) {
+        const mp = f03.match(/\(R\$ ([\d.,]+) mil por mês no portfólio de (\d+) obras\)/), esp = EXP.somaG * EXP.obras / EXP.prazo * CONS / 1000;
+        check('rodada 6: nota com o valor no portfólio (' + fMil(EXP.somaG * EXP.obras / EXP.prazo * CONS) + ' no portfólio de ' + EXP.obras + ' obras)', !!mp && +mp[2] === EXP.obras && Math.abs(parseFloat(mp[1].replace(/\./g, '').replace(',', '.')) - esp) < 0.06, mp && mp[0]);
+      } else check('rodada 6: nota sem "no portfólio" (1 obra)', f03.indexOf('no portfólio de') < 0 || /Total no portfólio/.test(f03));
+      check('rodada 6: nota do conservador sem fórmula nem cálculo (' + MODE + ')', !/Mesmo recuperando[^.]*(fórmula|cálculo)/i.test(f03));
+      check('rodada 6: sem "Pessimista" em nenhuma parte (' + MODE + ')', !/pessimista/i.test(all));
+      check('rodada 6: sem "Cenário adotado" na folha 06 nem em nenhuma parte (' + MODE + ')', !/Cenário adotado/i.test(all));
+      if (MODE === 'resumido') check('rodada 6: Resumido sem "fórmula"', !/fórmula/i.test(all));
+      else {
+        const ax4 = semNb(all).replace(/\s+/g, ' '), k4 = ax4.search(/A\.4 RETORNO MENSAL/i), a4 = k4 >= 0 ? ax4.slice(k4) : '';
+        check('rodada 6: A.4 presente', k4 >= 0);
+        check('rodada 6: A.4 total = folha 03 (perda ' + nf2(EXP.perdaMes) + ' e ganho ' + nf2(EXP.ganhoMes) + '; folha 03 ' + fMil(EXP.perdaMes) + ' e ' + fMil(EXP.ganhoMes) + ')', a4.indexOf(nf2(EXP.perdaMes)) >= 0 && a4.indexOf(nf2(EXP.ganhoMes)) >= 0 && f03.indexOf(fMil(EXP.ganhoMes)) >= 0);
+        const rotulos = Object.keys(EXP.P).filter(k => k !== 'mo' || EXP.P.mo);
+        check('rodada 6: A.4 com uma linha por fonte (perda ÷ ' + EXP.prazo + ' e ganho/mês de cada uma)', rotulos.every(k => a4.indexOf(fMil(EXP.P[k]) + ' ÷ ' + EXP.prazo) >= 0 && a4.indexOf(nf2(EXP.P[k] / EXP.prazo)) >= 0 && a4.indexOf(nf2(EXP.G[k] / EXP.prazo)) >= 0), a4.slice(0, 600));
+        check('rodada 6: A.4 com "Cenário conservador (50% do ganho proposto)" = ' + nf2(EXP.ganhoMes * CONS), a4.indexOf('Cenário conservador (50% do ganho proposto) ' + nf2(EXP.ganhoMes * CONS)) >= 0);
+        const hMes = EXP.horasRec * EXP.fator.time;
+        check('rodada 6: A.4 indicadores: horas recuperáveis ' + nf1(hMes) + ' h/mês (= ganho das horas ÷ R$ 115/h), ' + nf1(hMes * EXP.prazo) + ' h por obra, ' + (hMes / 176 * 100).toFixed(1).replace('.', ',') + '% de 1 profissional, conservador ' + nf1(hMes * CONS) + ' h/mês',
+          Math.abs(EXP.G.time / EXP.prazo / 115 - hMes) < 0.05 && a4.indexOf(nf1(hMes) + ' h/mês') >= 0 && a4.indexOf(nf1(hMes * EXP.prazo) + ' h') >= 0 && a4.indexOf((hMes / 176 * 100).toFixed(1).replace('.', ',') + '%') >= 0 && a4.indexOf(nf1(hMes * CONS) + ' h/mês') >= 0);
+        check('rodada 6: A.4 sem o modelo antigo (captura do cenário, Horas do time técnico, folha, indevidos)', !/captura do cenário|Horas do time técnico|Retrabalho pago na folha|Pagamentos indevidos|Potencial pleno/i.test(a4));
+      }
     }
     check('plano: Fases I e II, depois a Fase III, depois a régua, depois o card do plano de ação', dom.ordem.ok && dom.ordem.I_antes_III && dom.ordem.III_antes_regua && dom.ordem.regua_antes_plano, JSON.stringify(dom.ordem));
     check('folhas 02 e 05 sem IMEDIATA, PROGRAMADA, Dia 0, Após o dia 60 nem Início', !/IMEDIATA|PROGRAMADA|Dia 0|Após o dia 60|início em até|Implantar em até/i.test((dom.pages[1] || '') + (dom.pages[4] || '').split(/PLANO DE TRANSFORMAÇÃO/i)[0]) && !/IMEDIATA|PROGRAMADA/.test(all));
@@ -471,7 +496,7 @@ server.listen(PORT, async () => {
        'Resolve: pontos críticos 07 e 09; 1 ponto em alerta.', 'Resolve: prioridades 1 e 3; ponto crítico 08; 4 pontos em alerta.', 'Por fonte de perda · 10 pontos críticos',
        'Outros 11 pontos estão em alerta', '3 de 13 pontos críticos', 'Total das 3 prioridades', 'mesma fonte da Prioridade 1'].forEach(s => check('PCL contém "' + s + '"', allLow.indexOf(s.toLowerCase()) >= 0));
       // Hours+payroll model only in the Detalhado annex (A.4); 15-month source values only in the annex
-      [fMil(EXP.P.time), fMil(EXP.P.retrabalho), fMil(EXP.P.mo), fMil(EXP.somaP), 'R$ 20,5 mil', 'R$ 10,25 mil', 'R$ 6,15 mil', fMil(EXP.P.velocidade), fMil(EXP.P.erros), fMil(EXP.somaG)].forEach(s => check('PCL ' + (MODE === 'resumido' ? 'sem' : 'com (Anexo)') + ' "' + s + '"', (allLow.indexOf(s.toLowerCase()) >= 0) === (MODE !== 'resumido')));
+      [fMil(EXP.P.time), fMil(EXP.P.retrabalho), fMil(EXP.P.mo), fMil(EXP.somaP), fMil(EXP.P.velocidade), fMil(EXP.P.erros), fMil(EXP.somaG)].forEach(s => check('PCL ' + (MODE === 'resumido' ? 'sem' : 'com (Anexo)') + ' "' + s + '"', (allLow.indexOf(s.toLowerCase()) >= 0) === (MODE !== 'resumido')));
       check('PCL sem múltiplo da mensalidade (5,1×, 3,1×, 9,5×, 12,5×)', !/5,1×|3,1×|9,5×|12,5×/.test(all));
       {
         const ax = semNb(all).replace(/\s+/g, ' ');
@@ -492,10 +517,10 @@ server.listen(PORT, async () => {
       check('ajuste: MO.3 (aditivos de verba) segue no relatório, só como ponto crítico', /Implantação da gestão de aditivos de verba/.test(all) && !/PRIORIDADE 3[\s\S]{0,80}aditivos/i.test(dom.pages[3] || ''));
       check('ajuste folhas = ' + EXP_FOLHAS, dom.pages.length === EXP_FOLHAS, dom.pages.length);
     } else if (CASE === 'prop') {
-      // Own labor: payroll lines stay (Annex A.4 in the Detalhado), no contractors front
+      // Own labor: the A.4 is per loss source (no payroll lines since round 6), no contractors front
       check('própria: "MO própria" no escopo', /MO própria/.test(all));
       check('própria folhas = ' + EXP_FOLHAS, dom.pages.length === EXP_FOLHAS, dom.pages.length);
-      if (MODE !== 'resumido') check('própria: Anexo com retrabalho pago na folha', /Retrabalho pago na folha/.test(all));
+      check('própria: sem linhas de retrabalho/pagamentos na folha (A.4 por fonte)', !/Retrabalho pago na folha|Pagamentos indevidos/.test(all));
     } else if (CASE === 'semhoras') {
       // No hours informed: 98 h/mês spent × 80% average saving = 78,4 h/mês recoverable; expected values come from the rule (78,4 h × R$ 115 × prazo × fator)
       const horasRec = 12.25 * 8 * 0.8, perdaTime = horasRec * 115 * EXP.prazo;

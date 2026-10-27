@@ -3550,6 +3550,8 @@ var ROI_REAL_K = {
 // análise de sensibilidade. Não afeta o fator por fonte do Mapa de Perdas
 // (calculateROI → capFactor), que segue variando com a maturidade.
 var ROI_CAPTURA_FIXA = 0.50;
+// Cenário conservador: fração do ganho proposto que ainda sobra se o programa recuperar só parte do plano (A.4, seção 02 e proposta).
+var ROI_CENARIO_CONSERVADOR = 0.50;
 
 var ROI_REAL_CENARIOS = [
   { nome:'Pessimista',  fator:0.30 },

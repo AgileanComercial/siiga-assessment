@@ -248,6 +248,7 @@ function ptpRetorno(M, num) {
   var reducoes = roi.items.map(function(it) { return NOME_RED[it.key] + ' ' + Math.round((it.reducao != null ? it.reducao : 1) * 100) + '%'; }).join(' · ');
   var pb = propPayback(roi, cfg, prazo, 3);
   var ganhoMes = pb.ganhoMes, mesesGanho = Math.max(0, prazo - 2), ganhoPeriodo = ganhoMes * mesesGanho;
+  var CC = ROI_CENARIO_CONSERVADOR, ccPct = Math.round(CC * 100) + '%', ganhoMesC = ganhoMes * CC, ganhoPeriodoC = ganhoPeriodo * CC;
   var pbTxt, pbSub;
   if (pb.mes != null) { pbTxt = pb.mes + (pb.mes === 1 ? ' mês' : ' meses'); pbSub = 'Investimento total até o mês ' + pb.mes + ': ' + money(pb.inv) + ' · ganho acumulado: ' + money(pb.ganho) + ' (ganho a partir do 3º mês).'; }
   else { pbTxt = 'Sem payback'; pbSub = 'O ganho acumulado não cobre o investimento total nos ' + prazo + ' meses da duração média das obras.'; }
@@ -264,11 +265,12 @@ function ptpRetorno(M, num) {
     { c: ['Redução com o SIIGA por fonte (referência SIIGA)<div class="note">' + reducoes + '</div>', ''] },
     { c: ['Ganho mensal do portfólio (ganho por obra ÷ ' + prazo + ' meses × ' + cfg.nObras + ' obra' + (cfg.nObras === 1 ? '' : 's') + ')', money(ganhoMes) + '/mês'] },
     { c: ['Ganho no período da obra, a partir do 3º mês, após a implantação inicial (' + mesesGanho + ' meses)', fmtNum(ganhoPeriodo)] },
+    { c: ['Cenário conservador: ' + ccPct + ' do ganho proposto', money(ganhoMesC) + '/mês · ' + fmtNum(ganhoPeriodoC) + ' no período'] },
     { c: ['Investimento total até o payback' + (linhaInv.length ? ' (' + linhaInv.join(' + ') + ')' : ''), pb.mes != null ? money(pb.inv) : '—'] },
     { c: ['Payback: 1º mês em que o ganho acumulado (a partir do mês 3) alcança o investimento acumulado', pb.mes != null ? pb.mes + (pb.mes === 1 ? ' mês' : ' meses') : 'sem payback em ' + prazo + ' meses'], cls: 'tot' },
     { c: ['Duração considerada (média das obras)', prazo + ' meses'] }], 'ax');
   var b1 = ptpHead(num, 'Retorno projetado para a ' + emp) +
-    '<div class="row" style="margin-top:5mm"><div><div class="lbl rule">Retorno</div></div><div><p class="lead">Consultoria de resultado não promete número mágico. Partimos da perda estimada de <b>' + fmtNum(perdaBruta) + '</b> do diagnóstico; aplicando a redução com o SIIGA de cada fonte, o ganho mensal do portfólio é <b>' + money(ganhoMes) + '</b>. No período da obra, a partir do 3º mês, após a implantação inicial (' + mesesGanho + ' dos ' + prazo + ' meses de duração média), o ganho é <b>' + fmtNum(ganhoPeriodo) + '</b>.</p><div style="margin-top:4mm">' + strip + '</div></div></div>';
+    '<div class="row" style="margin-top:5mm"><div><div class="lbl rule">Retorno</div></div><div><p class="lead">Consultoria de resultado não promete número mágico. Partimos da perda estimada de <b>' + fmtNum(perdaBruta) + '</b> do diagnóstico; aplicando a redução com o SIIGA de cada fonte, o ganho mensal do portfólio é <b>' + money(ganhoMes) + '</b>. No período da obra, a partir do 3º mês, após a implantação inicial (' + mesesGanho + ' dos ' + prazo + ' meses de duração média), o ganho é <b>' + fmtNum(ganhoPeriodo) + '</b>. Mesmo que o programa recupere só ' + (CC === 0.5 ? 'metade disso' : ccPct + ' disso') + ', o ganho seria ' + money(ganhoMesC) + ' por mês (' + fmtNum(ganhoPeriodoC) + ' no período da obra).</p><div style="margin-top:4mm">' + strip + '</div></div></div>';
   var b2 = ptpRow('Como é calculado', calc);
   return [{ sec: num, html: b1 }, { sec: num, html: b2 }];
 }

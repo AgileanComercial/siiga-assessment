@@ -234,6 +234,12 @@ server.listen(PORT, async () => {
       const paga = pb.mes && pb.mes > meses;
       check('10: plataforma entra a partir do mês ' + (meses + 1) + (paga ? ' e aparece no investimento, por obra' : ' (payback dentro do programa: sem plataforma)'), paga ? txt.indexOf('mensalidade') >= 0 && txt.indexOf('por obra, para ' + cfg.nObras + ' obra') >= 0 : txt.indexOf('plataforma R$') < 0);
       check('10: premissa "a partir do 3º mês" e ganho no período da obra (' + (prazo - 2) + ' meses)', txt.indexOf('Ganho no período da obra, a partir do 3º mês') >= 0 && txt.indexOf('(' + (prazo - 2) + ' meses)') >= 0);
+      // rodada 6: cenário conservador = 50% do ganho proposto (ganho mensal e no período); SEM payback conservador
+      const ganhoMesC = ganhoMes * 0.5, periodoC = ganhoMesC * (prazo - 2);
+      check('10: linha "Cenário conservador: 50% do ganho proposto" = ' + moeda(ganhoMesC) + '/mês · ' + fTela(periodoC) + ' no período', tem('Cenário conservador: 50% do ganho proposto ' + moeda(ganhoMesC) + '/mês · ' + fTela(periodoC) + ' no período'), (lo.match(/cenário conservador.{0,80}/) || [''])[0]);
+      check('10: lead com "Mesmo que o programa recupere só metade disso, o ganho seria ' + moeda(ganhoMesC) + ' por mês (' + fTela(periodoC) + ' no período da obra)."', tem('Mesmo que o programa recupere só metade disso, o ganho seria ' + moeda(ganhoMesC) + ' por mês (' + fTela(periodoC) + ' no período da obra).'));
+      check('10: sem payback no cenário conservador (nem linha nem frase)', !/payback no cenário conservador/i.test(txt) && !/payback ocorreria/i.test(txt) && !/não haveria payback/i.test(txt));
+      check('10: strip de 3 cards inalterado (Exposição em Risco, Ganho capturável, Payback)', tem('Exposição em Risco') && tem('Ganho capturável com o programa') && /payback (sem payback|\d+ meses?)/.test(lo));
       const redTxt = Object.keys(EXP.red).filter(k => EXP.P[k] != null).map(k => ({ time: 'horas', retrabalho: 'retrabalho', velocidade: 'custo do prazo', erros: 'erros de medição', mo: 'estouro de MO' })[k] + ' ' + fPct(EXP.red[k])).join(' · ');
       check('10: sem o percentual total de captura; "Redução com o SIIGA por fonte (referência SIIGA)" lista a redução de cada fonte (' + redTxt + ')', tem('Redução com o SIIGA por fonte (referência SIIGA) ' + redTxt) && !/Captura efetiva/i.test(txt) && !/captura efetiva de [0-9]+%/i.test(txt));
       check('10: exposição com o nº de obras da proposta (' + cfg.nObras + ')', tem('Exposição em Risco ' + fTela(EXP.somaP * cfg.nObras)), fTela(EXP.somaP * cfg.nObras));

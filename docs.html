@@ -317,7 +317,7 @@ section { animation: fadeIn 0.5s ease forwards; }
     <section id="overview">
       <h2><div class="sec-icon" style="background:var(--orange-dim)">🎯</div> Sobre o Projeto</h2>
       <p>O <strong>SIIGA Assessment</strong> é uma ferramenta de diagnóstico comercial desenvolvida para a <strong>Agilean</strong>. Seu objetivo é avaliar a maturidade da gestão de obras de construtoras através do método <strong>SIIGA</strong> (Sistema Integrado e Inteligente de Gestão Ágil), estruturado em 4 pilares interdependentes.</p>
-      <p>O sistema captura dados da operação do prospect, calcula um score de maturidade ponderado, estima o potencial de ganho financeiro com a adoção do método e gera um relatório executivo completo — tudo em uma única sessão de diagnóstico guiado.</p>
+      <p>O sistema captura dados da operação do prospect, calcula um score de maturidade (soma dos pontos dos 4 pilares, de 0 a 57), estima o potencial de ganho financeiro com a adoção do método e gera um relatório executivo completo — tudo em uma única sessão de diagnóstico guiado.</p>
 
       <div class="info-grid">
         <div class="info-card">
@@ -482,10 +482,10 @@ section { animation: fadeIn 0.5s ease forwards; }
         <tbody>
           <tr><td><code>B0.1</code></td><td>Input numérico</td><td>Nº obras, orçamento médio, prazo médio</td><td>Não</td></tr>
           <tr><td><code>B0.2</code></td><td>Múltipla escolha</td><td>Tipologia (vertical, horizontal, MCMV, comercial, diversificado)</td><td>Não</td></tr>
-          <tr><td><code>B0.3</code></td><td>Múltipla escolha</td><td>Estrutura de time de gestão (0-3)</td><td>✅ Sim</td></tr>
+          <tr><td><code>B0.3</code></td><td>Múltipla escolha</td><td>Estrutura de time de gestão (0-3)</td><td>Registrada, fora do score de 57 pontos</td></tr>
           <tr><td><code>B0.4</code></td><td>Múltipla escolha</td><td>Modelo de MO (própria, mista, terceirizada)</td><td>Não</td></tr>
           <tr><td><code>B0.5</code></td><td>Múltipla escolha</td><td>Momento estratégico</td><td>Não</td></tr>
-          <tr><td><code>B0.6</code></td><td>Múltipla escolha</td><td>Estrutura do orçamento (0-3)</td><td>✅ Sim</td></tr>
+          <tr><td><code>B0.6</code></td><td>Múltipla escolha</td><td>Ferramentas usadas em cada rotina (planejamento, medição, qualidade, ERP etc.)</td><td>Não</td></tr>
         </tbody>
       </table>
       <div class="alert alert-info">
@@ -503,22 +503,22 @@ section { animation: fadeIn 0.5s ease forwards; }
         <div class="info-card" style="border-left:3px solid var(--purple)">
           <div class="doc-badge badge-purple">Pilar 1</div>
           <div class="card-title">Planejamento Estratégico</div>
-          <div class="card-desc">7 perguntas · Score máx: 21 · Peso: 30%<br>Linha de Base, Curva S, integração orçamento, suprimentos, cronograma bancário.</div>
+          <div class="card-desc">7 perguntas · Score máx: 21<br>Linha de Base, Curva S, integração orçamento, suprimentos, cronograma bancário.</div>
         </div>
         <div class="info-card" style="border-left:3px solid var(--teal)">
           <div class="doc-badge badge-teal">Pilar 2</div>
           <div class="card-title">Proteção da Execução</div>
-          <div class="card-desc">4 perguntas · Score máx: 12 · Peso: 20%<br>Lookahead, gestão de restrições, antecipação de riscos, reprogramação.</div>
+          <div class="card-desc">3 perguntas · Score máx: 9<br>Lookahead, gestão de restrições, antecipação de riscos, reprogramação.</div>
         </div>
         <div class="info-card" style="border-left:3px solid var(--green)">
           <div class="doc-badge badge-green">Pilar 3</div>
           <div class="card-title">Gestão da Produção</div>
-          <div class="card-desc">6 perguntas · Score máx: 18 · Peso: 30%<br>Programação semanal, check-in/out diário, avanço físico, qualidade × pagamento.</div>
+          <div class="card-desc">5 perguntas · Score máx: 15<br>Programação semanal, check-in/out diário, avanço físico, qualidade × pagamento.</div>
         </div>
         <div class="info-card" style="border-left:3px solid var(--gray3)">
           <div class="doc-badge badge-gray">Pilar 4</div>
           <div class="card-title">Controle e Performance</div>
-          <div class="card-desc">4 perguntas · Score máx: 12 · Peso: 20%<br>Fechamento técnico, reunião executiva, painel integrado, pagamento por evidência.</div>
+          <div class="card-desc">4 perguntas · Score máx: 12<br>Fechamento técnico, reunião executiva, painel integrado, pagamento por evidência.</div>
         </div>
       </div>
     </section>
@@ -580,38 +580,34 @@ section { animation: fadeIn 0.5s ease forwards; }
         </div>
       </div>
 
-      <h3>Faixas de Maturidade (Score Geral)</h3>
+      <h3>Faixas de Maturidade (% do score geral)</h3>
       <table class="doc-table">
         <thead><tr><th>Faixa</th><th>Nível</th><th>Descrição</th></tr></thead>
         <tbody>
-          <tr><td><strong style="color:var(--red)">0 – 34</strong></td><td>Gestão Reativa</td><td>Base inexistente. Decisões por feeling e planilhas desconectadas</td></tr>
-          <tr><td><strong style="color:var(--orange)">35 – 54</strong></td><td>Em Construção</td><td>Práticas parciais, baixa padronização e integração</td></tr>
-          <tr><td><strong style="color:var(--blue)">55 – 74</strong></td><td>Estruturado</td><td>Processo existe, rotina funciona, dado parcialmente confiável</td></tr>
-          <tr><td><strong style="color:var(--green)">75 – 89</strong></td><td>Avançado</td><td>Rotina, dados e indicadores gerando decisões estruturadas</td></tr>
-          <tr><td><strong style="color:var(--green)">90 – 100</strong></td><td>Referência SIIGA</td><td>Benchmark de mercado — ciclo virtuoso operando</td></tr>
+          <tr><td><strong style="color:var(--red)">abaixo de 40%</strong></td><td>Crítico / Vulnerável</td><td>Base inexistente. Decisões por feeling e planilhas desconectadas</td></tr>
+          <tr><td><strong style="color:var(--orange)">40% a 59%</strong></td><td>Operação Artesanal / Risco de Desvio</td><td>Práticas parciais, baixa padronização e integração</td></tr>
+          <tr><td><strong style="color:#eab308">60% a 74%</strong></td><td>Parcialmente Estruturado (Gargalos de Escala)</td><td>Processo existe, rotina funciona, dado parcialmente confiável</td></tr>
+          <tr><td><strong style="color:var(--blue)">75% a 89%</strong></td><td>Estruturado com Perdas Ocultas</td><td>Rotina, dados e indicadores gerando decisões estruturadas</td></tr>
+          <tr><td><strong style="color:var(--green)">90% ou mais</strong></td><td>Referência SIIGA / Alta Performance</td><td>Benchmark de mercado — ciclo virtuoso operando</td></tr>
         </tbody>
       </table>
     </section>
 
     <!-- SCORING -->
     <section id="scoring">
-      <h2><div class="sec-icon" style="background:rgba(96,165,250,0.1)">🧮</div> Score Ponderado</h2>
-      <p>O score geral é calculado com pesos diferenciados por pilar, refletindo o impacto de cada fase na maturidade total:</p>
+      <h2><div class="sec-icon" style="background:rgba(96,165,250,0.1)">🧮</div> Score de Maturidade</h2>
+      <p>O score geral é a <strong>soma simples dos pontos dos 4 pilares</strong>, sem pesos por pilar. Cada pergunta vale de 0 a 3 pontos; o máximo é 57 (P1 21 + P2 9 + P3 15 + P4 12). O nível de maturidade vem do percentual sobre 57:</p>
 
       <div class="code-block">
-<span class="comment">// Fórmula do Score Ponderado (0-100)</span>
+<span class="comment">// Score de maturidade (getMaturityScoreSummary)</span>
 
-pct_F1 = score_F1 / <span class="number">21</span>  →  contribuição_F1 = pct_F1 × <span class="number">30</span>
-pct_F2 = score_F2 / <span class="number">12</span>  →  contribuição_F2 = pct_F2 × <span class="number">20</span>
-pct_F3 = score_F3 / <span class="number">18</span>  →  contribuição_F3 = pct_F3 × <span class="number">30</span>
-pct_F4 = score_F4 / <span class="number">12</span>  →  contribuição_F4 = pct_F4 × <span class="number">20</span>
-
-<span class="keyword">Score Geral</span> = contribuição_F1 + F2 + F3 + F4  <span class="comment">(0 a 100)</span>
+<span class="keyword">Score Geral</span> = pontos_P1 + pontos_P2 + pontos_P3 + pontos_P4   <span class="comment">(0 a 57)</span>
+<span class="keyword">Percentual</span> = Score Geral / <span class="number">57</span>   →  nível (faixas acima)
       </div>
 
       <div class="alert alert-info">
         <span class="alert-icon">📐</span>
-        <div><strong>Por que esses pesos?</strong> F1 (30%) e F3 (30%) são os fundamentos — sem planejamento, nada funciona; sem dados de produção, não há controle. F2 (20%) e F4 (20%) são complementares e dependem das outras.</div>
+        <div><strong>Fora do score:</strong> a pergunta B0.3 (estrutura do time de gestão) e o Bloco MO não entram nos 57 pontos. O radar, o relatório, a proposta e os registros salvos usam o mesmo total.</div>
       </div>
     </section>
 
@@ -624,7 +620,7 @@ pct_F4 = score_F4 / <span class="number">12</span>  →  contribuição_F4 = pct
         <div class="card-title" style="color:var(--blue)">⏱ C1 — Otimização do Time de Gestão</div>
         <div class="card-desc">
           <code>Perda estimada = horas recuperáveis/mês × R$115/h × prazo médio × ajuste · Redução 100% (a perda já é a parte manual que o SIIGA elimina)</code><br>
-          Horas informadas pelo cliente × % de economia de cada rotina. Sem horas informadas: referência de mercado de 98 h/mês (12,25 dias × 8 h) nas rotinas de gestão (medição, indicadores, reprogramação, folha, qualidade) × 80% de economia média = 78,4 h/mês recuperáveis.
+          Horas informadas pelo cliente × % de economia de cada rotina. Sem horas informadas: referência de mercado de 98 h/mês (12,25 dias × 8 h) nas rotinas de gestão (planejar o cronograma, curto e médio prazo e reprogramação, medição, qualidade, consolidação de dados) × 80% de economia média = 78,4 h/mês recuperáveis.
         </div>
       </div>
       <div class="info-card" style="border-left:3px solid var(--red);margin-bottom:12px">
@@ -656,33 +652,41 @@ pct_F4 = score_F4 / <span class="number">12</span>  →  contribuição_F4 = pct
           Desvios por erros em planilhas e medições manuais. Aplica-se a todos os modelos de MO.
         </div>
       </div>
+      <div class="alert alert-info" style="margin-top:12px">
+        <span class="alert-icon">🛡</span>
+        <div><strong>Cenário conservador:</strong> o relatório e a proposta mostram também o ganho mensal se o programa recuperar só <strong>50% do ganho proposto</strong> (R$/mês e, na proposta, no período da obra). É uma leitura de segurança, calculada sobre o ganho total.</div>
+      </div>
     </section>
 
     <!-- LEAD SCORING -->
     <section id="lead-scoring">
       <h2><div class="sec-icon" style="background:rgba(52,211,153,0.1)">🏷</div> Lead Scoring</h2>
-      <p>O sistema classifica automaticamente cada prospect em um Lead Score (A, B, C) com base em critérios combinados de volume de negócio, cargo e momento estratégico.</p>
+      <p>O painel admin classifica cada prospect em um Lead Score (A, B, C ou sem score) a partir do cargo, da tipologia, do número de obras e do orçamento médio (<code>calcLeadScore</code> em <code>admin.js</code>).</p>
 
       <table class="doc-table">
-        <thead><tr><th>Score</th><th>Perfil</th><th>Critérios</th></tr></thead>
+        <thead><tr><th>Score</th><th>Tipologia</th><th>Cargo</th><th>Obras / orçamento médio</th></tr></thead>
         <tbody>
           <tr>
             <td><span style="color:var(--green);font-weight:700">A</span></td>
-            <td>Hot Lead</td>
-            <td>Orçamento elevado + Cargo C-Level/Sócio/Diretor + Momento de crescimento + Muitas obras</td>
+            <td>Residencial vertical</td>
+            <td>C-Level, sócio, proprietário, diretor, gerente, coordenador, supervisor ou engenheiro</td>
+            <td>1 obra ou mais · R$ 1 mi ou mais</td>
           </tr>
           <tr>
             <td><span style="color:var(--blue);font-weight:700">B</span></td>
-            <td>Qualified Lead</td>
-            <td>Operação média + Cargo gerencial + Score de maturidade intermediário</td>
+            <td>Comercial / industrial</td>
+            <td>Mesmos cargos do A</td>
+            <td>1 obra ou mais · R$ 1 mi ou mais</td>
           </tr>
           <tr>
             <td><span style="color:#fbbf24;font-weight:700">C</span></td>
-            <td>Nurture Lead</td>
-            <td>Operação menor ou cargo operacional + Menos urgência de decisão</td>
+            <td>Vertical, comercial / industrial ou diversificado</td>
+            <td>Cargos do A mais analista, autônomo ou consultor</td>
+            <td>5 obras ou mais · R$ 500 mil ou mais</td>
           </tr>
         </tbody>
       </table>
+      <p>Quem não se encaixa em nenhuma linha fica sem score (—).</p>
     </section>
 
     <!-- SUPABASE -->
