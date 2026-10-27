@@ -67,43 +67,39 @@ function ptpRecap(M, num) {
 function ptpPontos(M, num) {
   var nObras = M.cfg.nObras, perdaBruta = Math.round(M.roi.totalBase * nObras);
   var rows = M.criticos.map(function(c) {
-    return '<tr><td>' + c.n + '</td><td><span class="b6">' + ptEsc(c.titulo) + '</span>' + (c.frase ? '<span class="q">“' + ptEsc(c.frase.replace(/\.$/, '')) + '.”</span>' : '') + '</td>' +
-      '<td>' + c.pilar + ' · ' + ptEsc(c.fonte.label) + '</td><td>' + ptSt(c.alerta ? 'a' : 'c', c.alerta ? 'Em alerta' : 'Crítico') + '</td>' +
-      '<td class="n">' + (c.mes != null ? '<span class="perda">' + ptMil(c.mes, 1) + '</span>' : '—') + '</td></tr>';
+    return '<tr><td>' + c.n + '</td><td><span class="st ' + (c.alerta ? 'a' : 'c') + '" style="margin-right:1.6mm;vertical-align:baseline"><i></i></span><span class="b6">' + ptEsc(c.titulo) + '</span>' + (c.frase ? '<span class="q">“' + ptEsc(c.frase.replace(/.$/, '')) + '.”</span>' : '') + '</td>' +
+      '<td>' + c.pilar + ' · ' + ptEsc(c.fonte.label) + '</td>' +
+      '<td class="n">' + (c.mes != null ? '<span class="perda">' + ptMil(c.mes, 1) + '</span>' : '—') + '</td>' +
+      '<td class="n">' + (c.mes != null ? '<span class="ganho">' + ptMil(c.fonte.cap / M.prazo, 1) + '</span>' : '—') + '</td></tr>';
   }).join('');
+  var nCr = M.criticos.length;
+  rows += '<tr class="tot"><td></td><td>Total ' + (nCr === 1 ? 'da prioridade' : 'das ' + nCr + ' prioridades') + '</td><td></td><td class="n"><span class="perda">' + ptMil(M.critMes, 1) + '</span></td><td class="n"><span class="ganho">' + ptMil(M.critCapMes, 1) + '</span></td></tr>';
   var demais = M.demais.length;
-  var tab = '<table><thead><tr><th style="width:5mm">#</th><th>Prioridade</th><th style="width:34mm">Pilar · fonte de perda</th><th style="width:19mm">Situação</th><th class="n wrap" style="width:25mm">Perda por mês sem tratamento</th></tr></thead><tbody>' + rows + '</tbody></table>' +
-    (demais ? '<div class="note" style="margin-top:2mm">Demais pontos críticos do diagnóstico: <b>' + demais + '</b>, tratados na sequência das Fases de Implementação.</div>' : '');
-  var items = M.roi.items.map(function(it){ return M.fontes[it.key]; }).sort(function(a, b){ return b.perda - a.perda; });
-  var mx = items.reduce(function(a, f){ return Math.max(a, f.perda); }, 1);
-  var comp = items.map(function(f) {
-    return '<div class="pf"><div class="nm">' + ptEsc(f.label) + '</div><div class="bb"><div class="ln p"><i style="width:' + (f.perda / mx * 82).toFixed(1) + '%"></i><span>' + fmtNum(f.perda * nObras) + '</span></div></div></div>';
-  }).join('');
+  var tab = '<table><thead><tr><th style="width:5mm">#</th><th>Prioridade</th><th style="width:30mm">Pilar · fonte de perda</th><th class="n wrap" style="width:26mm">Perda por mês sem tratamento</th><th class="n wrap" style="width:17mm">Ganho por mês</th></tr></thead><tbody>' + rows + '</tbody></table>' +
+    (demais ? '<div class="note" style="margin-top:0.5mm">Demais pontos críticos do diagnóstico: <b>' + demais + '</b>, tratados na sequência das Fases de Implementação.</div>' : '');
   var b1 = ptpHead(num, 'Principais pontos críticos do diagnóstico') +
     '<div class="row" style="margin-top:5mm"><div><div class="lbl rule">Prioridades</div></div><div>' +
       '<p class="lead">A operação da ' + ptpEmp(M) + ' escala mais rápido que os controles. As prioridades abaixo são as mesmas do relatório que revisamos na 1ª reunião, e cada uma tem um custo que hoje passa despercebido.</p>' +
-      '<div style="margin-top:4mm">' + tab + '</div></div></div>';
-  var b2 = ptpRow('Composição', '<div class="chart-t">Onde o ' + fmtNum(perdaBruta) + ' se forma — composição da exposição no portfólio</div>' + comp);
+      '<div style="margin-top:2mm">' + tab + '</div></div></div>';
+  var b2 = ptpRow('Composição', ptChartPerdaGanho(M, '0'));
   return [{ sec: num, html: b1 }, { sec: num, html: b2 }];
 }
 
 // ── 03 · Objetivo ────────────────────────────────────────────────────────
 function ptpObjetivo(M, num) {
-  var emp = ptpEmp(M), meses = M.cfg.progMeses, metaScore = 0;
+  var emp = ptpEmp(M), meses = M.cfg.progMeses, D = propMetasD(M), metaScore = D.score, nC = M.criticos.length;
   var bars = M.pilares.map(function(p) {
-    var cur = p.pct, meta = propMetaPct(cur);
-    metaScore += Math.round(p.max * meta);
+    var cur = p.pct, meta = D.pilares[p.n].pct;
     return '<div class="bar"><div class="nm"><span class="pn">Pilar ' + p.n + ' · ' + p.nome + '</span></div>' +
       '<div class="trk"><div class="fill" style="width:' + Math.round(cur * 100) + '%"></div><div class="tb b" style="left:' + Math.round(cur * 100) + '%;width:' + Math.max(2, Math.round((meta - cur) * 100)) + '%"></div></div>' +
       '<div class="val" style="grid-column:3 / span 2;text-align:right">' + Math.round(cur * 100) + '% → <b class="b6">' + Math.round(meta * 100) + '%</b></div></div>';
   }).join('');
-  var metaPct = Math.round(metaScore / M.score.max * 100);
+  var metaPct = Math.round(D.pct * 100);
   var porMO = porModeloMO('dias de fechamento da medição', 'dias de fechamento da folha', 'dias de fechamento da medição e da folha');
   var b1 = ptpHead(num, 'Objetivo do Redesenho SIIGA') +
     '<div class="row" style="margin-top:5mm"><div><div class="lbl rule">Meta central</div><div class="lbl" style="margin-top:2mm">SIIGA Score</div>' +
-      '<div class="score" style="font-size:21pt;line-height:25pt;white-space:nowrap">' + ptNum(M.score.score, 0, 1) + ' <span style="color:var(--marca-txt)">→ ' + metaScore + '</span><small>/' + M.score.max + '</small></div></div><div>' +
-      '<p class="lead">Consultoria de resultado se compromete com número. O objetivo central é levar a ' + emp + ' do nível <b>' + ptEsc(ptNivel(M.score.nivel)) + '</b> rumo à <b>Referência SIIGA</b> em ' + meses + ' meses, com a meta de maturidade por pilar abaixo.</p>' +
-      '<p class="note" style="margin-top:2mm">Subir a maturidade de <b>' + Math.round(M.score.pct * 100) + '%</b> para <b>' + metaPct + '%</b> da referência — em ' + meses + ' meses.</p></div></div>';
+      '<div class="score" style="font-size:21pt;line-height:25pt;white-space:nowrap">' + ptNum(M.score.score, 0, 1) + ' <span style="color:var(--marca-txt)">→ ' + ptNum(metaScore, 0, 1) + '</span><small>/' + M.score.max + '</small></div></div><div>' +
+      '<p class="lead">Consultoria de resultado se compromete com número. O objetivo central é tirar a ' + emp + ' do nível <b>' + ptEsc(ptNivel(M.score.nivel)) + '</b> e levá-la de <b>' + Math.round(M.score.pct * 100) + '% para ' + metaPct + '% da Referência SIIGA</b> em ' + meses + ' meses, implantando todos os pontos do plano e consolidando ' + (nC === 1 ? 'a prioridade' : 'as ' + (PT_NUM_EXT_F[nC] || nC) + ' prioridades') + '.</p></div></div>';
   var b2 = ptpRow('Meta por pilar', '<div class="bars">' + bars + '</div>' +
       '<div class="leg"><span><i class="sw-cli"></i>Hoje</span><span><i class="tb b" style="position:relative;display:inline-block;width:5mm;height:2.4mm;margin-right:1.2mm;vertical-align:middle"></i>Meta do programa</span></div>' +
       '<div class="nt">As metas de maturidade acima saem direto do diagnóstico. As metas <b>operacionais e financeiras</b> — aderência plano × realizado, ' + porMO + ', % de retrabalho — são pactuadas sobre a baseline real medida na Fase de Implementação I, nunca estimadas antes.</div>');
@@ -253,24 +249,22 @@ function ptpRetorno(M, num) {
   if (pb.mes != null) { pbTxt = pb.mes + (pb.mes === 1 ? ' mês' : ' meses'); pbSub = 'Investimento total até o mês ' + pb.mes + ': ' + money(pb.inv) + ' · ganho acumulado: ' + money(pb.ganho) + ' (ganho a partir do 3º mês).'; }
   else { pbTxt = 'Sem payback'; pbSub = 'O ganho acumulado não cobre o investimento total nos ' + prazo + ' meses da duração média das obras.'; }
   var linhaInv = [];
-  if (!cfg.progNA) linhaInv.push('Redesenho de Processos SIIGA ' + money(pb.invRed));
-  if (!cfg.ativNA) linhaInv.push('Ativação SIIGA ' + money(pb.invAtiv));
-  if (pb.invPlat) linhaInv.push('plataforma ' + money(pb.invPlat) + ' (' + pb.mesesPlat + ' mensalidade' + (pb.mesesPlat === 1 ? '' : 's') + ' de ' + money(cfg.mensalPor) + ' por obra, para ' + cfg.nObras + ' obra' + (cfg.nObras === 1 ? '' : 's') + ')');
+  if (!cfg.progNA) linhaInv.push('Redesenho ' + money(pb.invRed));
+  if (!cfg.ativNA) linhaInv.push('Ativação ' + money(pb.invAtiv));
+  if (pb.invPlat) linhaInv.push(pb.mesesPlat + ' mensalidade' + (pb.mesesPlat === 1 ? '' : 's') + ' da plataforma' + (cfg.nObras > 1 ? ' (' + cfg.nObras + ' obras)' : '') + ' ' + money(pb.invPlat));
   var strip = '<div class="strip">' +
     '<div><div class="lbl">Exposição em Risco</div><div class="big p">' + fmtNum(perdaBruta) + '</div><div class="note">Perda estimada no portfólio, sem intervenção.</div></div>' +
     '<div><div class="lbl">Ganho capturável com o programa</div><div class="big g">' + fmtNum(ganhoPeriodo) + '</div><div class="note">No período da obra, a partir do 3º mês (' + mesesGanho + ' meses × ' + money(ganhoMes) + ').</div></div>' +
     '<div><div class="lbl">Payback</div><div class="big">' + pbTxt + '</div><div class="note">' + pbSub + '</div></div></div>';
+  var nt = function(t) { return t ? '<div class="note">' + t + '</div>' : ''; };
   var calc = ptpTabela([{ t: 'Item' }, { t: 'Valor', n: true }], [
-    { c: ['Exposição bruta no portfólio (sem intervenção)', fmtNum(perdaBruta)] },
-    { c: ['Redução com o SIIGA por fonte (referência SIIGA)<div class="note">' + reducoes + '</div>', ''] },
-    { c: ['Ganho mensal do portfólio (ganho por obra ÷ ' + prazo + ' meses × ' + cfg.nObras + ' obra' + (cfg.nObras === 1 ? '' : 's') + ')', money(ganhoMes) + '/mês'] },
-    { c: ['Ganho no período da obra, a partir do 3º mês, após a implantação inicial (' + mesesGanho + ' meses)', fmtNum(ganhoPeriodo)] },
-    { c: ['Cenário conservador: ' + ccPct + ' do ganho proposto', money(ganhoMesC) + '/mês · ' + fmtNum(ganhoPeriodoC) + ' no período'] },
-    { c: ['Investimento total até o payback' + (linhaInv.length ? ' (' + linhaInv.join(' + ') + ')' : ''), pb.mes != null ? money(pb.inv) : '—'] },
-    { c: ['Payback: 1º mês em que o ganho acumulado (a partir do mês 3) alcança o investimento acumulado', pb.mes != null ? pb.mes + (pb.mes === 1 ? ' mês' : ' meses') : 'sem payback em ' + prazo + ' meses'], cls: 'tot' },
-    { c: ['Duração considerada (média das obras)', prazo + ' meses'] }], 'ax');
+    { c: ['<span class="b6">Ganho mensal com o plano</span>' + nt('soma do ganho de cada fonte: ' + reducoes + (nObras > 1 ? ' · ganho por obra × ' + nObras + ' obras' : '')), money(ganhoMes) + '/mês'] },
+    { c: ['<span class="b6">Ganho no período da obra</span>', fmtNum(ganhoPeriodo)] },
+    { c: ['<span class="b6">Investimento até o payback</span>' + nt(linhaInv.join(' + ')), pb.mes != null ? money(pb.inv) : '—'] },
+    { c: ['<span class="b6">Payback</span>', pb.mes != null ? pb.mes + (pb.mes === 1 ? ' mês' : ' meses') : 'sem payback em ' + prazo + ' meses'], cls: 'tot' },
+  ], 'ax');
   var b1 = ptpHead(num, 'Retorno projetado para a ' + emp) +
-    '<div class="row" style="margin-top:5mm"><div><div class="lbl rule">Retorno</div></div><div><p class="lead">Consultoria de resultado não promete número mágico. Partimos da perda estimada de <b>' + fmtNum(perdaBruta) + '</b> do diagnóstico; aplicando a redução com o SIIGA de cada fonte, o ganho mensal do portfólio é <b>' + money(ganhoMes) + '</b>. No período da obra, a partir do 3º mês, após a implantação inicial (' + mesesGanho + ' dos ' + prazo + ' meses de duração média), o ganho é <b>' + fmtNum(ganhoPeriodo) + '</b>. Mesmo que o programa recupere só ' + (CC === 0.5 ? 'metade disso' : ccPct + ' disso') + ', o ganho seria ' + money(ganhoMesC) + ' por mês (' + fmtNum(ganhoPeriodoC) + ' no período da obra).</p><div style="margin-top:4mm">' + strip + '</div></div></div>';
+    '<div class="row" style="margin-top:5mm"><div><div class="lbl rule">Retorno</div></div><div><p class="lead">Consultoria de resultado não promete número mágico. Partimos da perda estimada de <b>' + fmtNum(perdaBruta) + '</b> do diagnóstico; aplicando a redução com o SIIGA de cada fonte, o ganho mensal do portfólio é <b>' + money(ganhoMes) + '</b>. No período da obra, a partir do 3º mês, após a implantação inicial (' + mesesGanho + ' dos ' + prazo + ' meses de duração média), o ganho é <b>' + fmtNum(ganhoPeriodo) + '</b>.</p><div style="margin-top:4mm">' + strip + '</div><div class="faixa"><b>Cenário conservador:</b> mesmo recuperando só ' + ccPct + ' do proposto, o ganho é de <b>' + money(ganhoMesC) + ' por mês</b> (' + fmtNum(ganhoPeriodoC) + ' no período da obra).</div></div></div>';
   var b2 = ptpRow('Como é calculado', calc);
   return [{ sec: num, html: b1 }, { sec: num, html: b2 }];
 }

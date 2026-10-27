@@ -470,7 +470,13 @@ server.listen(PORT, async () => {
       // Sheet 02 total (rounded in the lead) = monthly loss of sheet 03 × term
       check('total da folha 02 = perda/mês da folha 03 × prazo', !!(m2 && mm) && Math.abs(num(mm[1]) * +m2[3] - t2) <= (m2[2] === 'mi' ? 50 : 1),
         JSON.stringify({ folha02: m2 && m2.slice(1), mes: mm && mm[1] }));
-      check('folha 02: linha "Recuperável com o plano" só com o valor R$/mês (' + fMil(EXP.critCapMes) + '), sem múltiplo', semNb(p2).replace(/\s+/g, ' ').indexOf('Recuperável com o plano ' + fMil(EXP.critCapMes) + '/mês') >= 0 && !/Recuperável com o plano ·/.test(p2), (semNb(p2).match(/Recuperável com o plano.{0,30}/) || [''])[0]);
+      // rodada 6c: coluna "Ganho por mês" (verde) ao lado da perda, linha Total com os dois valores, sem a linha "Recuperável com o plano"
+      const p2n = semNb(p2).replace(/\s+/g, ' ');
+      check('folha 02: coluna "Ganho por mês" e total das prioridades "' + fMil(EXP.critMes) + ' ' + fMil(EXP.critCapMes) + '" (perda e ganho), sem a linha "Recuperável com o plano"', /Ganho por mês/i.test(p2n) && /Total das (\d+) prioridades/.test(p2n) && p2n.indexOf(' ' + fMil(EXP.critMes) + ' ' + fMil(EXP.critCapMes)) >= 0 && !/Recuperável com o plano/.test(p2n), (p2n.match(/Total das.{0,60}/) || [''])[0]);
+      {
+        const esperados = EXP.top3.map(k => [fMil(EXP.P[k] / EXP.prazo), fMil(EXP.G[k] / EXP.prazo)]);
+        check('folha 02: ganho por mês de cada prioridade = ganho da fonte ÷ prazo (' + esperados.map(e => e[0] + '/' + e[1]).join(', ') + ')', esperados.every(e => p2n.indexOf(e[0] + ' ' + e[1]) >= 0), p2n.slice(0, 0));
+      }
     }
     check('folha 02: Fase de Implementação com nome curto', /I · Planejamento e canteiro|III · Pagamento da MO/.test(dom.pages[1] || '') && /Fase de Implementação/i.test(dom.pages[1] || ''));
     if (MODE === 'resumido') {
@@ -489,7 +495,7 @@ server.listen(PORT, async () => {
       check('PCL ★ folhas = ' + EXP_FOLHAS, dom.pages.length === EXP_FOLHAS, dom.pages.length);
     } else if (CASE === 'pcl') {
       ['21,5', fMilInt(EXP.somaP), fMilInt(EXP.critPerda), fMil(EXP.P.retrabalho / EXP.prazo), fMil(EXP.P.time / EXP.prazo), fMil(EXP.P.mo / EXP.prazo),
-       fMil(EXP.critMes) + '/mês', fMil(EXP.critCapMes) + '/mês', fMil(EXP.ganhoMes), fMil(EXP.perdaMes),
+       fMil(EXP.critMes), fMil(EXP.critCapMes), fMil(EXP.ganhoMes), fMil(EXP.perdaMes),
        fMil(EXP.G.time / EXP.prazo), fMil(EXP.G.retrabalho / EXP.prazo), fMil(EXP.G.velocidade / EXP.prazo), fMil(EXP.G.erros / EXP.prazo), fMil(EXP.G.mo / EXP.prazo),
        'Digitalização do painel integrado de indicadores', 'Digitalização da comunicação de bloqueios de pagamento', 'Implantação da gestão de aditivos de verba',
        'Plano de Transformação Operacional para a Construtora PCL', 'Pilar 3, Gestão integrada da produção', 'Resolve: prioridade 2; pontos críticos 04, 05, 06, 10, 11, 12 e 13; 6 pontos em alerta.',
@@ -538,7 +544,7 @@ server.listen(PORT, async () => {
       check('ERP "Não utiliza ERP"', /Não utiliza ERP/.test(all));
       check('prazo 24 meses', /24 meses/.test(all));
       check('terceirizada folhas = ' + EXP_FOLHAS, dom.pages.length === EXP_FOLHAS, dom.pages.length);
-      ['Resolve: prioridade 2; pontos críticos 04, 05, 06, 07, 09, 10, 11 e 12; 5 pontos em alerta.', 'Resolve: pontos críticos 08 e 13; 1 ponto em alerta.', 'Resolve: prioridades 1 e 3; 1 ponto em alerta.', 'Por fonte de perda · 10 pontos críticos', 'Outros 7 pontos estão em alerta', fMil(EXP.perdaMes), fMil(EXP.ganhoMes), fMil(EXP.critCapMes) + '/mês', 'Total no portfólio (3 obras)', fMil(EXP.perdaMes * EXP.obras), fMil(EXP.ganhoMes * EXP.obras)].forEach(s => check('terceirizada contém "' + s + '"', allLow.indexOf(s.toLowerCase()) >= 0));
+      ['Resolve: prioridade 2; pontos críticos 04, 05, 06, 07, 09, 10, 11 e 12; 5 pontos em alerta.', 'Resolve: pontos críticos 08 e 13; 1 ponto em alerta.', 'Resolve: prioridades 1 e 3; 1 ponto em alerta.', 'Por fonte de perda · 10 pontos críticos', 'Outros 7 pontos estão em alerta', fMil(EXP.perdaMes), fMil(EXP.ganhoMes), fMil(EXP.critCapMes), 'Total no portfólio (3 obras)', fMil(EXP.perdaMes * EXP.obras), fMil(EXP.ganhoMes * EXP.obras)].forEach(s => check('terceirizada contém "' + s + '"', allLow.indexOf(s.toLowerCase()) >= 0));
     }
 
     if (uri && uri.startsWith('data:application/pdf')) {

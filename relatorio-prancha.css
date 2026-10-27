@@ -106,6 +106,9 @@
 .ptr tr.grp td .gsub{font-family:var(--f-mono);font-size:var(--t-th);color:var(--texto3);margin-top:.4mm}
 .ptr .q{display:block;font-style:italic;color:var(--texto2);font-size:8pt;line-height:11pt;margin-top:.6mm}
 .ptr .perda{color:var(--critico)} .ptr .ganho{color:var(--ok)}
+/* faixa do cenário conservador: filete verde à esquerda, fundo bem leve (relatório, folha 03, e proposta, seção 10) */
+.ptr .faixa{border-left:1.2mm solid var(--ok);background:rgba(30,122,76,.05);padding:2.6mm 4mm;margin-top:4mm;font-size:10pt;line-height:15pt;color:var(--tinta)}
+.ptr .faixa b{font-weight:var(--w-forte)}
 
 /* status markers: shape + word (legible in B&W) */
 .ptr .st{display:inline-flex;align-items:center;gap:1.2mm;white-space:nowrap}

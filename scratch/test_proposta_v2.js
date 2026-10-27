@@ -141,7 +141,7 @@ server.listen(PORT, async () => {
     check('#1 faixa Lean Experience na capa (2 fotos)', has('Workshop Lean Experience') && (t.match(/img\/lean\/lean\d\.jpg/g)||[]).length === 2);
     check('#2 faixa "prêmio/valor em jogo" removida', !has('valor em jogo') && !has('O PRÊMIO'));
     check('#3 recap com nome da empresa', has('Recapitulação Executiva do Diagnóstico SIIGA da CONSTRUTORA MERIDIANO'));
-    check('#4 principais pontos críticos', has('Principais pontos críticos do diagnóstico') && has('composição da exposição'));
+    check('#4 principais pontos críticos', has('Principais pontos críticos do diagnóstico') && has('de perda estimada por mês') && has('recuperáveis com o plano'));
     check('#5 objetivo do redesenho', has('Objetivo do Redesenho SIIGA') && has('Meta Central'));
     check('#6 programa de redesenho', has('O Programa de Redesenho SIIGA'));
     check('#7 resultados por nível', has('Resultados Esperados por Nível'));
@@ -155,7 +155,7 @@ server.listen(PORT, async () => {
     check('#11 investimento personalizado', has('Investimento Personalizado para a CONSTRUTORA MERIDIANO'));
     check('#11 sem chips de módulos', !hasCS('MO3') && !hasCS('MOP') && !hasCS('CPO'));
     check('#12 retorno projetado personalizado', has('Retorno Projetado para a CONSTRUTORA MERIDIANO'));
-    check('#12 exposição bruta × ganho no período + payback sobre o investimento total (sem ROI Mensal, horas nem % da jornada)', has('Exposição em Risco') && has('Ganho capturável com o programa') && has('Redução com o SIIGA por fonte (referência SIIGA)') && has('Payback') && has('a partir do 3º mês') && !/ROI Mensal|Horas recuperadas|% da jornada liberada/i.test(t));
+    check('#12 exposição bruta × ganho no período + payback sobre o investimento total (sem ROI Mensal, horas nem % da jornada)', has('Exposição em Risco') && has('Ganho capturável com o programa') && has('soma do ganho de cada fonte') && has('Payback') && has('a partir do 3º mês') && !/ROI Mensal|Horas recuperadas|% da jornada liberada/i.test(t));
     const mesesEsp = MO === 'terceirizada' ? 3 : 5;
     check('#6 programa pelas Fases de Implementação I, II e III, sem Pilar macro/tático/operacional e sem "Fase 1"', has('Fase de Implementação I') && has('Fase de Implementação II') && has('Fase de Implementação III') && !/Pilar (macro|tático|operacional)/.test(t) && !has('Fase 1'));
     check('programa com a duração do tipo de MO (' + MO + ': ' + mesesEsp + ' meses, R$ ' + (15 * mesesEsp) + '.000)', has('Mês ' + mesesEsp + ' — Análise e resultados') && has('R$ 15.000/mês × ' + mesesEsp + ' meses') && has('R$ ' + (15 * mesesEsp) + '.000'));

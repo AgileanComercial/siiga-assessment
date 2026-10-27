@@ -143,23 +143,23 @@ server.listen(PORT, async () => {
         setTimeout(() => { clearInterval(it); resolve(); }, 180000);
       }));
       const rel = norm(await page.evaluate(() => { var r = document.getElementById('ptr-root'); return r ? r.innerText : ''; }));
-      const M = await page.evaluate(() => { var m = ptModel('resumido'); return { crit: m.criticos.map(c => ({ n: c.n, code: c.code, titulo: c.titulo, pilar: c.pilar, frase: c.frase, mes: c.mes, fonte: c.fonte.label, alerta: c.alerta, fase: c.fase })), demais: m.demais.length, fontesLabels: m.roi.items.map(i => m.fontes[i.key].label) }; });
+      const M = await page.evaluate(() => { var m = ptModel('resumido'); return { crit: m.criticos.map(c => ({ n: c.n, code: c.code, titulo: c.titulo, pilar: c.pilar, frase: c.frase, mes: c.mes, fonte: c.fonte.label, alerta: c.alerta, fase: c.fase })), demais: m.demais.length, fontesLabels: m.roi.items.map(i => m.fontes[i.key].labelTab) }; });
       // Proposta
       const P = await page.evaluate(async () => {
         window.__LAST_PROPOSTA_PDF_DATA = null; window.__PT_KEEP_DOM = true; generateProposta('detalhado');
         await new Promise(resolve => { const it = setInterval(() => { if (!document.getElementById('pdf-loading') && window.__LAST_PROPOSTA_PDF_DATA) { clearInterval(it); resolve(); } }, 250); setTimeout(() => { clearInterval(it); resolve(); }, 120000); });
         var rr = document.getElementById('ptr-root');
         var tabela = rr ? Array.prototype.filter.call(rr.querySelectorAll('table'), function(t){ return /Pilar · fonte de perda/i.test(t.innerText); })[0] : null;
-        var linhas = tabela ? Array.prototype.map.call(tabela.querySelectorAll('tbody tr'), function(tr){ return Array.prototype.map.call(tr.children, function(td){ return td.innerText.replace(/ /g, ' ').replace(/\s+/g, ' ').trim(); }); }) : [];
+        var linhas = tabela ? Array.prototype.map.call(tabela.querySelectorAll('tbody tr:not(.tot)'), function(tr){ return Array.prototype.map.call(tr.children, function(td){ return td.innerText.replace(/ /g, ' ').replace(/\s+/g, ' ').trim(); }); }) : [];
         var pgs = rr ? Array.prototype.slice.call(rr.querySelectorAll(':scope > .page')) : [];
         var estrutura = { paginas: pgs.length, capaImgs: pgs[0] ? Array.prototype.map.call(pgs[0].querySelectorAll('img'), function(i){ return i.getAttribute('src'); }) : [],
           carimbos: pgs.filter(function(p){ return !p.classList.contains('cover'); }).map(function(p){ var c = p.querySelector('.carimbo'); return c ? c.innerText.replace(/ /g, ' ').replace(/\s+/g, ' ').trim() : ''; }),
           folgas: pgs.filter(function(p){ return !p.classList.contains('cover'); }).map(function(p){ var st = p.querySelector('.carimbo').getBoundingClientRect().top, b = 0; p.querySelectorAll('.body > *').forEach(function(e){ b = Math.max(b, e.getBoundingClientRect().bottom); }); return +((st - b) / (96 / 25.4)).toFixed(1); }),
           ultimoEhTitulo: pgs.filter(function(p){ return !p.classList.contains('cover'); }).map(function(p){ var k = p.querySelector('.body').lastElementChild; return !!(k && k.querySelector && k.querySelector('.secnum') && !k.nextElementSibling && k.parentNode.children.length >= 1 && /^\s*$/.test((k.nextSibling || {}).textContent || '')); }),
           secnums: rr ? Array.prototype.map.call(rr.querySelectorAll('.secnum'), function(e){ return e.textContent.trim(); }) : [],
-          calcW: rr ? (function(){ var td = Array.prototype.filter.call(rr.querySelectorAll('td'), function(t){ return /^Exposição bruta no portfólio/.test(t.innerText); })[0]; return td ? +(td.getBoundingClientRect().width / (96 / 25.4)).toFixed(1) : 0; })() : 0,
+          calcW: rr ? (function(){ var td = Array.prototype.filter.call(rr.querySelectorAll('td'), function(t){ return /^Ganho mensal com o plano/.test(t.innerText); })[0]; return td ? +(td.getBoundingClientRect().width / (96 / 25.4)).toFixed(1) : 0; })() : 0,
           fontes: rr ? [getComputedStyle(rr).getPropertyValue('--papel').trim(), getComputedStyle(rr.querySelector('.page')).backgroundColor] : [] };
-        return { txt: rr ? rr.innerText : '', cfg: getPropostaCfg(), linhas: linhas, est: estrutura };
+        return { txt: rr ? rr.innerText : '', cfg: getPropostaCfg(), linhas: linhas, alertas: tabela ? tabela.querySelectorAll('.st.a').length : 0, criticos: tabela ? tabela.querySelectorAll('.st.c').length : 0, est: estrutura };
       });
       const txt = norm(P.txt), cfg = P.cfg, lo = txt.toLowerCase();   // rótulos de KPI e títulos saem em maiúsculas no innerText
       const tem = x => lo.indexOf(x.toLowerCase()) >= 0;
@@ -175,12 +175,14 @@ server.listen(PORT, async () => {
         if (ip <= ordem) okOrd = false; ordem = ip;
         check('prioridade ' + c.n + ': pilar e fonte "' + c.pilar + ' · ' + c.fonte + '"', txt.indexOf(c.pilar + ' · ' + c.fonte) >= 0);
         if (c.frase) check('prioridade ' + c.n + ': frase do cliente entre aspas', txt.indexOf('“' + c.frase.replace(/\.$/, '') + '.”') >= 0 && rel.indexOf(c.frase.replace(/\.$/, '')) >= 0);
-        { const ln = P.linhas.filter(l => l[1].indexOf(c.titulo) === 0)[0] || []; check('prioridade ' + c.n + ': perda por mês ' + (c.mes != null ? fMil(c.mes) : '—') + ' na proposta (1ª prioridade da fonte) e no relatório', (c.mes != null ? ln[ln.length - 1] === fMil(c.mes) && rel.indexOf(fMil(c.mes)) >= 0 : ln[ln.length - 1] === '—'), ln[ln.length - 1]); }
+        { const ln = P.linhas.filter(l => l[1].indexOf(c.titulo) === 0)[0] || []; const gk = /Horas/.test(c.fonte) ? 'time' : /Retrabalho/.test(c.fonte) ? 'retrabalho' : /Custo indireto/.test(c.fonte) ? 'velocidade' : /Erros/.test(c.fonte) ? 'erros' : 'mo';
+        const pn = ln[ln.length - 2], gn = ln[ln.length - 1];
+        check('prioridade ' + c.n + ': perda por mês ' + (c.mes != null ? fMil(c.mes) : '—') + ' e ganho por mês ' + (c.mes != null ? fMil(EXP.G[gk] / EXP.prazo) : '—') + ' na proposta (1ª prioridade da fonte); perda também no relatório', (c.mes != null ? pn === fMil(c.mes) && gn === fMil(EXP.G[gk] / EXP.prazo) && rel.indexOf(fMil(c.mes)) >= 0 && rel.indexOf(fMil(EXP.G[gk] / EXP.prazo)) >= 0 : pn === '—' && gn === '—'), pn + ' | ' + gn); }
       });
       check('prioridades na mesma ordem do relatório', okOrd);
       const fontesDist = new Set(M.crit.map(c => c.fonte)).size;
-      check('perda por mês só na 1ª prioridade de cada fonte (' + fontesDist + ')', P.linhas.filter(l => l[l.length - 1] !== '—').length === fontesDist);
-      check('etiquetas Crítico / Em alerta conforme a nota (' + M.crit.filter(c => c.alerta).length + ' em alerta)', P.linhas.filter(l => /Em alerta/.test(l.join(' '))).length === M.crit.filter(c => c.alerta).length);
+      check('perda por mês só na 1ª prioridade de cada fonte (' + fontesDist + ')', P.linhas.filter(l => l[l.length - 2] !== '—').length === fontesDist && P.linhas.filter(l => l[l.length - 1] !== '—').length === fontesDist);
+      check('quadradinho de status antes do título (cheio = Crítico, hachurado = Em alerta) conforme a nota (' + M.crit.filter(c => c.alerta).length + ' em alerta)', P.alertas === M.crit.filter(c => c.alerta).length && P.criticos === M.crit.filter(c => !c.alerta).length);
       check('"Demais pontos críticos do diagnóstico: ' + M.demais + '"', M.demais === 0 || txt.indexOf('Demais pontos críticos do diagnóstico: ' + M.demais) >= 0, M.demais);
       check('composição da exposição com os nomes de fonte do relatório', M.fontesLabels.every(l => txt.indexOf(l) >= 0), M.fontesLabels.join(' | '));
 
@@ -189,7 +191,7 @@ server.listen(PORT, async () => {
       check('01: perda por mês ' + fMil(EXP.perdaMes) + ' igual ao relatório', tem('Perda por mês ' + fMil(EXP.perdaMes)) && rel.indexOf(fMil(EXP.perdaMes)) >= 0);
       if (obras > 1) check('01: perda por mês no portfólio (' + obras + ' obras) ' + fMil(EXP.perdaMes * obras), txt.indexOf(fMil(EXP.perdaMes * obras) + ' no portfólio de ' + obras + ' obras') >= 0 && rel.indexOf(fMil(EXP.perdaMes * obras)) >= 0);
       if (['terc', 'pcl', 'ajuste', 'prop'].indexOf(nome) >= 0) {
-        check('01: recuperável com o plano ' + fMil(EXP.critCapMes) + '/mês igual ao relatório', tem('Recuperável com o plano ' + fMil(EXP.critCapMes) + '/mês') && rel.indexOf(fMil(EXP.critCapMes) + '/mês') >= 0);
+        check('01: recuperável com o plano ' + fMil(EXP.critCapMes) + '/mês igual ao relatório', tem('Recuperável com o plano ' + fMil(EXP.critCapMes) + '/mês') && rel.indexOf(fMil(EXP.critMes) + ' ' + fMil(EXP.critCapMes)) >= 0);
       }
       check('01: sem "Payback Projetado" no recap', !/Payback Projetado/i.test(txt));
       ['Planejamento estratégico do fluxo de produção', 'Proteção e garantia da execução do plano', 'Gestão integrada da produção', 'Controle real e performance da produção'].forEach((n, i) => check('01: "Pilar ' + (i + 1) + ' · ' + n + '"', txt.indexOf('Pilar ' + (i + 1) + ' · ' + n) >= 0));
@@ -232,16 +234,32 @@ server.listen(PORT, async () => {
       check('10: payback esperado ' + (pb.mes ? pb.mes + ' meses' : 'sem payback') + ' (investimento ' + (pb.mes ? moeda(pb.inv) : '-') + ', ganho mensal ' + moeda(ganhoMes) + ')', pb.mes ? kpi === pb.mes + (pb.mes === 1 ? ' mês' : ' meses') : kpi === 'sem payback', kpi);
       if (pb.mes) check('10: investimento total até o payback ' + moeda(pb.inv) + ' e ganho acumulado ' + moeda(pb.ganho) + ' na tela', tem(moeda(pb.inv)) && tem(moeda(pb.ganho)));
       const paga = pb.mes && pb.mes > meses;
-      check('10: plataforma entra a partir do mês ' + (meses + 1) + (paga ? ' e aparece no investimento, por obra' : ' (payback dentro do programa: sem plataforma)'), paga ? txt.indexOf('mensalidade') >= 0 && txt.indexOf('por obra, para ' + cfg.nObras + ' obra') >= 0 : txt.indexOf('plataforma R$') < 0);
-      check('10: premissa "a partir do 3º mês" e ganho no período da obra (' + (prazo - 2) + ' meses)', txt.indexOf('Ganho no período da obra, a partir do 3º mês') >= 0 && txt.indexOf('(' + (prazo - 2) + ' meses)') >= 0);
+      check('10: plataforma entra a partir do mês ' + (meses + 1) + (paga ? ' e aparece no investimento, por obra' : ' (payback dentro do programa: sem plataforma)'), paga ? txt.indexOf('mensalidade') >= 0 && tem((pb.mes - meses) + ' mensalidade' + (pb.mes - meses === 1 ? '' : 's') + ' da plataforma' + (cfg.nObras > 1 ? ' (' + cfg.nObras + ' obras)' : '') + ' ' + moeda((pb.mes - meses) * cfg.mensalPor * cfg.nObras)) : txt.indexOf('da plataforma R$') < 0);
+      check('10: premissa "a partir do 3º mês" no strip (' + (prazo - 2) + ' meses × ' + moeda(ganhoMes) + ') e linha "Ganho no período da obra" sem nota', tem('No período da obra, a partir do 3º mês (' + (prazo - 2) + ' meses × ' + moeda(ganhoMes) + ')') && tem('Ganho no período da obra') && !tem('dos ' + prazo + ' meses, a partir do 3º mês'));
+      check('10: tabela "Como é calculado" com as 4 linhas (Ganho mensal com o plano, Ganho no período da obra, Investimento até o payback, Payback) e sem "Exposição bruta" nem "Duração considerada"', ['Ganho mensal com o plano ', 'Ganho no período da obra', 'Investimento até o payback', 'Payback ' + (pb.mes ? pb.mes + (pb.mes === 1 ? ' mês' : ' meses') : 'sem payback em ' + prazo + ' meses')].every(x => tem(x)) && !tem('Exposição bruta no portfólio') && !tem('Duração considerada'));
       // rodada 6: cenário conservador = 50% do ganho proposto (ganho mensal e no período); SEM payback conservador
       const ganhoMesC = ganhoMes * 0.5, periodoC = ganhoMesC * (prazo - 2);
-      check('10: linha "Cenário conservador: 50% do ganho proposto" = ' + moeda(ganhoMesC) + '/mês · ' + fTela(periodoC) + ' no período', tem('Cenário conservador: 50% do ganho proposto ' + moeda(ganhoMesC) + '/mês · ' + fTela(periodoC) + ' no período'), (lo.match(/cenário conservador.{0,80}/) || [''])[0]);
-      check('10: lead com "Mesmo que o programa recupere só metade disso, o ganho seria ' + moeda(ganhoMesC) + ' por mês (' + fTela(periodoC) + ' no período da obra)."', tem('Mesmo que o programa recupere só metade disso, o ganho seria ' + moeda(ganhoMesC) + ' por mês (' + fTela(periodoC) + ' no período da obra).'));
+      check('10: faixa "Cenário conservador: mesmo recuperando só 50% do proposto, o ganho é de ' + moeda(ganhoMesC) + ' por mês (' + fTela(periodoC) + ' no período da obra)." (uma vez, fora da tabela)', tem('Cenário conservador: mesmo recuperando só 50% do proposto, o ganho é de ' + moeda(ganhoMesC) + ' por mês (' + fTela(periodoC) + ' no período da obra).') && lo.split('cenário conservador').length === 2, (lo.match(/cenário conservador.{0,80}/) || [''])[0]);
+      check('10: o lead termina como antes da Rodada 6 (sem a frase "Mesmo que o programa recupere")', !tem('Mesmo que o programa recupere') && tem('o ganho é ' + fTela(ganhoMes * (prazo - 2)).toLowerCase() + '.'));
       check('10: sem payback no cenário conservador (nem linha nem frase)', !/payback no cenário conservador/i.test(txt) && !/payback ocorreria/i.test(txt) && !/não haveria payback/i.test(txt));
       check('10: strip de 3 cards inalterado (Exposição em Risco, Ganho capturável, Payback)', tem('Exposição em Risco') && tem('Ganho capturável com o programa') && /payback (sem payback|\d+ meses?)/.test(lo));
       const redTxt = Object.keys(EXP.red).filter(k => EXP.P[k] != null).map(k => ({ time: 'horas', retrabalho: 'retrabalho', velocidade: 'custo do prazo', erros: 'erros de medição', mo: 'estouro de MO' })[k] + ' ' + fPct(EXP.red[k])).join(' · ');
-      check('10: sem o percentual total de captura; "Redução com o SIIGA por fonte (referência SIIGA)" lista a redução de cada fonte (' + redTxt + ')', tem('Redução com o SIIGA por fonte (referência SIIGA) ' + redTxt) && !/Captura efetiva/i.test(txt) && !/captura efetiva de [0-9]+%/i.test(txt));
+      check('10: sem o percentual total de captura; a nota de "Ganho mensal com o plano" lista a redução de cada fonte (' + redTxt + ')', tem('soma do ganho de cada fonte: ' + redTxt + (cfg.nObras > 1 ? ' · ganho por obra × ' + cfg.nObras + ' obras' : '')) && !/Captura efetiva/i.test(txt) && !/captura efetiva de [0-9]+%/i.test(txt));
+      // ── seção 02: gráfico da composição igual ao da folha 03 do relatório (rodada 6c) ──
+      check('02: composição = gráfico do relatório ("' + fMil(EXP.ganhoMes) + ' dos ' + fMil(EXP.perdaMes) + ' de perda estimada por mês' + (obras > 1 ? ', por obra,' : '') + ' são recuperáveis com o plano"), sem o gráfico antigo', tem(fMil(EXP.ganhoMes) + ' dos ' + fMil(EXP.perdaMes) + ' de perda estimada por mês' + (obras > 1 ? ', por obra,' : '') + ' são recuperáveis com o plano') && !tem('Onde o ') && tem('Perda por mês (R$ mil)') && tem('Ganho mensal com o plano (R$ mil)'));
+      // ── seção 03: meta pela regra D (esperado calculado das respostas; as prioridades vêm do relatório) ──
+      {
+        const prio = new Set(M.crit.map(c => c.code)), ptsP = { 1: 0, 2: 0, 3: 0, 4: 0 }, maxP = { 1: 21, 2: 9, 3: 15, 4: 12 }, curP = { 1: 0, 2: 0, 3: 0, 4: 0 };
+        Object.keys(C.resp).filter(k => /^F[1-4]/.test(k)).forEach(k => { const p = +k.charAt(1), sc = C.resp[k], alvo = prio.has(k) ? 3 : 2; curP[p] += sc; ptsP[p] += sc < alvo ? alvo : sc; });
+        const nv = p => p < 0.4 ? 'Crítico / Vulnerável' : p < 0.6 ? 'Operação Artesanal / Risco de Desvio' : p < 0.75 ? 'Em alerta · Gargalos de escala' : p < 0.9 ? 'Estruturado com Perdas Ocultas' : 'Referência SIIGA / Alta Performance';
+        const cur = curP[1] + curP[2] + curP[3] + curP[4], meta = ptsP[1] + ptsP[2] + ptsP[3] + ptsP[4];
+        const fN = v => v.toLocaleString('pt-BR', { maximumFractionDigits: 1 });
+        const nC = M.crit.length, pri = nC === 1 ? 'a prioridade' : 'as ' + ({ 2: 'duas', 3: 'três', 4: 'quatro', 5: 'cinco' }[nC]) + ' prioridades';
+        const esp = 'tirar a ' + C.empresa + ' do nível ' + nv(cur / 57) + ' e levá-la de ' + Math.round(cur / 57 * 100) + '% para ' + Math.round(meta / 57 * 100) + '% da Referência SIIGA em ' + meses + ' meses, implantando todos os pontos do plano e consolidando ' + pri + '.';
+        check('03: meta pela regra D = ' + fN(meta) + '/57 (' + Math.round(meta / 57 * 100) + '%) a partir de ' + fN(cur) + ': "' + esp + '"', tem(esp), (lo.match(/o objetivo central.{0,260}/) || [''])[0]);
+        check('03: destaque lateral "' + fN(cur) + ' → ' + fN(meta) + '/57" e metas por pilar', tem(fN(cur) + ' → ' + fN(meta) + '/57') && [1, 2, 3, 4].every(p => tem(Math.round(curP[p] / maxP[p] * 100) + '% → ' + Math.round(ptsP[p] / maxP[p] * 100) + '%') && ptsP[p] > curP[p]), JSON.stringify([curP, ptsP]));
+        check('03: sem o nível da meta, sem "rumo à" e sem a linha de apoio antiga; nota "As metas de maturidade acima saem direto do diagnóstico" mantida', !tem('rumo à referência siiga') && !tem('Implantar todos os pontos do plano e consolidar') && !tem('Subir a maturidade') && tem('As metas de maturidade acima saem direto do diagnóstico'));
+      }
       check('10: exposição com o nº de obras da proposta (' + cfg.nObras + ')', tem('Exposição em Risco ' + fTela(EXP.somaP * cfg.nObras)), fTela(EXP.somaP * cfg.nObras));
       check('10: sem "Fator de captura (pela maturidade atual)"', txt.indexOf('Fator de captura (pela maturidade atual)') < 0);
 

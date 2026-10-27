@@ -287,7 +287,7 @@ server.listen(PORT, async () => {
       const t2 = m2 && num(m2[1]) * k(m2[2]), t3 = m3 && num(m3[1]) * k(m3[2]);
       check('total da folha 02 = total da folha 03 (e perda/mês × prazo)', !!(m2 && m3 && mm) && Math.abs(t2 - t3) <= (m2[2] === 'mi' ? 50 : 0.5) && Math.abs(num(mm[1]) * +m3[3] - t3) <= 1 && m2[3] === m3[3],
         JSON.stringify({ folha02: m2 && m2.slice(1), folha03: m3 && m3.slice(1), mes: mm && mm[1] }));
-      check('folha 02: linha "Recuperável com o plano" com × mensalidade ref.', /Recuperável com o plano · [\d,]+× mensalidade ref\./.test(p2));
+      check('folha 02: coluna "Ganho por mês" e total das prioridades com perda e ganho (R$ mil), sem a linha "Recuperável com o plano"', /Ganho por mês/i.test(p2) && /Total das \d+ prioridades\s+R\$ [0-9,.]+ mil\s+R\$ [0-9,.]+ mil/.test(p2.replace(/\u00a0/g, ' ')) && !/Recuperável com o plano/.test(p2));
     }
     check('folha 02: Fase de Implementação com nome curto e sem Prioridade', /I · Planejamento e canteiro|III · Pagamento da MO/.test(dom.pages[1] || '') && /Fase de Implementação/i.test(dom.pages[1] || ''));
     if (MODE === 'resumido') {

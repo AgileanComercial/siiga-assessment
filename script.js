@@ -5627,10 +5627,26 @@ function propPilotoObs(cfg){
 }
 
 
-// Meta de maturidade por pilar: fecha 50% do gap até a Referência SIIGA (100%).
-// Regra determinística validada contra o protótipo (reproduz o 35→46 e os
-// pares por pilar da tela "Metas do Programa"). meta = atual + 0.5×(1−atual).
-function propMetaPct(curPct) { return curPct + 0.5 * (1 - curPct); }
+// Meta de maturidade do programa (regra D), determinística e a partir das notas atuais do diagnóstico:
+// todo ponto do plano (crítico ou de atenção, getGapPlan().all) abaixo de 2 sobe para a nota 2; as perguntas das
+// prioridades (plan.anchors, as mesmas do relatório) sobem para a nota 3; as demais não mudam. Só contam as
+// perguntas dos 4 pilares (os 57 pontos); as de MO ficam fora do score. Meta do pilar = pontos ÷ máximo do pilar.
+// M = ptModel(): usa M.pilares (pts, max, n) e M.plan.
+function propMetasD(M) {
+  var plan = M.plan, alvo = {}, pil = {}, sobe2 = { 1:0, 2:0, 3:0, 4:0 }, sobe3 = { 1:0, 2:0, 3:0, 4:0 };
+  plan.all.forEach(function(o){ alvo[o.code] = 2; });
+  plan.anchors.forEach(function(o){ alvo[o.code] = 3; });
+  M.pilares.forEach(function(p){ pil[p.n] = { n:p.n, cur:p.pts, pts:p.pts, max:p.max, pct:0, curPct:p.pct }; });
+  plan.all.forEach(function(o) {
+    var k = String(o.bk || '').charAt(1), a = alvo[o.code];
+    if (!pil[k] || !(o.score < a)) return;
+    pil[k].pts += a - o.score;
+    (a === 3 ? sobe3 : sobe2)[k]++;
+  });
+  var tot = 0, max = 0;
+  Object.keys(pil).forEach(function(k){ var p = pil[k]; p.pts = Math.min(p.pts, p.max); p.pct = p.max ? p.pts / p.max : 0; tot += p.pts; max += p.max; });
+  return { pilares: pil, score: tot, max: max, pct: max ? tot / max : 0, nivel: levelFromPct(max ? tot / max : 0), sobe2: sobe2, sobe3: sobe3 };
+}
 
 // Investimento mês a mês e payback sobre o INVESTIMENTO TOTAL (Redesenho + Ativação + plataforma).
 // Ganho mensal do portfólio = (roi.totalPorObra ÷ prazo) × nº de obras da proposta, o mesmo ganho do relatório.

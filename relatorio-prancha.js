@@ -328,8 +328,9 @@ function ptSecResumo(M) {
   var ext = PT_NUM_EXT_F[nC] || String(nC);
   var crit = M.criticos.map(function(c) {
     return '<tr><td>' + c.n + '</td><td><span class="b6">' + c.titulo + '</span>' + (c.frase ? '<span class="q">“' + ptEsc(c.frase.replace(/\.$/, '')) + '.”</span>' : '') + '</td>' +
-      '<td>' + c.pilar + '</td><td style="white-space:nowrap">' + c.faseCurta + '</td>' +
-      '<td class="n">' + (c.mes != null ? ptMil(c.mes, 1) : '—') + '</td></tr>';
+      '<td>' + c.pilar + '</td><td>' + c.faseCurta + '</td>' +
+      '<td class="n">' + (c.mes != null ? '<span class="perda">' + ptMil(c.mes, 1) + '</span>' : '—') + '</td>' +
+      '<td class="n">' + (c.mes != null ? '<span class="ganho">' + ptMil(c.fonte.cap / M.prazo, 1) + '</span>' : '—') + '</td></tr>';
   }).join('');
   var pctCrit = M.roi.totalBase ? Math.round(M.critPerda / M.roi.totalBase * 100) : 0;
   var lead = 'A perda estimada ' + ptPorObra(M) + ' é de <b>' + ptMilInt(M.roi.totalBase) + '</b> em ' + M.prazo + ' meses' +
@@ -360,11 +361,26 @@ function ptSecResumo(M) {
   var blocks = [{ sec:'01', html:b1 }];
   if (nC) {
     blocks.push({ sec:'01', html:'<div class="row sec"><div><div class="lbl rule">Prioridades</div><div class="note" style="margin-top:1.5mm">' + (nC - M.nPrioAlerta) + ' de ' + M.nCritTot + ' pontos críticos' + (M.nPrioAlerta ? '; ' + M.nPrioAlerta + (M.nPrioAlerta === 1 ? ' ponto em alerta com dor declarada' : ' pontos em alerta com dor declarada') : '') + '</div></div><div>' +
-      '<table><thead><tr><th style="width:5mm">#</th><th>Prioridade</th><th style="width:15mm">Pilar</th><th style="width:38mm">Fase de Implementação</th><th class="n wrap" style="width:24mm">Perda por mês sem tratamento</th></tr></thead>' +
-      '<tbody>' + crit + '<tr class="tot"><td></td><td>Total ' + (nC === 1 ? 'da prioridade' : 'das ' + nC + ' prioridades') + '</td><td></td><td></td><td class="n">' + ptMil(M.critMes, 1) + '/mês</td></tr>' +
-      '<tr class="rec"><td></td><td colspan="3">Recuperável com o plano</td><td class="n">' + ptMil(M.critCapMes, 1) + '/mês</td></tr></tbody></table></div></div>' });
+      '<table><thead><tr><th style="width:5mm">#</th><th>Prioridade</th><th style="width:15mm">Pilar</th><th style="width:27mm">Fase de Implementação</th><th class="n wrap" style="width:24mm">Perda por mês sem tratamento</th><th class="n wrap" style="width:19mm">Ganho por mês</th></tr></thead>' +
+      '<tbody>' + crit + '<tr class="tot"><td></td><td>Total ' + (nC === 1 ? 'da prioridade' : 'das ' + nC + ' prioridades') + '</td><td></td><td></td><td class="n"><span class="perda">' + ptMil(M.critMes, 1) + '</span></td><td class="n"><span class="ganho">' + ptMil(M.critCapMes, 1) + '</span></td></tr></tbody></table></div></div>' });
   }
   return blocks;
+}
+
+// Paired loss x gain bars per source (R$ mil per month, per project), shared by section 02 of the report and of the proposal.
+function ptChartPerdaGanho(M, mt) {
+  var P = M.prazo, porObra = M.obras > 1, perdaMes = M.roi.totalBase / P, ganhoMes = M.roi.totalPorObra / P;
+  var porPerda = M.roi.items.map(function(it){ return M.fontes[it.key]; }).sort(function(a, b){ return b.perda - a.perda; });
+  var mx = porPerda.length ? porPerda[0].perda / P : 0;
+  var w = function(v) { return mx ? (v / (mx * 1.22) * 100).toFixed(1) + '%' : '0%'; };
+  var lab = function(v) { return ptNum(v / 1000, 1, 1); };
+  return '<div style="margin-top:' + (mt || '0') + '"><div class="chart-t">' + ptMil(ganhoMes, 1) + ' dos ' + ptMil(perdaMes, 1) + ' de perda estimada por mês' + (porObra ? ', por obra,' : '') + ' são recuperáveis com o plano</div>' +
+    porPerda.map(function(f) {
+      return '<div class="pf"><div class="nm">' + f.labelTab + '</div><div class="bb">' +
+        '<div class="ln p"><i style="width:' + w(f.mes) + '"></i><span>' + lab(f.mes) + '</span></div>' +
+        '<div class="ln g"><i style="width:' + w(f.cap / P) + '"></i><span>' + lab(f.cap / P) + '</span></div></div></div>';
+    }).join('') +
+    '<div class="leg5"><span><i class="p"></i>Perda por mês (R$ mil)</span><span><i class="g"></i>Ganho mensal com o plano (R$ mil)</span></div></div>';
 }
 
 // Section 02: total loss and monthly gain on the loss-map base (same R$ total as section 01).
@@ -376,17 +392,7 @@ function ptSecPerdaGanho(M) {
   var linked = {};
   M.criticos.forEach(function(c){ (linked[c.fonte.key] = linked[c.fonte.key] || []).push(c.n); });
   var itens = M.roi.items.map(function(it){ return M.fontes[it.key]; });
-  var porPerda = itens.slice().sort(function(a, b){ return b.perda - a.perda; });
-  var mx = porPerda.length ? porPerda[0].perda / P : 0;
-  var w = function(v) { return mx ? (v / (mx * 1.22) * 100).toFixed(1) + '%' : '0%'; };
-  var lab = function(v) { return ptNum(v / 1000, 1, 1); };
-  var chart = '<div style="margin-top:6mm"><div class="chart-t">' + ptMil(ganhoMes, 1) + ' dos ' + ptMil(perdaMes, 1) + ' de perda estimada por mês' + (porObra ? ', por obra,' : '') + ' são recuperáveis com o plano</div>' +
-    porPerda.map(function(f) {
-      return '<div class="pf"><div class="nm">' + f.labelTab + '</div><div class="bb">' +
-        '<div class="ln p"><i style="width:' + w(f.mes) + '"></i><span>' + lab(f.mes) + '</span></div>' +
-        '<div class="ln g"><i style="width:' + w(f.cap / P) + '"></i><span>' + lab(f.cap / P) + '</span></div></div></div>';
-    }).join('') +
-    '<div class="leg5"><span><i class="p"></i>Perda por mês (R$ mil)</span><span><i class="g"></i>Ganho mensal com o plano (R$ mil)</span></div></div>';
+  var chart = ptChartPerdaGanho(M, '6mm');
   var baseInf = '<div class="meta"><div class="lbl rule" style="margin-bottom:2.4mm">Base informada</div>' +
     '<div><span class="lbl">' + (porObra ? 'Orçamento médio por obra' : 'Orçamento da obra') + '</span>' + ptMilVar(M.orc) + '</div>' +
     '<div><span class="lbl">Prazo</span>' + P + ' meses</div>' +
@@ -402,8 +408,8 @@ function ptSecPerdaGanho(M) {
       (l ? ptPrioLista(l) : '—') + '</td></tr>';
   }).join('');
   var portf = porObra ? '<tr class="tot"><td>Total no portfólio (' + M.obras + ' obras)</td><td class="n">' + ptMil(M.roi.totalBase * M.obras / P, 1) + '</td><td class="n"></td><td class="n">' + ptMil(M.roi.totalPortfolio / P, 1) + '</td><td></td></tr>' : '';
-  var consNota = '<p class="note" style="margin-top:3mm"><b class="b6">Mesmo recuperando só ' + ptPct(ROI_CENARIO_CONSERVADOR) + ' do proposto: ' + ptMil(ganhoMes * ROI_CENARIO_CONSERVADOR, 1) + ' por mês' + (porObra ? ', por obra' : '') + '</b>' +
-    (porObra ? ' (' + ptMil(M.roi.totalPortfolio / P * ROI_CENARIO_CONSERVADOR, 1) + ' por mês no portfólio de ' + M.obras + ' obras)' : '') + '.</p>';
+  var consNota = '<div class="faixa"><b>Mesmo recuperando só ' + ptPct(ROI_CENARIO_CONSERVADOR) + ' do proposto: ' + ptMil(ganhoMes * ROI_CENARIO_CONSERVADOR, 1) + ' por mês' + (porObra ? ', por obra' : '') + '</b>' +
+    (porObra ? ' (' + ptMil(M.roi.totalPortfolio / P * ROI_CENARIO_CONSERVADOR, 1) + ' por mês no portfólio de ' + M.obras + ' obras)' : '') + '.</div>';
   var b2 = '<div class="row sec"><div><div class="lbl rule">Composição</div></div><div><table><thead><tr><th>Fonte de perda</th><th class="n" style="width:22mm">Perda/mês</th><th class="n" style="width:16mm">Captura</th><th class="n" style="width:24mm">Ganho/mês</th><th class="wrap" style="width:31mm;padding-left:5mm">Prioridade ligada</th></tr></thead><tbody>' + rows +
     '<tr class="tot"><td>' + (porObra ? 'Total por obra' : 'Total, 1 obra') + '</td><td class="n perda">' + ptMil(perdaMes, 1) + '</td><td class="n"></td><td class="n ganho">' + ptMil(ganhoMes, 1) + '</td><td></td></tr>' + portf + '</tbody></table><div class="src">Nas fontes Horas do time de gestão e Custo indireto do prazo a captura é 100%: a perda já é a parte que o SIIGA elimina (a parte manual das rotinas e o tempo a mais de obra).</div>' + consNota + '</div></div>';
   return [{ sec:'02', html:b1 }, { sec:'02', html:b2 }];
