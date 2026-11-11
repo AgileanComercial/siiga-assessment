@@ -5495,14 +5495,17 @@ async function checkAdminPdfRequest() {
   if(!id) return false;
   // pdf_mode: 'resumido' ou 'detalhado' (default), passado pelo admin (admin.js) —
   // mesma distinção Resumido/Detalhado disponível no fluxo normal do diagnóstico.
-  var pdfMode = params.get('pdf_mode') === 'resumido' ? 'resumido' : 'detalhado';
+  // 'proposta' gera o PDF da Proposta (proposta-prancha.js) a partir do mesmo registro.
+  var modeParam = params.get('pdf_mode');
+  var pdfMode = modeParam === 'resumido' ? 'resumido' : (modeParam === 'proposta' ? 'proposta' : 'detalhado');
   if(!sbClient) { alert('Não foi possível conectar ao Supabase para carregar o diagnóstico.'); return true; }
   try {
     var result = await sbClient.from('assessments').select('*').eq('id', id).single();
     if(result.error || !result.data) { alert('Diagnóstico não encontrado (id ' + id + ').'); return true; }
     S = result.data.state;
     if(!S.ferramentas) S.ferramentas = {planejamento:'',medicao:'',qualidade:'',contratos:'',folha:''};
-    generatePDF(true, null, pdfMode);
+    if(pdfMode === 'proposta') generateProposta('detalhado');
+    else generatePDF(true, null, pdfMode);
   } catch(err) {
     alert('Erro ao carregar diagnóstico: ' + err.message);
   }
