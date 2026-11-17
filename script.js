@@ -5157,11 +5157,12 @@ function recordToRow(rec) {
     email: rec.email || '',
     telefone: rec.telefone || '',
     data: rec.data,
-    modelo_mo: rec.modeloMO,
-    num_obras: rec.numObras,
-    orcamento_medio: rec.orcamentoMedio,
-    total_score: rec.totalScore,
-    total_max: rec.totalMax,
+    // aceita o formato local atual (snake_case, gravado por confirmSave) e o antigo (camelCase)
+    modelo_mo: rec.modelo_mo !== undefined ? rec.modelo_mo : rec.modeloMO,
+    num_obras: rec.num_obras !== undefined ? rec.num_obras : rec.numObras,
+    orcamento_medio: rec.orcamento_medio !== undefined ? rec.orcamento_medio : rec.orcamentoMedio,
+    total_score: rec.total_score !== undefined ? rec.total_score : rec.totalScore,
+    total_max: rec.total_max !== undefined ? rec.total_max : rec.totalMax,
     nivel: rec.nivel,
     scores: rec.scores,
     state: rec.state
@@ -5276,6 +5277,9 @@ async function confirmSave() {
   saveDiagnosticos(list);
   closeSaveModal();
   clearDraft();
+  // O autosave pode ter um envio pendente (debounce de 2 s) com estado anterior: cancela, para ele nao
+  // sobrescrever o nome/estado finais depois deste salvamento.
+  clearTimeout(syncTimeout);
 
   // Enviar para o Supabase — o admin.html lê EXCLUSIVAMENTE do Supabase (não do
   // localStorage), então um insert que falha silenciosamente torna o diagnóstico
@@ -5286,7 +5290,9 @@ async function confirmSave() {
   // mostra um erro explícito, pedindo para tentar salvar novamente.
   if(sbClient) {
     try {
-      const { data, error } = await sbClient.from('assessments').insert([recordToRow(record)]);
+      // upsert (PK id, igual ao autosave em syncToSupabase): a linha ja foi criada pelo autosave desde o inicio do
+      // diagnostico, entao insert estoura "duplicate key". `record` ja esta com as colunas do banco (snake_case).
+      const { error } = await sbClient.from('assessments').upsert([record]);
       if(error) {
         console.error("Erro ao salvar no Supabase:", error);
         showToast('Diagnóstico salvo apenas neste dispositivo — falha ao sincronizar com o painel. Tente salvar novamente.', 'error');

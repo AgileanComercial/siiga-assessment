@@ -257,11 +257,12 @@ function localToRow(rec) {
     email: rec.email || '',
     telefone: rec.telefone || '',
     data: rec.data,
-    modelo_mo: rec.modeloMO,
-    num_obras: rec.numObras,
-    orcamento_medio: rec.orcamentoMedio,
-    total_score: rec.totalScore,
-    total_max: rec.totalMax,
+    // aceita o formato local atual (snake_case, gravado por confirmSave) e o antigo (camelCase)
+    modelo_mo: rec.modelo_mo !== undefined ? rec.modelo_mo : rec.modeloMO,
+    num_obras: rec.num_obras !== undefined ? rec.num_obras : rec.numObras,
+    orcamento_medio: rec.orcamento_medio !== undefined ? rec.orcamento_medio : rec.orcamentoMedio,
+    total_score: rec.total_score !== undefined ? rec.total_score : rec.totalScore,
+    total_max: rec.total_max !== undefined ? rec.total_max : rec.totalMax,
     nivel: rec.nivel,
     scores: rec.scores,
     state: rec.state
