@@ -1,5 +1,5 @@
 // Gerar Proposta SIIGA (v2): proposta comercial em PDF 16:9 (1440pt x 810pt), 16 paginas, identidade Agilean.
-// Porte do template Piemonte v2.11 para a ferramenta. Entradas: openPropostaSiiga() (formulario "Ficha da proposta")
+// Porte do template da proposta SIIGA (16 paginas, 16:9) para a ferramenta. Entradas: openPropostaSiiga() (formulario "Ficha da proposta")
 // e generatePropostaSiiga() (gera com o que estiver em S.proposta). Reaproveita os motores do diagnostico (ptModel,
 // getGapPlan, gapsNumerados, calculateROI) sem alterar nenhum calculo. A folha de estilo (proposta-siiga.css) so e
 // carregada dentro de um iframe de geracao: nada vaza para a ferramenta. Nunca sai tarja de campo em aberto: o
@@ -92,7 +92,7 @@ function psHoraBR(h) { var m = /^(\d{1,2})(?::(\d{2}))?/.exec(h || ''); if (!m) 
 function psCap(t) { t = String(t || '').trim(); return t ? t.charAt(0).toUpperCase() + t.slice(1) : t; }
 function psLow(t) { t = String(t || '').trim(); return t ? t.charAt(0).toLowerCase() + t.slice(1) : t; }
 function psHojeMais(dias) { var d = new Date(); d.setDate(d.getDate() + dias); return d.getFullYear() + '-' + psPad(d.getMonth() + 1) + '-' + psPad(d.getDate()); }
-// "por" + "a Piemonte" = "pela Piemonte"
+// "por" + "a Alfa" = "pela Alfa"
 function psPor(quem) { quem = String(quem || '').trim(); if (/^a\s/i.test(quem)) return 'pela ' + quem.slice(2); if (/^o\s/i.test(quem)) return 'pelo ' + quem.slice(2); return 'por ' + quem; }
 function psEmpresaFmt(nome) {
   var fem = /^(construtora|incorporadora|empresa)\b/i.test(nome) || /\b(engenharia|constru[cç][õo]es|incorpora[cç][õo]es|edifica[cç][õo]es|empreiteira)\s*$/i.test(nome);
@@ -101,8 +101,8 @@ function psEmpresaFmt(nome) {
 }
 
 // Nome curto para o texto corrido (ficha: "Como chamar o cliente no texto"). Regra do artigo: o nome curto e usado como foi digitado.
-// Sem artigo (ex.: "Piemonte") o texto usa "de Piemonte", "por Piemonte", "com Piemonte", "para Piemonte"; com artigo digitado
-// (ex.: "a Piemonte") usa "da", "pela", "com a", "para a". A capa e o cabecalho usam o nome completo.
+// Sem artigo (ex.: "Alfa") o texto usa "de Alfa", "por Alfa", "com Alfa", "para Alfa"; com artigo digitado
+// (ex.: "a Alfa") usa "da", "pela", "com a", "para a". A capa e o cabecalho usam o nome completo.
 function psNomeCurtoFmt(nc) {
   nc = String(nc || '').trim().replace(/\s+/g, ' ');
   var m = /^(a|o)\s+(.+)$/i.exec(nc);
@@ -982,7 +982,7 @@ function openPropostaSiiga() {
 
     '<div class="h">B · Cliente</div>' +
     '<div style="margin-bottom:12px"><label class="l">Logo do cliente (PNG, JPG ou SVG; fundo claro ou transparente)</label><input type="file" id="pm-logo" accept="image/png,image/jpeg,image/svg+xml" class="pf"><div id="pm-logoprev" style="margin-top:6px"></div></div>' +
-    '<div style="margin-bottom:12px"><label class="l">Como chamar o cliente no texto (nome curto; a capa e o cabeçalho usam o nome completo)</label><input class="pf" id="pm-nc" value="' + psEsc(w.nomeCurto) + '"><div class="nota">Ex.: Piemonte. Sem artigo o texto usa "de Piemonte", "por Piemonte"; digite "a Piemonte" para usar "da", "pela", "para a".</div></div>' +
+    '<div style="margin-bottom:12px"><label class="l">Como chamar o cliente no texto (nome curto; a capa e o cabeçalho usam o nome completo)</label><input class="pf" id="pm-nc" value="' + psEsc(w.nomeCurto) + '"><div class="nota">Ex.: Alfa. Sem artigo o texto usa "de Alfa", "por Alfa"; digite "a Alfa" para usar "da", "pela", "para a".</div></div>' +
     '<div class="g2"><div><label class="l">Decisor/patrocinador: nome</label><input class="pf" id="pm-decn" value="' + psEsc(w.decisor.nome) + '"></div><div><label class="l">Cargo</label><input class="pf" id="pm-decc" value="' + psEsc(w.decisor.cargo) + '"></div></div>' +
     '<div class="g3"><div><label class="l">Data da reunião de apresentação</label><input class="pf" id="pm-rd" type="date" value="' + (w.reuniao.data || '') + '"></div><div><label class="l">Hora</label><input class="pf" id="pm-rh" type="time" value="' + (w.reuniao.hora || '') + '"></div><div><label class="l">Quem define a obra-piloto</label><input class="pf" id="pm-quem" value="' + psEsc(w.piloto.quem) + '"></div></div>' +
     '<label class="l">Objetivos do projeto (a biblioteca sugere pelos gaps e preenche o ponto de partida; nome e texto são livres)</label><div id="pm-obj"></div>' +
