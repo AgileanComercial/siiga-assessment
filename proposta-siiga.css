@@ -149,3 +149,6 @@ td .q{margin-top:4pt}
 /* v2.11: atribuição das falas */
 .q .qa{display:block;font-size:.84em;letter-spacing:.02em;margin-top:2pt;color:var(--mut)}
 
+
+/* v2.15 p14: tabelas de investimento um pouco mais compactas */
+.rm.inv td{padding:12pt 10pt 12pt 0}

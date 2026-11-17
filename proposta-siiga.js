@@ -1,12 +1,12 @@
-// Gerar Proposta SIIGA (v2): proposta comercial em PDF 16:9 (1440pt x 810pt), 16 paginas, identidade Agilean.
-// Porte do template da proposta SIIGA (16 paginas, 16:9) para a ferramenta. Entradas: openPropostaSiiga() (formulario "Ficha da proposta")
+// Gerar Proposta SIIGA (v2): proposta comercial em PDF 16:9 (1440pt x 810pt), 17 paginas, identidade Agilean.
+// Porte do template da proposta SIIGA (17 paginas, 16:9) para a ferramenta. Entradas: openPropostaSiiga() (formulario "Ficha da proposta")
 // e generatePropostaSiiga() (gera com o que estiver em S.proposta). Reaproveita os motores do diagnostico (ptModel,
 // getGapPlan, gapsNumerados, calculateROI) sem alterar nenhum calculo. A folha de estilo (proposta-siiga.css) so e
 // carregada dentro de um iframe de geracao: nada vaza para a ferramenta. Nunca sai tarja de campo em aberto: o
 // formulario valida os campos obrigatorios e o que for opcional simplesmente nao aparece.
 
 var PS_VERSAO = '2.0';
-var PS_TOTAL = 16;
+var PS_TOTAL = 17;
 var PS_MAX_FALAS = 10;                // limite de falas do cliente (decisao do Israel: ate 10)
 var PS_CREME = '#FAF7F5';
 
@@ -44,7 +44,9 @@ var PS_RITOS = [
   ['Quinzenal', 'Rito tático', 'Sala técnica: análise de restrições e planejamento de médio prazo, com as áreas de apoio.'],
   ['Mensal', 'Comitê executivo', 'Diretoria e Agilean: leitura dos indicadores do projeto, avanço das metas e decisões de curso.']
 ];
-var PS_CRITERIOS_PILOTO = ['Obra com entrega no ano que vem', 'Obra nova, com pré-obra e sala de guerra já em curso', 'Todas as áreas de apoio na mesa desde o início'];
+var PS_CRITERIOS_PILOTO = ['Obra em estágio não tão avançado (até 20% de execução)'];
+// Formação Lean (p14): textos fixos e valores padrão editáveis na ficha
+var PS_FORMACAO = { v1: 8000, v2: 20000 };
 var PS_VISITAS = [['start', 0, 'No start, Fase 0 e início do Pilar 1.'], ['Pilar 2 → 3', 2, 'Na consolidação do Pilar 2 e início do Pilar 3.'], ['fim do Pilar 4', 4, 'Na conclusão do Pilar 4, para consolidar o escopo de consultoria.']];
 var PS_DIM = [
   ['Pessoas', 'Quem opera o processo', ['Definição do RACI: quem faz o quê', 'Dono de processo identificado', 'Capacitação com dados reais da obra', 'Cultura de apontamento contínuo', 'Ritos de gestão instalados no campo'], 'Redesenhado no escopo'],
@@ -231,7 +233,7 @@ function psFichaPadrao(M) {
   d.piloto.quem = d.piloto.quem || psNomeCurtoFmt(d.nomeCurto).a;
   d.piloto.criterios = (d.piloto.criterios && d.piloto.criterios.length) ? d.piloto.criterios : PS_CRITERIOS_PILOTO.slice();
   d.escopo = Object.assign({ fase0Dias: 1, participantes: 25, visitas: 3, fase5: true, fase5Obras: 4, fase5Dias: 60 }, d.escopo || {});
-  d.inv = Object.assign({ redesenho: '', redesParcelas: 4, mensalidade: '', ativPorObra: '', ativParcelas: '', validade: psHojeMais(10) }, d.inv || {});
+  d.inv = Object.assign({ redesenho: '', redesParcelas: 4, mensalidade: '', ativPorObra: '', ativParcelas: '', validade: psHojeMais(10), formacao1: PS_FORMACAO.v1, formacao2: PS_FORMACAO.v2 }, d.inv || {});
   d.contatos = (d.contatos && d.contatos.length) ? d.contatos : (ult.length ? ult : [{ nome: '', cargo: '', email: '', tel: '' }]);
   d.transcricao = d.transcricao || { nome: '', texto: '' };
   return d;
@@ -243,6 +245,8 @@ function psValida(f) {
   if (!n(f.inv.redesenho)) e.push('Informe o valor total do Redesenho.');
   if (!n(f.inv.mensalidade)) e.push('Informe a mensalidade Agilean por obra, por mês.');
   if (!/^\d{4}-\d{2}-\d{2}$/.test(f.inv.validade || '')) e.push('Informe a validade da proposta.');
+  if (!n(f.inv.formacao1)) e.push('Informe o valor da Formação Lean, opção 1 (Workshop Lean Experience).');
+  if (!n(f.inv.formacao2)) e.push('Informe o valor da Formação Lean, opção 2 (Imersão Black Belt em Lean).');
   var cs = (f.contatos || []).filter(function(c) { return c && c.nome && c.nome.trim(); });
   if (!cs.length) e.push('Informe pelo menos 1 contato comercial (nome).');
   if (f.escopo && f.escopo.fase5) {
@@ -405,7 +409,7 @@ function psBuildPages(f, imgs) {
   // 11 workshop
   pg.ws = page(11, 'Workshop Lean Experience', '<div class="abs" style="left:385pt;right:75pt;top:150pt"><div style="font-size:15pt;font-weight:700;letter-spacing:.2em;text-transform:uppercase;color:var(--laranja)">A maior imersão em Lean Construction do Brasil</div>' +
     '<div style="font-size:19pt;line-height:1.4;margin-top:14pt;color:var(--corpo);max-width:860pt">Nivelamento Lean para até ' + part + ' participantes por workshop, com eventos e imersões realizados pela Agilean: base metodológica do SIIGA e alinhamento de linguagem do time.</div></div>' +
-    '<div class="abs" style="left:75pt;right:75pt;top:290pt;border-top:1.5pt solid var(--titulo);padding-top:12pt;display:flex;align-items:baseline;gap:22pt"><span class="lab d">Nivelamento Lean</span><span style="font-size:30pt;font-weight:700;color:var(--titulo)">Até <span style="color:var(--laranja)">' + part + '</span> participantes por workshop</span></div>' +
+    '<div class="abs" style="left:75pt;right:75pt;top:290pt;border-top:1.5pt solid var(--titulo);padding-top:12pt;display:flex;align-items:baseline;gap:22pt"><span class="lab d">Nivelamento Lean</span><span style="font-size:30pt;font-weight:700;color:var(--titulo)">Até <span style="color:var(--laranja)">' + part + '</span> participantes por workshop</span><span style="margin-left:auto;font-size:16pt;color:var(--mut)">Conduzido por Juliana Quinderé, COO Agilean</span></div>' +
     '<div class="abs" style="left:75pt;right:75pt;top:372pt;display:flex;gap:30pt"><img src="img/proposta/wr_eventos.jpg" style="width:630pt;height:352pt;object-fit:cover;display:block;border-radius:2pt" alt=""><img src="img/proposta/wr_imersao.jpg" style="width:630pt;height:352pt;object-fit:cover;display:block;border-radius:2pt" alt=""></div>');
 
   // 12 cronograma e visitas
@@ -431,7 +435,7 @@ function psBuildPages(f, imgs) {
 
   // 13 piloto e ativacao
   var crit = (f.piloto.criterios || []).filter(function(c) { return c && c.trim(); }).slice(0, 5);
-  var critTab = crit.length ? '<div class="lab d" style="margin:34pt 0 8pt">Critérios sugeridos para a escolha da obra-piloto</div><table><tbody>' + crit.map(function(c, i) { return '<tr><td style="width:50pt"><span class="nn p">' + psPad(i + 1) + '</span></td><td>' + esc(c) + '</td></tr>'; }).join('') + '</tbody></table>' : '';
+  var critTab = crit.length ? '<div class="lab d" style="margin:34pt 0 8pt">' + (crit.length === 1 ? 'Critério sugerido' : 'Critérios sugeridos') + ' para a escolha da obra-piloto</div><table><tbody>' + crit.map(function(c, i) { return crit.length === 1 ? '<tr><td>' + esc(c) + '</td></tr>' : '<tr><td style="width:50pt"><span class="nn p">' + psPad(i + 1) + '</span></td><td>' + esc(c) + '</td></tr>'; }).join('') + '</tbody></table>' : '';
   var f5tab = f5 ? '<tr><td><span class="nn p">Fase 5 · Ativação nas demais obras (opcional)</span></td><td>Processo e ritos do piloto aplicados com as equipes das demais obras, conduzidos ' + esc(psPor(f.piloto.quem)) + ' ou pela Agilean.</td><td class="m">Até ' + dF5 + ' dias no total</td></tr>' : '';
   var aside13 = '<div class="aside"><div class="blk"><div class="lab">Obra-piloto</div><div class="big" style="margin-top:6pt">1</div></div>' + (f5 ? '<div class="blk"><div class="lab">Fase 5 · opcional</div><div class="big" style="margin-top:6pt">+' + nF5 + '</div><div style="font-size:15pt;margin-top:2pt">obras opcionais, em até ' + dF5 + ' dias no total</div></div>' : '') + '</div>';
   pg.pil = page(13, 'Piloto e ativação por obra', '<div class="c rm"><table><thead><tr><th></th><th>Escopo</th><th>Prazo</th></tr></thead><tbody>' +
@@ -441,7 +445,8 @@ function psBuildPages(f, imgs) {
   // 14 investimento
   var kv = function(a, b) { return '<tr style="height:50pt"><td style="width:215pt;font-weight:600">' + a + '</td><td>' + b + '</td></tr>'; };
   var nP = inv.redesParcelas || 1;
-  var t1 = kv('Investimento total do Redesenho', '<b>' + psMoney(inv.redesenho) + '</b>') + kv('Pagamento', nP === 1 ? 'Parcela única' : nP + ' parcelas, pagas durante os 4 meses do escopo') + kv('Obra-piloto', 'Incluída no escopo, em 1 obra');
+  var t1 = kv('Investimento total do Redesenho', '<b>' + psMoney(inv.redesenho) + '</b>') + kv('Pagamento', nP === 1 ? 'Parcela única' : nP + ' parcelas, pagas durante os 4 meses do escopo') + kv('Obra-piloto', 'Incluída no escopo, em 1 obra') +
+    kv('Formação Lean<div style="font-size:15pt;font-weight:400;color:var(--mut);margin-top:2pt">Escolha uma opção</div>', '<div style="display:flex;justify-content:space-between;gap:8pt;font-size:16pt;white-space:nowrap"><span><span style="color:var(--mut)">Opção 1 ·</span> Workshop Lean Experience</span><b style="white-space:nowrap">' + psMoney(inv.formacao1) + '</b></div><div style="font-size:13pt;line-height:1.3;color:var(--mut);margin-top:2pt">Conduzido por Juliana Quinderé, COO Agilean</div><div style="display:flex;justify-content:space-between;gap:8pt;font-size:16pt;white-space:nowrap;margin-top:10pt"><span><span style="color:var(--mut)">Opção 2 ·</span> Imersão Black Belt em Lean</span><b style="white-space:nowrap">' + psMoney(inv.formacao2) + '</b></div><div style="font-size:13pt;line-height:1.3;color:var(--mut);margin-top:2pt">Conduzida por André Quinderé, CEO Agilean; Alexandre&nbsp;Mourão,<br>CEO CCR Engenharia; e Barros Neto, Prof. Dr. da UFC</div>');
   var colR = '<div style="flex:1"><div class="lab d" style="margin-bottom:4pt">Redesenho · escopo de consultoria</div><div style="font-size:15pt;margin-bottom:10pt">Pago pela empresa · Fase 0 e Pilares 1 a 4</div><table style="border-top:1.5pt solid var(--titulo)"><tbody>' + t1 + '</tbody></table></div>';
   var colA = '';
   if (f5) {
@@ -450,14 +455,14 @@ function psBuildPages(f, imgs) {
     var t2 = kv('Valor por obra', '<b>' + psMoney(inv.ativPorObra) + '</b>') + kv('Total das ' + nF5 + ' obras', '<b>' + psMoney(totA) + '</b>, ' + regraA) + kv('Contratação', 'Opcional, depois do Pilar 4; conduzida ' + esc(psPor(f.piloto.quem)) + ' ou pela Agilean');
     colA = '<div style="flex:1"><div class="lab d" style="margin-bottom:4pt">Ativação das demais ' + nF5 + ' obras · Fase 5 (opcional)</div><div style="font-size:15pt;margin-bottom:10pt">Pago pela empresa · ativação da metodologia, por obra</div><table style="border-top:1.5pt solid var(--titulo)"><tbody>' + t2 + '</tbody></table></div>';
   }
-  pg.inv = page(14, 'Investimento', '<div class="cw rm" style="display:flex;gap:44pt">' + colR + colA + '</div>' +
-    '<div class="cw" style="top:420pt;border-top:1.5pt solid var(--titulo);padding-top:12pt"><div class="lab d" style="margin-bottom:4pt">Agilean · mensalidade</div><div style="display:flex;gap:44pt;align-items:flex-start"><div style="flex:0 0 330pt"><div style="font-size:15pt;margin-bottom:4pt">Mensalidade Agilean</div><div style="font-size:34pt;font-weight:700;color:var(--laranja-prof);line-height:1.1">' + psMoney(inv.mensalidade) + '</div><div style="font-size:15pt;margin-top:2pt">por obra, por mês</div></div>' +
+  pg.inv = page(14, 'Investimento', '<div class="cw rm inv" style="display:flex;gap:44pt">' + colR + colA + '</div>' +
+    '<div class="cw" style="top:519pt;border-top:1.5pt solid var(--titulo);padding-top:12pt"><div class="lab d" style="margin-bottom:4pt">Agilean · mensalidade</div><div style="display:flex;gap:44pt;align-items:flex-start"><div style="flex:0 0 330pt"><div style="font-size:15pt;margin-bottom:4pt">Mensalidade Agilean</div><div style="font-size:34pt;font-weight:700;color:var(--laranja-prof);line-height:1.1">' + psMoney(inv.mensalidade) + '</div><div style="font-size:15pt;margin-top:2pt">por obra, por mês</div></div>' +
     '<div style="flex:1;font-size:16pt;line-height:1.4;color:var(--titulo)"><div style="margin-bottom:10pt"><b>Obra-piloto:</b> sem mensalidade durante os 4 meses do escopo. Depois, 30 dias de carência; a cobrança começa no 2º mês após o escopo.</div><div><b>Demais obras, se contratadas:</b> 30 dias de carência; a cobrança começa no 2º mês.</div></div></div></div>' +
-    '<div class="cw" style="top:640pt;border-top:1pt solid var(--fio);padding-top:12pt"><span class="lab d" style="margin-right:20pt">Validade</span><span style="font-size:17pt;font-weight:600;color:var(--titulo)">Proposta válida até ' + psDataBR(inv.validade) + '</span></div>' +
-    '<div class="cw" style="top:690pt;border-left:4pt solid var(--laranja);padding-left:16pt;font-size:17pt;font-weight:700;color:var(--titulo);line-height:1.35">Custos de deslocamento e hospedagem da equipe Agilean ficam a cargo ' + esc(E.da) + ' e não estão incluídos nesta proposta comercial.</div>');
+    '<div class="cw" style="top:652pt;border-top:1pt solid var(--fio);padding-top:12pt"><span class="lab d" style="margin-right:20pt">Validade</span><span style="font-size:17pt;font-weight:600;color:var(--titulo)">Proposta válida até ' + psDataBR(inv.validade) + '</span></div>' +
+    '<div class="cw" style="top:702pt;border-left:4pt solid var(--laranja);padding-left:16pt;font-size:17pt;font-weight:700;color:var(--titulo);line-height:1.35">Custos de deslocamento e hospedagem da equipe Agilean ficam a cargo ' + esc(E.da) + ' e não estão incluídos nesta proposta comercial.</div>');
 
   // 15 proximos passos
-  var passos15 = [['01', psCap(f.piloto.quem) + ' define a obra-piloto', 'Com base nos critérios da página 13.'], ['02', 'Aprofundamos o diagnóstico', 'Com todas as áreas de apoio na mesa.'], ['03', 'Kick-off da obra-piloto', 'Workshop Lean Experience.']];
+  var passos15 = [['01', psCap(f.piloto.quem) + ' define a obra-piloto', (crit.length === 1 ? 'Com base no critério da página 13.' : 'Com base nos critérios da página 13.')], ['02', 'Aprofundamos o diagnóstico', 'Com todas as áreas de apoio na mesa.'], ['03', 'Kick-off da obra-piloto', 'Workshop Lean Experience.']];
   var rows15 = passos15.map(function(p) { return '<tr><td style="width:60pt"><span class="nn p">' + p[0] + '</span></td><td style="width:380pt;font-weight:700;font-size:19pt">' + esc(p[1]) + '</td><td>' + p[2] + '</td></tr>'; }).join('');
   var cts = (f.contatos || []).filter(function(c) { return c && c.nome && c.nome.trim(); }).slice(0, 2);
   var ctHtml = cts.map(function(c, i) {
@@ -465,18 +470,24 @@ function psBuildPages(f, imgs) {
       (c.cargo ? '<div style="font-size:15pt;margin-top:2pt">' + esc(c.cargo) + '</div>' : '') + (c.email ? '<div style="font-size:15pt;margin-top:2pt">' + esc(c.email) + '</div>' : '') + (c.tel ? '<div style="font-size:15pt;margin-top:2pt">' + esc(c.tel) + '</div>' : '') + '</div>';
   }).join('');
   var reun = dataL ? '<div class="abs" style="left:75pt;top:524pt"><div class="lab">Reunião de apresentação</div><div style="font-size:19pt;font-weight:600;color:var(--titulo);margin-top:7pt">' + psDataBR(f.reuniao.data) + (horaL ? ', ' + horaL : '') + '</div></div>' : '';
-  pg.prox = page(15, 'Próximos passos', '<div class="cw rm"><table><thead><tr><th>#</th><th>Passo</th><th>Detalhe</th></tr></thead><tbody>' + rows15 + '</tbody></table>' +
+  var fac = [['fac_barros', 'Barros Neto', ['Professor da UFC', 'Líder do GERCON', 'Referência nacional em Lean Construction']],
+    ['fac_mourao', 'Alexandre Mourão', ['CEO CCR Engenharia', 'Comitê Inovacon-CE', 'Experiência prática em inovação, produção e sustentabilidade']],
+    ['fac_andre', 'André Quinderé', ['CEO Agilean', 'Atuação direta em canteiros, tecnologia, Lean e eficiência operacional']]];
+  var fach = fac.map(function(x) { return '<div style="flex:1;display:flex;flex-direction:column;align-items:center;text-align:center"><img src="img/proposta/' + x[0] + '.png" style="width:240pt;height:240pt;border-radius:50%;display:block;box-shadow:0 0 0 1pt var(--fio)" alt=""><div style="font-size:24pt;font-weight:700;color:var(--titulo);margin-top:26pt">' + x[1] + '</div>' + x[2].map(function(d) { return '<div style="font-size:17pt;line-height:1.35;color:var(--corpo);margin-top:6pt;max-width:330pt">' + d + '</div>'; }).join('') + '</div>'; }).join('');
+  pg.fac = page(15, 'Facilitadores da Imersão Black Belt', '<div class="abs" style="left:75pt;right:75pt;top:190pt;border-top:1.5pt solid var(--titulo);padding-top:44pt;display:flex;gap:40pt;align-items:flex-start">' + fach + '</div>');
+
+  pg.prox = page(16, 'Próximos passos', '<div class="cw rm"><table><thead><tr><th>#</th><th>Passo</th><th>Detalhe</th></tr></thead><tbody>' + rows15 + '</tbody></table>' +
     '<div style="margin-top:20pt;display:flex;gap:30pt;align-items:baseline;border-bottom:1pt solid var(--fio2);padding-bottom:16pt"><span class="lab d" style="width:130pt">Condição</span><span style="font-size:17pt;color:var(--titulo)">Confirmar a data do kick-off e receber o planejamento e o orçamento das obras contempladas.</span></div></div>' +
     '<div class="abs" style="left:75pt;right:75pt;top:500pt;height:1pt;background:var(--fio)"></div>' + reun + ctHtml);
 
   // 16 clientes parceiros
   var kph = PS_PARCEIROS_KP.map(function(k) { return '<div style="display:flex;align-items:baseline;gap:9pt"><span class="lab">Mais de</span><span style="font-size:27pt;font-weight:700;color:var(--laranja-prof)">' + k[0] + '</span><span style="font-size:14pt">' + k[1] + '</span></div>'; }).join('');
   var prh = PS_PREMIOS.map(function(p) { return '<div style="flex:1;display:flex;gap:10pt;align-items:center"><div style="flex:none;width:96pt;height:54pt;background:#18171C"><img src="img/proposta/' + p[0] + '.png" style="width:100%;height:100%;object-fit:contain" alt=""></div><div style="font-size:11.5pt;line-height:1.25;color:var(--titulo);font-weight:600">' + p[1] + '</div></div>'; }).join('');
-  pg.par = page(16, 'Clientes parceiros e resultados atingidos', '<div class="abs" style="left:75pt;top:150pt;width:1290pt;display:flex;gap:30pt;align-items:flex-start"><img src="' + (imgs.portA || 'img/proposta/portfolio_a.png') + '" style="width:630pt;display:block" alt=""><img src="' + (imgs.portB || 'img/proposta/portfolio_b.png') + '" style="width:630pt;display:block" alt=""></div>' +
+  pg.par = page(17, 'Clientes parceiros e resultados atingidos', '<div class="abs" style="left:75pt;top:150pt;width:1290pt;display:flex;gap:30pt;align-items:flex-start"><img src="' + (imgs.portA || 'img/proposta/portfolio_a.png') + '" style="width:630pt;display:block" alt=""><img src="' + (imgs.portB || 'img/proposta/portfolio_b.png') + '" style="width:630pt;display:block" alt=""></div>' +
     '<div class="abs" style="left:75pt;right:75pt;top:528pt;border-top:1.5pt solid var(--titulo);padding-top:12pt;display:flex;justify-content:space-between;align-items:baseline">' + kph + '</div>' +
     '<div class="abs" style="left:75pt;right:75pt;top:610pt;border-top:1pt solid var(--fio);padding-top:16pt;display:flex;gap:16pt">' + prh + '</div>');
 
-  var order = ['capa', 'met', 'res', 'falhas', 'perda', 'obj', 'dim', 'incl', 'est', 'ent', 'ws', 'cron', 'pil', 'inv', 'prox', 'par'];
+  var order = ['capa', 'met', 'res', 'falhas', 'perda', 'obj', 'dim', 'incl', 'est', 'ent', 'ws', 'cron', 'pil', 'inv', 'fac', 'prox', 'par'];
   var html = order.map(function(k) { return pg[k]; });
   if (html.length !== PS_TOTAL) throw new Error('Proposta: número de páginas diferente de ' + PS_TOTAL);
   return { pages: html, model: M };
@@ -801,7 +812,7 @@ function psPromptCopiavel(M, f) {
     '3. No máximo ' + PS_MAX_FALAS + ' falas. Cada uma ligada a um alvo: "obj:<id do objetivo>", "ent:<id do entregável>" ou "falha:<código do ponto crítico>".\n' +
     '4. Escolha exatamente 4 objetivos da biblioteca, priorizando os pontos críticos do diagnóstico e o que o cliente pediu.\n' +
     '5. Se o nome padrão de um objetivo escolhido puder ser adaptado ao caso do cliente, proponha em "objetivos_nomes" um nome na linguagem do método (curto, institucional, sem gíria). NUNCA copie a fala do cliente nem use palavras dele entre aspas como nome. Se não houver adaptação melhor, omita.\n' +
-    '6. Critérios de escolha da obra-piloto: só os que o cliente mencionou (até 3), em frases curtas. Se não houver, devolva lista vazia.\n' +
+    '6. Critérios de escolha da obra-piloto: o critério padrão da proposta é "Obra em estágio não tão avançado (até 20% de execução)". Sugira só critérios ADICIONAIS que o cliente mencionou (até 2), em frases curtas. Se não houver, devolva lista vazia.\n' +
     '7. Cada fala é SÓ a frase literal entre aspas: sem nome, sem cargo e sem atribuição. O campo "decisor" é opcional e serve apenas para eu conferir quem é o falante; se não estiver claro, devolva vazio.\n\n' +
     'CONTEXTO DO DIAGNÓSTICO\nCliente: ' + M.empresa + '\n' + (dec ? 'Decisor informado pelo vendedor: ' + dec + '\n' : '') + '\nPILARES (pilar | nome | pontuação)\n' + pil + '\n\nPONTOS CRÍTICOS (código | nº | falha | pilar)\n' + pts + '\n\n' +
     'BIBLIOTECA\nOBJETIVOS (id | nome)\n' + objs + '\n\nENTREGÁVEIS (id | nome)\n' + ents + '\n\n' +
@@ -920,11 +931,11 @@ function openPropostaSiiga() {
       return '<div class="fala"><textarea class="pf" rows="2" data-st="' + i + '">' + psEsc(x.texto) + '</textarea><div class="nota">' + (nf ? '<span class="bad">não encontrada na transcrição</span>' : '<span class="ok">conferida com a transcrição</span>') + '</div><div style="display:flex;gap:8px;margin-top:6px;align-items:center"><select class="pf" style="flex:1" data-sa="' + i + '">' + optsAlvo(x.alvo) + '</select><button class="btn2" data-sacc="' + i + '">' + (nf ? 'Aceitar mesmo assim' : 'Aceitar') + '</button><button class="btn2" data-sdel="' + i + '">Descartar</button></div></div>';
     }).join('');
     if (sug.objetivos.length) h += '<div class="fala"><div class="nota">Objetivos sugeridos</div><div>' + sug.objetivos.map(function(id) { var b = psObjBiblioteca(id), ad = sug.nomes && sug.nomes[id]; return psEsc(b.nome) + (ad ? ' <span class="ok">→ nome sugerido: ' + psEsc(ad) + '</span>' : ''); }).join('<br>') + '</div><button class="btn2" id="sg-obj" style="margin-top:6px">Usar estes objetivos (você pode editar o nome e o texto depois)</button></div>';
-    if (sug.criterios.length) h += '<div class="fala"><div class="nota">Critérios da obra-piloto</div><div>' + sug.criterios.map(psEsc).join(' · ') + '</div><button class="btn2" id="sg-crit" style="margin-top:6px">Usar estes critérios</button></div>';
+    if (sug.criterios.length) h += '<div class="fala"><div class="nota">Critérios adicionais da obra-piloto (somam ao critério padrão)</div><div>' + sug.criterios.map(psEsc).join(' · ') + '</div><button class="btn2" id="sg-crit" style="margin-top:6px">Adicionar estes critérios</button></div>';
     c.innerHTML = h;
     var d = c.querySelector('#sg-dec'); if (d) d.addEventListener('click', function() { w.decisor = { nome: sug.decisor.nome, cargo: sug.decisor.cargo }; $('pm-decn').value = w.decisor.nome; $('pm-decc').value = w.decisor.cargo; });
     var o = c.querySelector('#sg-obj'); if (o) o.addEventListener('click', function() { w.objetivos = sug.objetivos.map(function(id) { var b = psObjDeId(id, psNomeCurtoFmt(w.nomeCurto)); if (sug.nomes && sug.nomes[id]) b.nome = sug.nomes[id]; return b; }); renderObj(); renderFalas(); });
-    var k = c.querySelector('#sg-crit'); if (k) k.addEventListener('click', function() { w.piloto.criterios = sug.criterios.slice(); renderCrit(); });
+    var k = c.querySelector('#sg-crit'); if (k) k.addEventListener('click', function() { sug.criterios.forEach(function(x) { if (w.piloto.criterios.indexOf(x) < 0) w.piloto.criterios.push(x); }); w.piloto.criterios = w.piloto.criterios.filter(Boolean).slice(0, 5); renderCrit(); });
     c.querySelectorAll('[data-st]').forEach(function(el) { el.addEventListener('input', function() { var x = sug.falas[+el.dataset.st]; x.texto = el.value; x.verif = psFalaConfere(x.texto, w.transcricao.texto) ? 'ok' : 'nao_encontrada'; }); el.addEventListener('change', renderSug); });
     c.querySelectorAll('[data-sa]').forEach(function(el) { el.addEventListener('change', function() { sug.falas[+el.dataset.sa].alvo = el.value; }); });
     c.querySelectorAll('[data-sdel]').forEach(function(el) { el.addEventListener('click', function() { sug.falas.splice(+el.dataset.sdel, 1); renderSug(); }); });
@@ -954,8 +965,10 @@ function openPropostaSiiga() {
   }
   function renderCrit() {
     var c = $('pm-crit'); if (!c) return;
-    c.innerHTML = [0, 1, 2].map(function(i) { return '<div style="margin-bottom:6px"><input class="pf" data-cr="' + i + '" value="' + psEsc(w.piloto.criterios[i] || '') + '" placeholder="Critério ' + psPad(i + 1) + ' (opcional)"></div>'; }).join('');
+    c.innerHTML = w.piloto.criterios.map(function(v, i) { return '<div style="display:flex;gap:6px;margin-bottom:6px"><input class="pf" data-cr="' + i + '" value="' + psEsc(v || '') + '" placeholder="Critério ' + psPad(i + 1) + '"><button class="btn2" data-crd="' + i + '">Remover</button></div>'; }).join('') + (w.piloto.criterios.length < 5 ? '<button class="btn2" id="pm-addcr">+ Adicionar critério</button>' : '');
     c.querySelectorAll('[data-cr]').forEach(function(el) { el.addEventListener('input', function() { w.piloto.criterios[+el.dataset.cr] = el.value; }); });
+    c.querySelectorAll('[data-crd]').forEach(function(el) { el.addEventListener('click', function() { w.piloto.criterios.splice(+el.dataset.crd, 1); renderCrit(); }); });
+    var ac = c.querySelector('#pm-addcr'); if (ac) ac.addEventListener('click', function() { w.piloto.criterios.push(''); renderCrit(); });
   }
   function renderContatos() {
     var c = $('pm-cts'); if (!c) return;
@@ -998,6 +1011,7 @@ function openPropostaSiiga() {
     '<div class="g2"><div><label class="l">Redesenho · valor total (R$) *</label><input class="pf" id="pm-red" value="' + fmtIn(w.inv.redesenho) + '"></div><div><label class="l">Redesenho · nº de parcelas</label><input class="pf" id="pm-redp" type="number" min="1" value="' + w.inv.redesParcelas + '"></div></div>' +
     '<div style="margin-bottom:12px"><label class="l">Mensalidade Agilean por obra, por mês (R$) *</label><input class="pf" id="pm-mens" value="' + fmtIn(w.inv.mensalidade) + '"><div class="nota" id="pm-sugmens"></div></div>' +
     '<div class="g2"><div><label class="l">Ativação (Fase 5) · valor por obra (R$)</label><input class="pf" id="pm-ativ" value="' + fmtIn(w.inv.ativPorObra) + '"></div><div><label class="l">Ativação · nº de parcelas (1 por obra entregue)</label><input class="pf" id="pm-ativp" type="number" min="1" placeholder="= nº de obras" value="' + (w.inv.ativParcelas || '') + '"></div></div>' +
+    '<div class="g2"><div><label class="l">Formação Lean · Opção 1 · Workshop Lean Experience (R$) *</label><input class="pf" id="pm-fm1" value="' + fmtIn(w.inv.formacao1) + '"><div class="nota">Conduzido por Juliana Quinderé, COO Agilean</div></div><div><label class="l">Formação Lean · Opção 2 · Imersão Black Belt em Lean (R$) *</label><input class="pf" id="pm-fm2" value="' + fmtIn(w.inv.formacao2) + '"><div class="nota">Conduzida por André Quinderé, Alexandre Mourão e Barros Neto</div></div></div>' +
     '<div style="max-width:240px"><label class="l">Validade da proposta *</label><input class="pf" id="pm-val" type="date" value="' + (w.inv.validade || '') + '"></div>' +
     '<div class="nota">Regras fixas no documento: obra-piloto sem mensalidade durante o escopo, 30 dias de carência e cobrança a partir do 2º mês após o escopo; demais obras com 30 dias de carência; deslocamento e hospedagem por conta do cliente.</div>' +
 
@@ -1042,7 +1056,7 @@ function openPropostaSiiga() {
   $('pm-addfala').addEventListener('click', function() { if (w.falas.length < PS_MAX_FALAS) { w.falas.push({ texto: '', alvo: '', origem: 'manual', verif: 'manual', confirmada: true }); renderFalas(); } });
   [['pm-f0', 'fase0Dias'], ['pm-part', 'participantes'], ['pm-vis', 'visitas'], ['pm-f5o', 'fase5Obras'], ['pm-f5d', 'fase5Dias']].forEach(function(p) { $(p[0]).addEventListener('input', function() { var v = parseInt(this.value, 10); w.escopo[p[1]] = v > 0 ? v : 0; }); });
   $('pm-f5').addEventListener('change', function() { w.escopo.fase5 = this.checked; });
-  [['pm-red', 'redesenho'], ['pm-mens', 'mensalidade'], ['pm-ativ', 'ativPorObra']].forEach(function(p) { $(p[0]).addEventListener('input', function() { var v = psParseMoney(this.value); w.inv[p[1]] = isNaN(v) ? '' : v; }); });
+  [['pm-red', 'redesenho'], ['pm-mens', 'mensalidade'], ['pm-ativ', 'ativPorObra'], ['pm-fm1', 'formacao1'], ['pm-fm2', 'formacao2']].forEach(function(p) { $(p[0]).addEventListener('input', function() { var v = psParseMoney(this.value); w.inv[p[1]] = isNaN(v) ? '' : v; }); });
   $('pm-redp').addEventListener('input', function() { var v = parseInt(this.value, 10); w.inv.redesParcelas = v > 0 ? v : 0; });
   $('pm-ativp').addEventListener('input', function() { var v = parseInt(this.value, 10); w.inv.ativParcelas = v > 0 ? v : ''; });
   $('pm-val').addEventListener('input', function() { w.inv.validade = this.value; });
