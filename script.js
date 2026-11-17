@@ -5495,7 +5495,7 @@ async function checkAdminPdfRequest() {
   if(!id) return false;
   // pdf_mode: 'resumido' ou 'detalhado' (default), passado pelo admin (admin.js) —
   // mesma distinção Resumido/Detalhado disponível no fluxo normal do diagnóstico.
-  // 'proposta' gera o PDF da Proposta (proposta-prancha.js) a partir do mesmo registro.
+  // 'proposta' abre o formulario da Proposta SIIGA (proposta-siiga.js) com o registro carregado.
   var modeParam = params.get('pdf_mode');
   var pdfMode = modeParam === 'resumido' ? 'resumido' : (modeParam === 'proposta' ? 'proposta' : 'detalhado');
   if(!sbClient) { alert('Não foi possível conectar ao Supabase para carregar o diagnóstico.'); return true; }
@@ -5504,7 +5504,10 @@ async function checkAdminPdfRequest() {
     if(result.error || !result.data) { alert('Diagnóstico não encontrado (id ' + id + ').'); return true; }
     S = result.data.state;
     if(!S.ferramentas) S.ferramentas = {planejamento:'',medicao:'',qualidade:'',contratos:'',folha:''};
-    if(pdfMode === 'proposta') generateProposta('detalhado');
+    if(pdfMode === 'proposta') {
+      // abre o mesmo formulario do botao do resultado, preenchido com o S.proposta salvo (proposta-siiga.js carrega depois deste script)
+      if(typeof openPropostaSiiga === 'function') openPropostaSiiga(); else window.addEventListener('load', function(){ openPropostaSiiga(); });
+    }
     else generatePDF(true, null, pdfMode);
   } catch(err) {
     alert('Erro ao carregar diagnóstico: ' + err.message);

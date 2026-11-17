@@ -447,7 +447,7 @@ function renderTable() {
           '<a onclick="handleAction(\'view\', ' + index + ')">📄 Detalhes</a>' +
           '<a onclick="handleAction(\'pdf-resumido\', ' + index + ')">🖨️ Gerar PDF Resumido</a>' +
           '<a onclick="handleAction(\'pdf-detalhado\', ' + index + ')">🖥️ Gerar PDF Detalhado</a>' +
-          '<a onclick="handleAction(\'pdf-proposta\', ' + index + ')">📑 Gerar Proposta</a>' +
+          '<a onclick="handleAction(\'pdf-proposta\', ' + index + ')">📑 Gerar Proposta SIIGA</a>' +
           '<a onclick="handleAction(\'export-questions\', ' + index + ')">📥 Exportar Perguntas (CSV)</a>' +
           '<a onclick="handleAction(\'edit\', ' + index + ')">✏️ Editar</a>' +
           '<a onclick="handleAction(\'delete\', ' + index + ')" style="color:var(--red);">🗑️ Excluir</a>' +
