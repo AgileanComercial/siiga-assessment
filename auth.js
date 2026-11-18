@@ -20,13 +20,19 @@ var SiigaAuth = (function () {
     if (!client || !session) return;
     try {
       var r = await client.from('perfis').select('user_id,nome,papel,ativo').eq('user_id', session.user.id).maybeSingle();
-      if (!r.error && r.data && r.data.ativo !== false) profile = r.data;
+      if (!r.error && r.data) profile = r.data;
     } catch (e) { /* tabela ainda não existe: segue sem perfil */ }
   }
 
   async function setSession(s) {
     session = s || null;
     await loadProfile();
+    // perfil desativado por um admin: derruba a sessão e avisa (a RLS já corta o acesso via is_ativo())
+    if (session && profile && profile.ativo === false) {
+      try { if (client) await client.auth.signOut(); } catch (e) {}
+      session = null; profile = null;
+      siigaMostrarAcessoDesativado();
+    }
     notify();
   }
 
@@ -73,7 +79,8 @@ var SiigaAuth = (function () {
     email: function () { return session ? session.user.email : ''; },
     nome: function () { return profile && profile.nome ? profile.nome : ''; },
     papel: function () { return profile ? profile.papel : null; },
-    isAdmin: function () { return !!profile && profile.papel === 'admin'; },
+    isAdmin: function () { return !!profile && profile.papel === 'admin' && profile.ativo !== false; },
+    token: function () { return session && session.access_token ? session.access_token : null; },
     // vendedor edita só o que é dele; registro sem dono (os antigos) só o admin edita
     podeEditar: function (row) {
       if (api.isAdmin()) return true;
@@ -240,4 +247,21 @@ function siigaAbrirDefinirSenha(tipo) {
   document.getElementById('siiga-senha-titulo').textContent = tipo === 'recovery' ? 'Crie uma nova senha' : 'Defina sua senha';
   ov.style.display = 'flex';
   setTimeout(function () { var i = document.getElementById('siiga-senha-nova'); if (i) i.focus(); }, 50);
+}
+
+// Tela de bloqueio para quem foi desativado por um administrador.
+function siigaMostrarAcessoDesativado() {
+  var ov = document.getElementById('siiga-desativado');
+  if (!ov) {
+    ov = document.createElement('div');
+    ov.id = 'siiga-desativado';
+    ov.style.cssText = 'position:fixed;inset:0;background:#0d0d12;z-index:9900;display:flex;align-items:center;justify-content:center;font-family:inherit';
+    ov.innerHTML = '<div style="background:#14141b;border:1px solid rgba(255,255,255,0.12);border-radius:12px;padding:32px;width:min(92vw,420px);color:#fff;text-align:center">' +
+      '<h3 style="margin:0 0 8px;font-size:20px">Acesso desativado</h3>' +
+      '<p style="margin:0 0 18px;font-size:13px;color:#9a9aa8">Sua conta foi desativada. Fale com um administrador do SIIGA para voltar a entrar.</p>' +
+      '<button type="button" id="siiga-desativado-ok" style="padding:9px 18px;border-radius:8px;border:none;background:#ff5f1f;color:#fff;font-weight:700;cursor:pointer">Entendi</button></div>';
+    document.body.appendChild(ov);
+    document.getElementById('siiga-desativado-ok').onclick = function () { location.href = location.pathname; };
+  }
+  ov.style.display = 'flex';
 }

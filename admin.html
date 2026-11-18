@@ -510,6 +510,7 @@
   <nav class="tabs">
     <button class="tab-btn active" id="tabbtn-diagnosticos" onclick="showTab('diagnosticos')">Diagnósticos</button>
     <button class="tab-btn" id="tabbtn-agendamentos" onclick="showTab('agendamentos')">Agendamentos</button>
+    <button class="tab-btn" id="tabbtn-usuarios" onclick="showTab('usuarios')" style="display:none">Usuários</button>
   </nav>
 
   <main>
@@ -691,6 +692,37 @@
       </table>
     </div>
    </section>
+
+   <section id="tab-usuarios" style="display:none">
+    <div id="us-aviso"></div>
+    <div class="ag-card">
+      <h2>Usuários</h2>
+      <p style="color: var(--gray); font-size: 13px; margin-bottom: 14px;">Quem pode entrar no SIIGA. Adicionar envia um convite por e-mail. Desativar corta o acesso sem apagar os diagnósticos da pessoa.</p>
+      <div style="display:flex; gap:10px; margin-bottom:14px; flex-wrap:wrap;">
+        <button class="btn btn-sm" id="us-btn-add" onclick="usAbrirForm()">＋ Adicionar usuário</button>
+        <button class="btn btn-sm" onclick="usCarregar()" style="background: var(--surface2); border: 1px solid var(--border);">⟳ Atualizar</button>
+      </div>
+      <div id="us-form" style="display:none; margin-bottom:18px; padding:16px; border:1px solid var(--border); border-radius:10px;">
+        <div style="display:grid; grid-template-columns:repeat(auto-fit,minmax(200px,1fr)); gap:10px; margin-bottom:12px;">
+          <input type="text" id="us-nome" class="input-pass" placeholder="Nome" maxlength="100" autocomplete="off">
+          <input type="email" id="us-email" class="input-pass" placeholder="E-mail" autocomplete="off">
+          <select id="us-papel" class="input-pass"><option value="vendedor">Vendedor</option><option value="admin">Administrador</option></select>
+        </div>
+        <div id="us-erro" style="display:none; color:#f87171; font-size:13px; margin-bottom:10px;"></div>
+        <div style="display:flex; gap:10px; flex-wrap:wrap;">
+          <button class="btn btn-sm" id="us-btn-enviar" onclick="usConvidar()">Enviar convite</button>
+          <button class="btn btn-sm" id="us-btn-reenviar" onclick="usReenviar(document.getElementById('us-email').value)" style="display:none; background: var(--surface2); border: 1px solid var(--border);">Reenviar convite</button>
+          <button class="btn btn-sm" onclick="usFecharForm()" style="background: var(--surface2); border: 1px solid var(--border);">Cancelar</button>
+        </div>
+      </div>
+      <div class="table-container">
+        <table>
+          <thead><tr><th>Nome</th><th>E-mail</th><th>Papel</th><th>Status</th><th>Criado em</th><th>Ações</th></tr></thead>
+          <tbody id="us-body"></tbody>
+        </table>
+      </div>
+    </div>
+   </section>
   </main>
 
   <!-- Slide-over Detalhes -->
@@ -844,7 +876,7 @@
   </div>
 
   <script src="material-previo.js?v=3"></script>
-  <script src="auth.js?v=2"></script>
-  <script src="admin.js?v=9"></script>
+  <script src="auth.js?v=3"></script>
+  <script src="admin.js?v=10"></script>
 </body>
 </html>

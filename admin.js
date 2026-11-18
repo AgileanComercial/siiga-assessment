@@ -46,6 +46,10 @@ function aplicarSessao() {
     var b = document.getElementById(id);
     if (b) b.style.display = SiigaAuth.isAdmin() ? '' : 'none';
   });
+  // aba Usuários: só para admin
+  var tbUs = document.getElementById('tabbtn-usuarios');
+  if (tbUs) tbUs.style.display = SiigaAuth.isAdmin() ? '' : 'none';
+  if (!SiigaAuth.isAdmin() && document.getElementById('tab-usuarios').style.display !== 'none') showTab('diagnosticos');
   if (logado && !adminDadosCarregados) { adminDadosCarregados = true; fetchData(); }
   else if (!logado) { adminDadosCarregados = false; allData = []; filteredData = []; var tb = document.getElementById('table-body'); if (tb) tb.innerHTML = ''; }
   else if (allData.length) { applyFilters(); }
@@ -1628,7 +1632,8 @@ async function deleteRow(id, name) {
 // ═══════════════════════════════════════════
 var agCarregado = false;
 function showTab(nome) {
-  ['diagnosticos', 'agendamentos'].forEach(function (t) {
+  if (nome === 'usuarios' && !SiigaAuth.isAdmin()) nome = 'diagnosticos';
+  ['diagnosticos', 'agendamentos', 'usuarios'].forEach(function (t) {
     document.getElementById('tab-' + t).style.display = t === nome ? '' : 'none';
     document.getElementById('tabbtn-' + t).classList.toggle('active', t === nome);
   });
@@ -1636,6 +1641,7 @@ function showTab(nome) {
     b.style.display = nome === 'diagnosticos' ? '' : 'none';
   });
   if (nome === 'agendamentos' && !agCarregado) { agCarregado = true; initAgendamentos(); }
+  if (nome === 'usuarios') usCarregar();
 }
 
 // ═══════════════════════════════════════════
@@ -2135,4 +2141,161 @@ async function salvarModelos() {
     else erro('Não foi possível salvar: ' + (err.message || err));
   }
   btn.disabled = false; btn.style.opacity = '';
+}
+
+
+// ═══════════════════════════════════════
+//  ABA USUÁRIOS (só admin)
+//  - Adicionar: POST /api/usuarios (função serverless com a service role; o navegador só manda o JWT do admin).
+//  - Desativar/Reativar/Trocar papel: UPDATE direto em `perfis` (policy perfis_admin_update).
+//  - "Remover" = desativar (ativo=false): o auth user fica, para preservar o owner_id dos diagnósticos.
+// ═══════════════════════════════════════
+var usDados = [];
+
+function usAviso(msg, erro) {
+  var box = document.getElementById('us-aviso');
+  box.innerHTML = '';
+  if (!msg) return;
+  var d = document.createElement('div');
+  d.className = 'ag-aviso';
+  d.style.color = erro ? '#f87171' : '#34d399';
+  d.textContent = msg;
+  box.appendChild(d);
+}
+
+async function usCarregar() {
+  if (!SiigaAuth.isAdmin() || !supabaseClient) return;
+  var r = await supabaseClient.from('perfis').select('*').order('created_at', { ascending: true });
+  if (r.error) { usAviso('Não foi possível carregar os usuários: ' + r.error.message, true); return; }
+  usDados = r.data || [];
+  usRender();
+}
+
+function usCelula(tr, texto) {
+  var td = document.createElement('td');
+  td.textContent = texto;
+  tr.appendChild(td);
+  return td;
+}
+
+function usBotao(texto, fn, perigo, desabilitado, dica) {
+  var b = document.createElement('button');
+  b.className = 'btn btn-sm';
+  b.textContent = texto;
+  b.style.marginRight = '6px';
+  b.style.background = perigo ? 'rgba(248,113,113,0.15)' : 'var(--surface2)';
+  b.style.border = '1px solid var(--border)';
+  if (perigo) b.style.color = '#f87171';
+  if (desabilitado) { b.disabled = true; b.style.opacity = '0.4'; b.style.cursor = 'not-allowed'; if (dica) b.title = dica; }
+  else b.onclick = fn;
+  return b;
+}
+
+function usRender() {
+  var tb = document.getElementById('us-body');
+  tb.innerHTML = '';
+  var eu = SiigaAuth.userId();
+  usDados.forEach(function (u) {
+    var tr = document.createElement('tr');
+    var souEu = u.user_id === eu;
+    usCelula(tr, (u.nome || '—') + (souEu ? ' (você)' : ''));
+    usCelula(tr, u.email || '—');
+    usCelula(tr, u.papel === 'admin' ? 'Administrador' : 'Vendedor');
+    var st = usCelula(tr, u.ativo ? 'Ativo' : 'Inativo');
+    st.style.color = u.ativo ? '#34d399' : '#f87171';
+    usCelula(tr, u.created_at ? new Date(u.created_at).toLocaleDateString('pt-BR') : '—');
+    var ac = document.createElement('td');
+    var dicaEu = 'Você não pode alterar a si mesmo.';
+    ac.appendChild(usBotao(u.ativo ? 'Desativar' : 'Reativar', function () { usSetAtivo(u.user_id, !u.ativo); }, u.ativo, souEu, dicaEu));
+    ac.appendChild(usBotao(u.papel === 'admin' ? 'Tornar vendedor' : 'Tornar admin', function () { usTrocarPapel(u.user_id, u.papel === 'admin' ? 'vendedor' : 'admin'); }, false, souEu, dicaEu));
+    if (u.email) ac.appendChild(usBotao('Reenviar convite', function () { usReenviar(u.email); }, false, !u.ativo, 'Usuário inativo'));
+    tr.appendChild(ac);
+    tb.appendChild(tr);
+  });
+  if (!usDados.length) { var tr0 = document.createElement('tr'); var td0 = usCelula(tr0, 'Nenhum usuário cadastrado.'); td0.colSpan = 6; tb.appendChild(tr0); }
+}
+
+async function usAtualizarPerfil(id, campos, okMsg) {
+  if (!SiigaAuth.isAdmin()) { usAviso('Só administradores podem alterar usuários.', true); return; }
+  if (id === SiigaAuth.userId()) { usAviso('Você não pode desativar nem rebaixar a si mesmo.', true); return; }
+  usAviso('');
+  var r = await supabaseClient.from('perfis').update(campos).eq('user_id', id).select();
+  if (r.error) { usAviso('Não foi possível alterar: ' + r.error.message, true); return; }
+  if (!r.data || !r.data.length) { usAviso('Nada foi alterado (sem permissão ou usuário não encontrado).', true); return; }
+  usAviso(okMsg, false);
+  usCarregar();
+}
+
+function usSetAtivo(id, ativo) {
+  var u = usDados.find(function (x) { return x.user_id === id; });
+  var nome = u ? u.nome : 'este usuário';
+  if (!ativo && !confirm('Desativar ' + nome + '? Ele perde o acesso na hora; os diagnósticos dele continuam no painel.')) return;
+  usAtualizarPerfil(id, { ativo: ativo }, ativo ? nome + ' reativado.' : nome + ' desativado.');
+}
+
+function usTrocarPapel(id, papel) {
+  var u = usDados.find(function (x) { return x.user_id === id; });
+  var nome = u ? u.nome : 'este usuário';
+  if (!confirm('Tornar ' + nome + ' ' + (papel === 'admin' ? 'administrador' : 'vendedor') + '?')) return;
+  usAtualizarPerfil(id, { papel: papel }, nome + ' agora é ' + (papel === 'admin' ? 'administrador' : 'vendedor') + '.');
+}
+
+function usAbrirForm() {
+  document.getElementById('us-form').style.display = '';
+  document.getElementById('us-nome').value = '';
+  document.getElementById('us-email').value = '';
+  document.getElementById('us-papel').value = 'vendedor';
+  usErroForm('');
+  document.getElementById('us-nome').focus();
+}
+function usFecharForm() { document.getElementById('us-form').style.display = 'none'; }
+
+function usErroForm(msg, mostrarReenvio) {
+  var e = document.getElementById('us-erro');
+  e.textContent = msg || '';
+  e.style.display = msg ? '' : 'none';
+  document.getElementById('us-btn-reenviar').style.display = mostrarReenvio ? '' : 'none';
+}
+
+async function usChamarApi(corpo) {
+  var token = SiigaAuth.token();
+  if (!token) return { ok: false, erro: 'sem_token', mensagem: 'Entre novamente.' };
+  try {
+    var r = await fetch('/api/usuarios', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', Authorization: 'Bearer ' + token },
+      body: JSON.stringify(Object.assign({ redirectTo: location.origin }, corpo))
+    });
+    var d = await r.json().catch(function () { return null; });
+    return d || { ok: false, erro: 'resposta', mensagem: 'Resposta inesperada do servidor (HTTP ' + r.status + ').' };
+  } catch (e) {
+    return { ok: false, erro: 'rede', mensagem: 'Sem conexão com o servidor.' };
+  }
+}
+
+async function usConvidar() {
+  var nome = document.getElementById('us-nome').value.trim();
+  var email = document.getElementById('us-email').value.trim();
+  var papel = document.getElementById('us-papel').value;
+  usErroForm('');
+  if (!nome) { usErroForm('Informe o nome.'); return; }
+  if (!email) { usErroForm('Informe o e-mail.'); return; }
+  var btn = document.getElementById('us-btn-enviar');
+  btn.disabled = true;
+  var r = await usChamarApi({ acao: 'convidar', nome: nome, email: email, papel: papel });
+  btn.disabled = false;
+  if (!r.ok) { usErroForm(r.mensagem || 'Não foi possível enviar o convite.', r.erro === 'email_existe'); return; }
+  usFecharForm();
+  usAviso(r.mensagem || ('Convite enviado para ' + email + '. A pessoa define a senha pelo link do e-mail.'), false);
+  usCarregar();
+}
+
+async function usReenviar(email) {
+  email = String(email || '').trim();
+  if (!email) { usErroForm('Informe o e-mail.'); return; }
+  var r = await usChamarApi({ acao: 'reenviar', email: email });
+  if (!r.ok) { usErroForm(r.mensagem || 'Não foi possível reenviar.', false); usAviso(r.mensagem || 'Não foi possível reenviar.', true); return; }
+  usErroForm('');
+  usFecharForm();
+  usAviso('Acesso reenviado para ' + email + (r.via === 'recuperacao' ? ' (e-mail para criar nova senha).' : ' (convite).'), false);
 }
