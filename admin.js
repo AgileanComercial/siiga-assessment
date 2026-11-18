@@ -14,19 +14,44 @@ let currentDetailRow = null;
 // ═══════════════════════════════════════════
 //  LOGIN
 // ═══════════════════════════════════════════
-document.getElementById('pass-input').addEventListener('keypress', function (e) {
-  if (e.key === 'Enter') checkLogin();
+['login-email', 'pass-input'].forEach(function (id) {
+  document.getElementById(id).addEventListener('keypress', function (e) {
+    if (e.key === 'Enter') checkLogin();
+  });
 });
 
-function checkLogin() {
-  const pass = document.getElementById('pass-input').value;
-  if (pass === '@Agilean2026') {
-    document.getElementById('login-overlay').style.display = 'none';
-    fetchData();
-  } else {
-    document.getElementById('login-error').style.display = 'block';
+// Login real (Supabase Auth, e-mail + senha por convite). Não existe mais senha fixa no código.
+async function checkLogin() {
+  var erro = document.getElementById('login-error');
+  erro.style.display = 'none';
+  try {
+    await SiigaAuth.entrar(document.getElementById('login-email').value, document.getElementById('pass-input').value);
+    document.getElementById('pass-input').value = '';
+  } catch (e) {
+    erro.textContent = e.message;
+    erro.style.display = 'block';
   }
 }
+
+var adminDadosCarregados = false;
+function aplicarSessao() {
+  var logado = SiigaAuth.logado();
+  document.getElementById('login-overlay').style.display = logado ? 'none' : 'flex';
+  var quem = document.getElementById('auth-quem');
+  if (quem) quem.textContent = logado ? (SiigaAuth.nome() || SiigaAuth.email()) + (SiigaAuth.isAdmin() ? ' (admin)' : '') : '';
+  var sair = document.getElementById('btn-sair');
+  if (sair) sair.style.display = logado ? '' : 'none';
+  // exclusão e registros de teste: só admin (quem garante é a RLS; aqui é só para não oferecer o botão)
+  ['btn-test', 'btn-delete-selected'].forEach(function (id) {
+    var b = document.getElementById(id);
+    if (b) b.style.display = SiigaAuth.isAdmin() ? '' : 'none';
+  });
+  if (logado && !adminDadosCarregados) { adminDadosCarregados = true; fetchData(); }
+  else if (!logado) { adminDadosCarregados = false; allData = []; filteredData = []; var tb = document.getElementById('table-body'); if (tb) tb.innerHTML = ''; }
+  else if (allData.length) { applyFilters(); }
+}
+SiigaAuth.init(supabaseClient);
+SiigaAuth.onChange(aplicarSessao);
 
 // ═══════════════════════════════════════════
 //  LEAD SCORING
@@ -247,7 +272,7 @@ function getLocalDiagnosticos() {
 
 // Mesmo mapeamento local -> colunas usado pelo script.js. Mantenha os dois iguais.
 function localToRow(rec) {
-  return {
+  return Object.assign({
     id: rec.id,
     nome: rec.nome,
     empresa: rec.empresa,
@@ -266,7 +291,7 @@ function localToRow(rec) {
     nivel: rec.nivel,
     scores: rec.scores,
     state: rec.state
-  };
+  }, SiigaAuth.donoDe(rec));
 }
 
 function getPendingLocal() {
@@ -312,7 +337,7 @@ async function resendLocal(id) {
   if (!rec) return;
   // upsert para ser seguro de repetir: se já estiver lá, atualiza em vez de
   // estourar erro de chave duplicada.
-  var res = await supabaseClient.from('assessments').upsert([localToRow(rec)]);
+  var res = await SiigaAuth.upsertAssessments(supabaseClient, [localToRow(rec)]);
   if (res.error) {
     console.error('Reenvio falhou:', res.error);
     alert('Não foi possível reenviar: ' + res.error.message);
@@ -327,7 +352,7 @@ async function resendAllLocal() {
   if (!pendentes.length) return;
   var ok = 0, falhas = 0;
   for (var i = 0; i < pendentes.length; i++) {
-    var res = await supabaseClient.from('assessments').upsert([localToRow(pendentes[i])]);
+    var res = await SiigaAuth.upsertAssessments(supabaseClient, [localToRow(pendentes[i])]);
     if (res.error) { falhas++; console.error('Reenvio falhou:', pendentes[i].empresa, res.error); }
     else { ok++; }
   }
@@ -450,8 +475,8 @@ function renderTable() {
           '<a onclick="handleAction(\'pdf-detalhado\', ' + index + ')">🖥️ Gerar PDF Detalhado</a>' +
           '<a onclick="handleAction(\'pdf-proposta\', ' + index + ')">📑 Gerar Proposta SIIGA</a>' +
           '<a onclick="handleAction(\'export-questions\', ' + index + ')">📥 Exportar Perguntas (CSV)</a>' +
-          '<a onclick="handleAction(\'edit\', ' + index + ')">✏️ Editar</a>' +
-          '<a onclick="handleAction(\'delete\', ' + index + ')" style="color:var(--red);">🗑️ Excluir</a>' +
+          (SiigaAuth.podeEditar(row) ? '<a onclick="handleAction(\'edit\', ' + index + ')">✏️ Editar</a>' : '') +
+          (SiigaAuth.isAdmin() ? '<a onclick="handleAction(\'delete\', ' + index + ')" style="color:var(--red);">🗑️ Excluir</a>' : '') +
         '</div>' +
       '</td>';
     tbody.appendChild(tr);
@@ -1055,6 +1080,7 @@ document.getElementById('details-modal').addEventListener('click', function (e) 
 //  INSERT TEST RECORDS
 // ═══════════════════════════════════════════
 async function insertTestRecords() {
+  if (!SiigaAuth.isAdmin()) { alert('Só administradores podem inserir registros de teste.'); return; }
   if (!supabaseClient) { alert('Supabase não inicializado'); return; }
 
   var btn = document.getElementById('btn-test');
@@ -1317,6 +1343,7 @@ function exportSelectedCSV() {
 }
 
 async function deleteSelected() {
+  if (!SiigaAuth.isAdmin()) { alert('Só administradores podem excluir diagnósticos.'); return; }
   if (selectedIds.length === 0) {
     alert('Nenhum registro selecionado para exclusão.');
     return;
@@ -1455,6 +1482,7 @@ document.addEventListener('click', function () {
 function openEditModal(index) {
   var row = filteredData[index];
   if (!row) return;
+  if (!SiigaAuth.podeEditar(row)) { alert('Você só pode editar os diagnósticos que você criou. Peça a um administrador.'); return; }
 
   var state = getState(row);
 
@@ -1567,6 +1595,7 @@ async function saveEdit() {
 //  DELETE RECORD
 // ═══════════════════════════════════════════
 async function deleteRow(id, name) {
+  if (!SiigaAuth.isAdmin()) { alert('Só administradores podem excluir diagnósticos.'); return; }
   if (!confirm('Tem certeza de que deseja excluir permanentemente o diagnóstico da empresa "' + name + '"?')) return;
 
   try {

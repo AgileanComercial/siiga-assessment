@@ -487,16 +487,21 @@
   <div id="login-overlay">
     <div class="login-box">
       <h2 style="font-family: var(--font-display); margin-bottom: 10px;">Acesso Restrito</h2>
-      <p style="color: var(--gray); font-size: 14px;">Insira a senha de administrador</p>
-      <input type="password" id="pass-input" class="input-pass" placeholder="Senha">
+      <p style="color: var(--gray); font-size: 14px;">Entre com o e-mail e a senha do seu convite</p>
+      <input type="email" id="login-email" class="input-pass" placeholder="E-mail" autocomplete="username" style="margin-bottom:10px">
+      <input type="password" id="pass-input" class="input-pass" placeholder="Senha" autocomplete="current-password">
       <button class="btn" style="width:100%" onclick="checkLogin()">Entrar</button>
-      <p id="login-error" style="color: #ff4444; font-size: 13px; margin-top: 15px; display: none;">Senha incorreta</p>
+      <a href="#" id="login-esqueci" onclick="event.preventDefault(); siigaEsqueciSenha(document.getElementById('login-email').value, document.getElementById('login-error'), document.getElementById('login-info'));" style="display:inline-block;margin-top:14px;font-size:13px;color:var(--orange);">Esqueci minha senha</a>
+      <p id="login-error" style="color: #ff4444; font-size: 13px; margin-top: 15px; display: none;">E-mail ou senha incorretos</p>
+      <p id="login-info" style="color: #34d399; font-size: 13px; margin-top: 15px; display: none;"></p>
     </div>
   </div>
 
   <header>
     <h1>SIIGA <span>Admin</span></h1>
     <div style="display: flex; gap: 10px; align-items: center;">
+      <span id="auth-quem" style="color: var(--gray); font-size: 12px;"></span>
+      <button class="btn btn-sm" id="btn-sair" onclick="SiigaAuth.sair()" style="display:none; background: var(--surface2); border: 1px solid var(--border);">Sair</button>
       <button class="btn btn-sm diag-only" id="btn-test" onclick="insertTestRecords()" style="background: var(--surface2); border: 1px solid var(--border);">＋ Inserir Testes</button>
       <button class="btn btn-sm diag-only" onclick="fetchData()">⟳ Atualizar</button>
     </div>
@@ -839,6 +844,7 @@
   </div>
 
   <script src="material-previo.js?v=3"></script>
-  <script src="admin.js?v=8"></script>
+  <script src="auth.js?v=2"></script>
+  <script src="admin.js?v=9"></script>
 </body>
 </html>
