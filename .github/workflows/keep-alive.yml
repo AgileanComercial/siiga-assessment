@@ -13,9 +13,8 @@ jobs:
       - name: Ping Supabase REST API
         run: |
           STATUS=$(curl -s -o /dev/null -w "%{http_code}" \
-            "${SUPABASE_URL}/rest/v1/assessments?select=id&limit=1" \
-            -H "apikey: ${SUPABASE_ANON_KEY}" \
-            -H "Authorization: Bearer ${SUPABASE_ANON_KEY}")
+            "${SUPABASE_URL}/auth/v1/settings" \
+            -H "apikey: ${SUPABASE_ANON_KEY}")
           echo "Supabase responded with HTTP $STATUS"
           if [ "$STATUS" -ge 400 ]; then
             echo "::error::Supabase keep-alive ping failed with status $STATUS"
