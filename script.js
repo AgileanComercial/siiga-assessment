@@ -4406,357 +4406,6 @@ function generatePDFFromAdmin(id, themeMode, mode) {
 
 
 // ═══════════════════════════════════════════
-//  AGENTE CONSULTIVO SIIGA
-// ═══════════════════════════════════════════
-var API_KEY_STORAGE = 'siiga_api_key';
-
-function getApiKey() {
-  return localStorage.getItem(API_KEY_STORAGE) || '';
-}
-
-function saveApiKey() {
-  var key = document.getElementById('api-key-input').value.trim();
-  if(!key || !key.startsWith('sk-ant-')) {
-    alert('Insira uma API key válida da Anthropic (começa com sk-ant-)');
-    return;
-  }
-  localStorage.setItem(API_KEY_STORAGE, key);
-  closeApiModal();
-  runAiAnalysis();
-}
-
-function openApiModal() {
-  var existingKey = getApiKey();
-  if(existingKey) {
-    // Key already saved — run directly
-    runAiAnalysis();
-    return;
-  }
-  var input = document.getElementById('api-key-input');
-  if(input) input.value = '';
-  document.getElementById('api-modal').style.display = 'flex';
-}
-
-function closeApiModal() {
-  document.getElementById('api-modal').style.display = 'none';
-}
-
-function toggleConsultorBlock() {
-  var block = document.getElementById('ai-consultor-block');
-  var icon = document.getElementById('consultor-toggle-icon');
-  if(block.style.display === 'none') {
-    block.style.display = 'block';
-    icon.style.transform = 'rotate(180deg)';
-  } else {
-    block.style.display = 'none';
-    icon.style.transform = 'rotate(0deg)';
-  }
-}
-
-function buildDiagnosticoJSON() {
-  var maxes = {f1:21, f2:9, f3:15, f4:12};
-
-  function pct(arr, max) {
-    if(!Array.isArray(arr)) return 0;
-    var sum = arr.reduce(function(a,b){return a+(b||0);},0);
-    return Math.round((sum/max)*100);
-  }
-
-  function nivel(p) {
-    if(p < 40) return 'Critico / Vulneravel';
-    if(p < 60) return 'Operacao Artesanal / Risco de Desvio';
-    if(p < 75) return 'Parcialmente Estruturado (Gargalos de Escala)';
-    if(p < 90) return 'Estruturado com Perdas Ocultas';
-    return 'Referencia SIIGA / Alta Performance';
-  }
-
-  var f1pct = pct(S.scores.f1, maxes.f1);
-  var f2pct = pct(S.scores.f2, maxes.f2);
-  var f3pct = pct(S.scores.f3, maxes.f3);
-  var f4pct = pct(S.scores.f4, maxes.f4);
-
-  var moScores = S.scores.mo || {};
-  var moEntries = Object.entries ? Object.entries(moScores) : Object.keys(moScores).map(function(k){return [k, moScores[k]];});
-  var moSum = moEntries.reduce(function(a,e){return a+(e[1]||0);},0);
-  var moMax = moEntries.length * 3;
-  var moPct = moMax > 0 ? Math.round((moSum/moMax)*100) : null;
-
-  var scoreTotal = getMaturityScoreSummary();
-  var totalScore = scoreTotal.score;
-  var totalMax = scoreTotal.max;
-
-  return {
-    cliente: {
-      empresa: S.empresa || 'Não informado',
-      consultor: S.consultor || '',
-      tipologia: S.tipologia || '',
-      modeloMO: S.modeloMO || '',
-      momento: S.momento || '',
-      numObras: S.numObras || 0,
-      orcamentoMedio: S.orcamentoMedio || 0,
-      prazoMedio: S.prazoMedio || 18,
-      pilarPriority: S.pilarPriority || [],
-      portfolioTotal: (S.numObras||0) * (S.orcamentoMedio||0),
-      estruturaTime: { score: S.scores.b03||0, nivel: nivel((S.scores.b03||0)/3*100) },
-      // Outsourced labor: no own-payroll field at all
-      roiReal: Object.assign({ horasGestaoPorObra: getHorasGestao() }, semMOPropria() ? {} : { folhaPorObra: folhaPropria() }, { mensalidade: MENSALIDADE_ROI_POR_OBRA, captura: ROI_CAPTURA_FIXA })
-    },
-    fases: {
-      fase1: { scores: S.scores.f1||[], somatorio: (S.scores.f1||[]).reduce(function(a,b){return a+(b||0);},0), maximo: maxes.f1, percentual: f1pct, nivel: nivel(f1pct) },
-      fase2: { scores: S.scores.f2||[], somatorio: (S.scores.f2||[]).reduce(function(a,b){return a+(b||0);},0), maximo: maxes.f2, percentual: f2pct, nivel: nivel(f2pct) },
-      fase3: { scores: S.scores.f3||[], somatorio: (S.scores.f3||[]).reduce(function(a,b){return a+(b||0);},0), maximo: maxes.f3, percentual: f3pct, nivel: nivel(f3pct) },
-      fase4: { scores: S.scores.f4||[], somatorio: (S.scores.f4||[]).reduce(function(a,b){return a+(b||0);},0), maximo: maxes.f4, percentual: f4pct, nivel: nivel(f4pct) }
-    },
-    blocoMO: moPct !== null ? { scores: moScores, somatorio: moSum, maximo: moMax, percentual: moPct, nivel: nivel(moPct) } : null,
-    scoreGeral: { total: totalScore, maximo: totalMax, percentual: Math.round((totalScore/totalMax)*100) },
-    referencia: {
-      perguntas: {
-        f1: ['Formalidade do planejamento','Tecnica de planejamento (LB)','Dimensionamento tecnico','Integracao orcamento x planejamento','Acompanhamento da Curva S','Cronograma bancario','Integracao planejamento x suprimentos'],
-        f2: ['Lookahead e antecipacao de restricoes','Planejamento de MO no medio prazo','Ciclo de reprogramacao'],
-        f3: ['Programacao semanal','Check-out, check-in e causa raiz diaria','Frequencia de coleta do avanco','Qualidade vinculada ao avanco fisico','Analise intermediaria de PPC e prazo'],
-        f4: ['Reuniao executiva com dados','Maturidade dos indicadores','Pagamento por evidencia']
-      }
-    }
-  };
-}
-
-var SYSTEM_PROMPT = `Voce e o Agente Consultor SIIGA da Agilean. Especialista senior em gestao de obras, Lean Construction, Last Planner System, Linha de Balanco e gestao de mao de obra. Voce atua como consultor — nao como vendedor.
-
-POSTURA: Linguagem executiva, pratica, orientada a decisao. Nunca academica. Nunca condescendente. Nao diga "voces estao errados" ou "sua obra e desorganizada". Use: "pelo que voce descreveu...", "e muito comum nesse estagio...", "a principal oportunidade parece estar em...".
-
-VOCABULARIO: nunca use a palavra "gap" nos textos que voce gera. Use "ponto critico" (nota 0 ou 1) ou "ponto em alerta" (nota 1,5).
-
-PRODUTOS AGILEAN:
-- Planejamento e Controle: Linha de Balanco digital, reprogramacoes automatizadas, Curva S fisico-financeira, IDP, gestao de restricoes com IRR, assistente Angelina via WhatsApp. Porta de entrada natural.
-- Qualidade: FVS automatica pos-medicao, PPCQ, controle de NCs, vinculo producao x qualidade x pagamento. Pre-requisito: P&C ativo.
-- Mao de Obra: folha de producao digital, medicao de empreiteiros integrada, produtividade por funcionario, improdutividade visivel. Pre-requisito: medicoes rodando.
-- Copilotos de IA Agilean: Copiloto de Planejamento (estruturacao agil de prazos e Linha de Balanco), Copiloto de Associacao de Planejamento com Orcamento (mapeamento automatizado EAP x orcamento) e Copiloto Operacional (apoio a rotina de campo, lookahead e insights diarios de canteiro).
-- Integracao ERP: API nativa com Sienge, TOTVS, Informakon, Mega e UAU.
-
-BENCHMARKS REAIS (use com precisao):
-- Media de 10% de economia em obras
-- Media de 25% de ganho de produtividade no canteiro
-- 2x mais aderencia entre planejado e realizado
-- Reducao de mais de 50% da carga operacional da equipe tecnica
-- Fechamento de folha e medicao: de semanas para horas
-- Planejamento e reprogramacao: de meses para horas
-- +5.000 canteiros impactados, 70M m2 construidos com Agilean
-
-REGRAS DE DEPENDENCIA (inviolaveis):
-1. Pilar 1 fraco: priorize planejamento antes de tudo
-2. Pilar 2 fraco: nao recomende Pilar 3 sem lookahead funcionando
-3. Pilar 3 fraco: dados do Pilar 4 sao nao confiaveis
-4. Orcamento score 0-1: limite a promessa, diga isso
-5. MO propria: foco em folha, improdutividade, estudo de pacotes
-6. MO terceirizada: foco em meta por empreiteiro, medicao, qualidade, bloqueios
-7. Crescimento: risco de escala sem sistema e o argumento central
-8. Consolidacao: ganho de controle, margem e previsibilidade
-
-CLASSIFICACAO POR PERCENTUAL:
-- Critico / Vulneravel: < 40%
-- Operacao Artesanal / Risco de Desvio: 40-59%
-- Em alerta · Gargalos de escala: 60-74%
-- Estruturado com Perdas Ocultas: 75-89%
-- Referencia SIIGA / Alta Performance: 90%+
-
-OBJECOES COMUNS:
-"Ja tentamos Last Planner e nao funcionou" -> explore por que nao funcionou: sem suporte, sem dados, sem ferramenta. A Agilean resolve os tres.
-"Nossa obra e muito complexa para metodo" -> quanto mais complexa, maior o beneficio. Cite 70M m2 construidos.
-"O mestre nao vai aderir" -> autoapontamento via WhatsApp, sem treinamento tecnico.
-"Ja temos ERP" -> Agilean nao compete com ERP. E a camada de gestao de producao que alimenta o ERP. Integracoes nativas.
-
-FORMATO DE SAIDA OBRIGATORIO:
-Responda em dois blocos claramente separados.
-
-BLOCO_CLIENTE_INICIO
-## Diagnostico SIIGA — [nome da empresa]
-
-### Leitura geral
-[2 paragrafos consultivos. Sem score numerico. Especifico: cite tipologia, modelo de MO, momento estrategico.]
-
-### Onde esta a maior oportunidade
-[1 paragrafo focado no gargalo raiz. Por que esse ponto crítico vem antes dos outros. Custo de nao agir.]
-
-### Potencial de resultado
-[Use benchmarks reais + dados da operacao. Cite 2-3 referencias maximas. Linguagem de negocio.]
-
-### Os proximos 90 dias
-Sprint 1 — Dias 1-30: [o que muda na pratica]
-Sprint 2 — Dias 31-60: [o que muda na pratica]
-Sprint 3 — Dias 61-90: [o que muda na pratica]
-
-### Uma frase para levar
-[1 frase que o cliente consegue repetir para um socio que nao estava na reuniao.]
-BLOCO_CLIENTE_FIM
-
-BLOCO_CONSULTOR_INICIO
-### Radar de maturidade
-| Pilar | % | Nivel | Observacao principal |
-[preencha com os dados reais]
-
-### Gargalo raiz — justificativa tecnica
-[Por que esse gargalo. Dependencias entre pilares. O que acontece se nao for resolvido.]
-
-### Porta de entrada recomendada
-[Produto especifico + por que agora + o que deixar para depois.]
-
-### O que NAO vender agora
-[O que seria prematuro e por que. Protege a implantacao e a reputacao.]
-
-### Objecoes provaveis neste cliente
-[2-3 objecoes especificas baseadas no perfil. Para cada uma: argumento de resposta.]
-
-### Riscos de implantacao
-[O que pode dificultar. Time, MO, orcamento, momento.]
-
-### Perguntas para a proxima reuniao
-[3-5 perguntas que criam urgencia e aprofundam o diagnostico.]
-BLOCO_CONSULTOR_FIM`;
-
-function runAiAnalysis() {
-  var apiKey = getApiKey();
-  if(!apiKey) { openApiModal(); return; }
-
-  // Show AI screen in loading state
-  document.getElementById('ai-empresa-name').textContent = S.empresa || 'Empresa';
-  document.getElementById('ai-loading').style.display = 'block';
-  document.getElementById('ai-content').style.display = 'none';
-  document.getElementById('ai-error').style.display = 'none';
-  showScreen('screen-ai');
-
-  var diagnostico = buildDiagnosticoJSON();
-  var userMsg = 'Analise este diagnostico SIIGA e gere a analise consultiva completa conforme o formato definido:\n\n' + JSON.stringify(diagnostico, null, 2);
-
-  fetch('https://api.anthropic.com/v1/messages', {
-    method: 'POST',
-    headers: {
-      'Content-Type': 'application/json',
-      'x-api-key': apiKey,
-      'anthropic-version': '2023-06-01',
-      'anthropic-dangerous-direct-browser-access': 'true'
-    },
-    body: JSON.stringify({
-      model: 'claude-sonnet-4-20250514',
-      max_tokens: 4000,
-      system: SYSTEM_PROMPT,
-      messages: [{ role: 'user', content: userMsg }]
-    })
-  })
-  .then(function(res) {
-    if(!res.ok) {
-      return res.json().then(function(err) {
-        throw new Error(err.error ? err.error.message : 'HTTP ' + res.status);
-      });
-    }
-    return res.json();
-  })
-  .then(function(data) {
-    var text = data.content && data.content[0] ? data.content[0].text : '';
-    if(!text) throw new Error('Resposta vazia da API');
-    renderAiResponse(text);
-  })
-  .catch(function(err) {
-    document.getElementById('ai-loading').style.display = 'none';
-    document.getElementById('ai-error').style.display = 'block';
-    var msg = err.message || 'Erro desconhecido';
-    document.getElementById('ai-error-msg').textContent = 'Erro ao gerar análise';
-    if(msg.includes('401') || msg.includes('authentication') || msg.includes('invalid') || msg.includes('api_key')) {
-      document.getElementById('ai-error-detail').textContent = 'API key inválida ou expirada. Clique em "Reconfigurar API Key" para inserir uma nova.';
-      localStorage.removeItem(API_KEY_STORAGE);
-    } else if(msg.includes('blocked') || msg.includes('content') || msg.includes('CSP')) {
-      document.getElementById('ai-error-detail').textContent = 'Conteúdo bloqueado pelo browser. Tente abrir o arquivo no Chrome ou Edge e verifique se não há extensões bloqueando requisições externas (ex: uBlock, AdBlock).';
-    } else if(msg.includes('Failed to fetch') || msg.includes('NetworkError') || msg.includes('CORS') || msg.includes('ERR_')) {
-      document.getElementById('ai-error-detail').textContent = 'Não foi possível conectar com a API. Verifique: (1) conexão com internet, (2) se está usando Chrome ou Edge, (3) se não há extensões bloqueando requisições.';
-    } else {
-      document.getElementById('ai-error-detail').textContent = msg;
-    }
-  });
-}
-
-function renderAiResponse(text) {
-  // Parse the two blocks
-  var clientStart = text.indexOf('BLOCO_CLIENTE_INICIO');
-  var clientEnd = text.indexOf('BLOCO_CLIENTE_FIM');
-  var consultorStart = text.indexOf('BLOCO_CONSULTOR_INICIO');
-  var consultorEnd = text.indexOf('BLOCO_CONSULTOR_FIM');
-
-  var clientText = clientStart >= 0 && clientEnd >= 0
-    ? text.slice(clientStart + 'BLOCO_CLIENTE_INICIO'.length, clientEnd).trim()
-    : text;
-
-  var consultorText = consultorStart >= 0 && consultorEnd >= 0
-    ? text.slice(consultorStart + 'BLOCO_CONSULTOR_INICIO'.length, consultorEnd).trim()
-    : '';
-
-  document.getElementById('ai-client-block').innerHTML = markdownToHtml(clientText);
-  document.getElementById('ai-consultor-block').innerHTML = markdownToHtml(consultorText);
-
-  document.getElementById('ai-loading').style.display = 'none';
-  document.getElementById('ai-content').style.display = 'block';
-}
-
-function markdownToHtml(md) {
-  if(!md) return '';
-  var lines = md.split('\n');
-  var result = '';
-  var inUl = false;
-  for(var i=0; i<lines.length; i++) {
-    var line = lines[i];
-    if(line.match(/^### /)) {
-      if(inUl){result+='</ul>';inUl=false;}
-      result += '<h4 style="font-family:Bai Jamjuree;font-size:15px;font-weight:700;color:var(--orange);margin:20px 0 8px">' + line.replace(/^### /,'') + '</h4>';
-    } else if(line.match(/^## /)) {
-      if(inUl){result+='</ul>';inUl=false;}
-      result += '<h3 style="font-family:Bai Jamjuree;font-size:18px;font-weight:700;margin:16px 0 10px">' + line.replace(/^## /,'') + '</h3>';
-    } else if(line.match(/^# /)) {
-      if(inUl){result+='</ul>';inUl=false;}
-      result += '<h2 style="font-family:Bai Jamjuree;font-size:22px;font-weight:700;margin:0 0 16px">' + line.replace(/^# /,'') + '</h2>';
-    } else if(line.match(/^Sprint [0-9]/)) {
-      if(inUl){result+='</ul>';inUl=false;}
-      result += '<div style="background:rgba(255,95,31,0.08);border-left:3px solid var(--orange);padding:10px 14px;border-radius:0 6px 6px 0;margin:10px 0"><strong style="color:var(--orange)">' + inlineFmt(line) + '</strong></div>';
-    } else if(line.match(/^[-•] /)) {
-      if(!inUl){result+='<ul style="list-style:none;padding:0;margin:10px 0">';inUl=true;}
-      result += '<li style="margin-bottom:6px;padding-left:16px;position:relative;color:rgba(255,255,255,0.85)"><span style="position:absolute;left:0;color:var(--orange)">→</span>' + inlineFmt(line.replace(/^[-•] /,'')) + '</li>';
-    } else if(line.match(/^\|/)) {
-      if(inUl){result+='</ul>';inUl=false;}
-      if(line.match(/^\|[\s\-:]+\|/)) continue;
-      var cells = line.split('|').filter(function(c){return c.trim();});
-      result += '<tr>' + cells.map(function(c){return '<td style="padding:8px 10px;border-bottom:1px solid rgba(255,255,255,0.06);font-size:12px">' + inlineFmt(c.trim()) + '</td>';}).join('') + '</tr>';
-    } else if(line.trim() === '') {
-      if(inUl){result+='</ul>';inUl=false;}
-      result += '<br>';
-    } else {
-      if(inUl){result+='</ul>';inUl=false;}
-      result += '<p style="margin:6px 0;line-height:1.7">' + inlineFmt(line) + '</p>';
-    }
-  }
-  if(inUl) result += '</ul>';
-  // Wrap table rows
-  result = result.replace(/(<tr>[\s\S]*?<\/tr>)/g, function(m){
-    return '<table style="width:100%;border-collapse:collapse;margin:12px 0">' + m + '</table>';
-  });
-  return result;
-}
-
-function inlineFmt(text) {
-  return text
-    .replace(/\*\*(.+?)\*\*/g, '<strong>$1</strong>')
-    .replace(/\*(.+?)\*/g, '<em style="color:var(--gray2)">$1</em>');
-}
-
-
-function loadAndAnalyze(id) {
-  var list = getAllDiagnosticos();
-  var rec = list.find(function(r){ return r.id === id; });
-  if(!rec) return;
-  S = rec.state;
-  if(!S.ferramentas) S.ferramentas = {planejamento:'',medicao:'',qualidade:'',contratos:'',folha:''};
-  buildAndShowRadar();
-  setTimeout(function(){ runAiAnalysis(); }, 200);
-}
-
-
-// ═══════════════════════════════════════════
 //  AHA-HA POTENCIAL DE GANHO
 // ═══════════════════════════════════════════
 
@@ -4994,8 +4643,9 @@ async function syncToSupabase() {
     state: JSON.parse(JSON.stringify(S))
   };
 
+  Object.assign(record, SiigaAuth.donoDe(S));
   try {
-    const { error } = await sbClient.from('assessments').upsert([record]);
+    const { error } = await SiigaAuth.upsertAssessments(sbClient, [record]);
     if (error) {
       console.error("Autosave: falha ao sincronizar com o Supabase.", error);
       reportSyncFailure();
@@ -5021,7 +4671,7 @@ function reportSyncFailure() {
   syncFailed = true;
   showDraftIndicator('error');
   if (primeira) {
-    showToast('Sem conexão com o painel — salvo apenas neste dispositivo. Não feche o navegador.', 'error');
+    showToast('Não sincronizou com o painel — salvo apenas neste dispositivo.' + (SiigaAuth.logado() ? ' Não feche o navegador.' : ' Entre (canto superior direito) para sincronizar. Não feche o navegador.'), 'error');
   }
 }
 
@@ -5147,7 +4797,7 @@ var STORAGE_KEY = 'siiga_diagnosticos';
 // isso estava duplicado bastava acrescentar um campo de um lado para o outro
 // passar a gravar registro incompleto, sem erro nenhum.
 function recordToRow(rec) {
-  return {
+  return Object.assign({
     id: rec.id,
     nome: rec.nome,
     empresa: rec.empresa,
@@ -5166,7 +4816,7 @@ function recordToRow(rec) {
     nivel: rec.nivel,
     scores: rec.scores,
     state: rec.state
-  };
+  }, SiigaAuth.donoDe(rec));
 }
 
 // ids que já estão no Supabase. null = não deu para consultar (sem rede ou painel
@@ -5199,7 +4849,7 @@ async function resendDiagnostico(id) {
   var rec = getAllDiagnosticos().find(function(r){ return r.id === id; });
   if(!rec) return;
   if(!sbClient) { showToast('Painel não configurado nesta instalação.', 'error'); return; }
-  var res = await sbClient.from('assessments').upsert([recordToRow(rec)]);
+  var res = await SiigaAuth.upsertAssessments(sbClient, [recordToRow(rec)]);
   if(res.error) {
     console.error('Reenvio falhou:', res.error);
     showToast('Não foi possível reenviar: ' + res.error.message, 'error');
@@ -5215,7 +4865,7 @@ async function resendAllPending() {
   if(!pendentes.length) return;
   var ok = 0, falhas = 0;
   for (var i = 0; i < pendentes.length; i++) {
-    var res = await sbClient.from('assessments').upsert([recordToRow(pendentes[i])]);
+    var res = await SiigaAuth.upsertAssessments(sbClient, [recordToRow(pendentes[i])]);
     if(res.error) { falhas++; console.error('Reenvio falhou:', pendentes[i].empresa, res.error); }
     else { ok++; }
   }
@@ -5273,6 +4923,7 @@ async function confirmSave() {
     scores: JSON.parse(JSON.stringify(S.scores)),
     state: JSON.parse(JSON.stringify(S))
   };
+  Object.assign(record, SiigaAuth.donoDe(S));
   list.unshift(record); // newest first
   saveDiagnosticos(list);
   closeSaveModal();
@@ -5292,7 +4943,7 @@ async function confirmSave() {
     try {
       // upsert (PK id, igual ao autosave em syncToSupabase): a linha ja foi criada pelo autosave desde o inicio do
       // diagnostico, entao insert estoura "duplicate key". `record` ja esta com as colunas do banco (snake_case).
-      const { error } = await sbClient.from('assessments').upsert([record]);
+      const { error } = await SiigaAuth.upsertAssessments(sbClient, [record]);
       if(error) {
         console.error("Erro ao salvar no Supabase:", error);
         showToast('Diagnóstico salvo apenas neste dispositivo — falha ao sincronizar com o painel. Tente salvar novamente.', 'error');
@@ -5393,7 +5044,6 @@ function renderAdminList() {
       '<div style="display:flex;gap:8px;flex-shrink:0">' +
         (sincronizado ? '' : '<button onclick="resendDiagnostico('+rec.id+')" style="background:'+(pendente?'#f87171':'rgba(255,255,255,0.08)')+';color:'+(pendente?'#14141b':'var(--gray2)')+';border:none;padding:7px 14px;border-radius:6px;cursor:pointer;font-size:11px;font-family:Bai Jamjuree;font-weight:700">Reenviar</button>') +
         '<button onclick="loadDiagnostico('+rec.id+')" class="btn btn-p" style="font-size:11px;padding:7px 14px">📊 Ver relatório</button>' +
-        '<button onclick="loadAndAnalyze('+rec.id+')" style="background:linear-gradient(135deg,#ff5f1f,#e03d00);color:white;border:none;padding:7px 14px;border-radius:6px;cursor:pointer;font-size:11px;font-family:Bai Jamjuree;font-weight:700">🤖 IA</button>' +
         '<button onclick="generatePDFFromAdmin('+rec.id+')" style="background:#1B4F8A;color:white;border:none;padding:7px 14px;border-radius:6px;cursor:pointer;font-size:11px;font-family:Bai Jamjuree;font-weight:700">📄 PDF</button>' +
         '<button onclick="exportDiagnostico('+rec.id+')" class="btn btn-s" style="font-size:11px;padding:7px 14px">⬇ JSON</button>' +
         '<button onclick="deleteDiagnostico('+rec.id+')" style="background:rgba(248,113,113,0.1);border:1px solid rgba(248,113,113,0.3);color:#f87171;padding:7px 10px;border-radius:6px;cursor:pointer;font-size:11px">✕</button>' +
@@ -5526,3 +5176,21 @@ checkAdminPdfRequest().then(function(handled) {
   if(!handled) checkAndOfferResume();
 });
 if(document.getElementById('c-data')) document.getElementById('c-data').value = new Date().toISOString().split('T')[0];
+
+
+// ═══════════════════════════════════════════
+//  LOGIN (auth.js) — sessão, chip "Entrar/Sair", nome do consultor, reenvio pós-login
+// ═══════════════════════════════════════════
+var sessaoJaTratada = null;
+async function aoMudarLogin() {
+  siigaDesenharChip();
+  if (!SiigaAuth.logado()) { sessaoJaTratada = null; return; }
+  var campo = document.getElementById('c-consultor');
+  if (campo && !campo.value.trim() && SiigaAuth.nome()) campo.value = SiigaAuth.nome();
+  if (sessaoJaTratada === SiigaAuth.userId()) return;
+  sessaoJaTratada = SiigaAuth.userId();
+  // diagnósticos que ficaram só neste dispositivo (feitos sem login ou com a rede fora) sobem agora
+  if (getAllDiagnosticos().length) { await refreshSyncStatus(); resendAllPending(); }
+}
+SiigaAuth.init(sbClient);
+SiigaAuth.onChange(aoMudarLogin);
