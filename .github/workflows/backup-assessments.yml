@@ -50,11 +50,15 @@ jobs:
       - name: Exportar assessments do Supabase
         env:
           SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
-          # service_role se existir (continua funcionando depois de fechar o RLS
-          # para o papel anon); senão cai no anon, que é o que há hoje.
-          KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY || secrets.SUPABASE_ANON_KEY }}
+          # SÓ a service_role. Com o RLS fechado para anon (login por vendedor), a chave anon leria 0 linhas;
+          # cair nela em silêncio geraria backup vazio. Sem o secret o workflow falha, com erro claro.
+          KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
         run: |
           set -euo pipefail
+          if [ -z "${KEY:-}" ]; then
+            echo "::error::Secret SUPABASE_SERVICE_ROLE_KEY não está definido. Crie-o em Settings > Secrets and variables > Actions (valor: service_role em Supabase > Project Settings > API). Backup abortado."
+            exit 1
+          fi
           PAGE=1000
           OFFSET=0
           echo "[]" > /tmp/all.json
